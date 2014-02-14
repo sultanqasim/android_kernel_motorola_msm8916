@@ -635,8 +635,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		trace_lmk_kill(selected->pid, selected->comm,
 				selected_oom_score_adj, selected_tasksize,
 				min_score_adj, sc->gfp_mask, zinfo);
-		send_sig(SIGKILL, selected, 0);
 		set_tsk_thread_flag(selected, TIF_MEMDIE);
+		send_sig(SIGKILL, selected, 0);
 		rem -= selected_tasksize;
 		rcu_read_unlock();
 		/* give the system time to free up the memory */
