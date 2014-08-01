@@ -884,6 +884,9 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
 	if (!dev)
 		return;
 
+	if (!dev)
+		return;
+
 	msm_iommu_detached(dev->parent);
 
 	mutex_lock(&msm_iommu_lock);
