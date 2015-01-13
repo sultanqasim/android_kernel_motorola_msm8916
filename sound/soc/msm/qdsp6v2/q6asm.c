@@ -2244,7 +2244,12 @@ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
 	if (open.postprocopo_id == ASM_STREAM_POSTPROC_TOPO_ID_DTS_HPX)
 		open.bits_per_sample = 24;
 
-	ac->topology = open.postprocopo_id;
+	/*
+	 * For Gapless playback it will use the same session for next stream,
+	 * So use the same topology
+	 */
+	if(!ac->topology)
+		ac->topology = open.postprocopo_id;
 	switch (format) {
 	case FORMAT_LINEAR_PCM:
 		open.dec_fmt_id = ASM_MEDIA_FMT_MULTI_CHANNEL_PCM_V2;
