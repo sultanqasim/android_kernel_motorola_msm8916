@@ -1846,6 +1846,11 @@ static int msm_cpp_copy_from_ioctl_ptr(void *dst_ptr,
 	struct msm_camera_v4l2_ioctl_t *ioctl_ptr)
 {
 	int ret;
+	if ((ioctl_ptr->ioctl_ptr == NULL) || (ioctl_ptr->len == 0) ||
+		(ioctl_ptr->len >= MSM_CPP_MAX_FW_NAME_LEN)) {
+		pr_err("Wrong ioctl_ptr %p\n", ioctl_ptr);
+		return -EINVAL;
+	}
 
 	if ((ioctl_ptr->ioctl_ptr == NULL) || (ioctl_ptr->len == 0)) {
 		pr_err("%s: Wrong ioctl_ptr %p / len %zu\n", __func__,
@@ -1924,7 +1929,7 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 				cpp_dev->fw_name_bin = NULL;
 			}
 			if ((ioctl_ptr->len == 0) ||
-				(ioctl_ptr->len > MSM_CPP_MAX_FW_NAME_LEN)) {
+				(ioctl_ptr->len >= MSM_CPP_MAX_FW_NAME_LEN)) {
 				pr_err("ioctl_ptr->len is 0\n");
 				mutex_unlock(&cpp_dev->mutex);
 				return -EINVAL;
@@ -1942,6 +1947,7 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 				kfree(cpp_dev->fw_name_bin);
 				cpp_dev->fw_name_bin = NULL;
 				mutex_unlock(&cpp_dev->mutex);
+				kfree(cpp_dev->fw_name_bin);
 				return -EINVAL;
 			}
 			rc = (copy_from_user(cpp_dev->fw_name_bin,
@@ -2135,6 +2141,9 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 				process_frame,
 				sizeof(struct msm_cpp_frame_info_t))) {
 					mutex_unlock(&cpp_dev->mutex);
+					kfree(process_frame->cpp_cmd_msg);
+					kfree(process_frame);
+					kfree(event_qcmd);
 					return -EINVAL;
 		}
 
