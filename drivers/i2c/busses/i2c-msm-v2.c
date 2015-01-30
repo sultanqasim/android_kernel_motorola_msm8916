@@ -2781,10 +2781,10 @@ static irqreturn_t i2c_msm_qup_isr(int irq, void *devid)
 
 		/* HW workaround: when interrupt is level triggerd, more
 		 * than one interrupt may fire in error cases. Thus we
-		 * resetting the QUP core state immediately in the ISR
-		 * to ward off the next interrupt.
+		 * change the QUP core state to Reset immediately in the
+		 * ISR to ward off the next interrupt.
 		 */
-		i2c_msm_qup_state_set(ctrl, QUP_STATE_RESET);
+		writel_relaxed(QUP_STATE_RESET, ctrl->rsrcs.base + QUP_STATE);
 
 		need_wmb        = true;
 		signal_complete = true;
@@ -3021,6 +3021,13 @@ static int i2c_msm_qup_post_xfer(struct i2c_msm_ctrl *ctrl, int err)
 		}
 	}
 
+	/*
+	 * Disable the IRQ before change to reset state to avoid
+	 * spurious interrupts.
+	 *
+	 */
+	disable_irq(ctrl->rsrcs.irq);
+
 	/* flush bam data and reset the qup core in timeout error.
 	 * for other error case, its handled by the ISR
 	 */
@@ -3030,8 +3037,8 @@ static int i2c_msm_qup_post_xfer(struct i2c_msm_ctrl *ctrl, int err)
 			writel_relaxed(QUP_I2C_FLUSH, ctrl->rsrcs.base
 								+ QUP_STATE);
 
-		/* reset the sw core */
-		i2c_msm_qup_sw_reset(ctrl);
+		/* reset the qup core */
+		i2c_msm_qup_state_set(ctrl, QUP_STATE_RESET);
 		err = -ETIMEDOUT;
 	}
 
@@ -3342,7 +3349,6 @@ static void i2c_msm_pm_xfer_end(struct i2c_msm_ctrl *ctrl)
 	struct i2c_msm_bam_pipe      *prod = &bam->pipe[I2C_MSM_BAM_PROD];
 	struct i2c_msm_bam_pipe      *cons = &bam->pipe[I2C_MSM_BAM_CONS];
 
-	disable_irq(ctrl->rsrcs.irq);
 
 	atomic_set(&ctrl->xfer.is_active, 0);
 
