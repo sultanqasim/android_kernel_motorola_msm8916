@@ -1254,7 +1254,7 @@ static uint8_t msm_isp_get_curr_stream_cnt(
 
 /*Factor in Q2 format*/
 #define ISP_DEFAULT_FORMAT_FACTOR 6
-#define ISP_BUS_UTILIZATION_FACTOR 6
+#define ISP_BUS_UTILIZATION_FACTOR 1536 /* 1.5 in Q10 format */
 static int msm_isp_update_stream_bandwidth(struct vfe_device *vfe_dev)
 {
 	int i, rc = 0;
@@ -1265,6 +1265,7 @@ static int msm_isp_update_stream_bandwidth(struct vfe_device *vfe_dev)
 	uint32_t num_rdi_streams = 0;
 	uint32_t total_streams   = 0;
 	uint64_t total_bandwidth = 0;
+	uint32_t bus_util_factor = ISP_BUS_UTILIZATION_FACTOR;
 
 	for (i = 0; i < MAX_NUM_STREAM; i++) {
 		stream_info = &axi_data->stream_info[i];
@@ -1281,14 +1282,18 @@ static int msm_isp_update_stream_bandwidth(struct vfe_device *vfe_dev)
 	}
 	total_bandwidth = total_pix_bandwidth + total_rdi_bandwidth;
 	total_streams = num_pix_streams + num_rdi_streams;
+	if (vfe_dev->bus_util_factor)
+		bus_util_factor = vfe_dev->bus_util_factor;
+	ISP_DBG("%s: bus_util_factor = %u\n", __func__, bus_util_factor);
+
 	if (total_streams == 1)
 		rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
 		total_bandwidth ,
-		(total_bandwidth * ISP_BUS_UTILIZATION_FACTOR / ISP_Q2));
+		(total_bandwidth * bus_util_factor / ISP_Q10));
 	else
 		rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
 		(total_bandwidth + MSM_ISP_MIN_AB),  (total_bandwidth *
-		ISP_BUS_UTILIZATION_FACTOR / ISP_Q2 + MSM_ISP_MIN_IB));
+		bus_util_factor / ISP_Q10 + MSM_ISP_MIN_IB));
 	if (rc < 0)
 		pr_err("%s: update failed\n", __func__);
 
