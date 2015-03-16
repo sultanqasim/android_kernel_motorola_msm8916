@@ -1,4 +1,3 @@
-#
 # NOTE! Don't add files that are generated in specific
 # subdirectories here. Add them in the ".gitignore" file
 # in that subdirectory instead.
@@ -33,9 +32,7 @@ modules.builtin
 *.patch
 *.gcno
 
-#
 # Top-level generic files
-#
 /tags
 /TAGS
 /linux
@@ -45,20 +42,14 @@ modules.builtin
 /Module.markers
 /Module.symvers
 
-#
 # Debian directory (make deb-pkg)
-#
 /debian/
 
-#
 # git files that we don't want to ignore even it they are dot-files
-#
 !.gitignore
 !.mailmap
 
-#
 # Generated include files
-#
 include/config
 include/generated
 arch/*/include/generated
@@ -91,3 +82,4 @@ extra_certificates
 signing_key.priv
 signing_key.x509
 x509.genkey
+
