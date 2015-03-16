@@ -18,6 +18,9 @@ mkbootimg --kernel arch/arm/boot/zImage --ramdisk boot/ramdisk/initrd.gz --base 
 Now you can flash your boot image:
 fastboot flash boot arch/arm/boot/boot.img
 
+To customize SELinux settings, see:
+https://source.android.com/devices/tech/security/selinux/implement.html
+
 Upstream Info:
 Source code is from Motorola's published Styx LTE 5.0.2 kernel source at
 https://github.com/MotorolaMobilityLLC/kernel-msm/tree/lollipop-5.0.2-release-styxlte
