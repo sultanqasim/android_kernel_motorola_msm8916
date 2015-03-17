@@ -23,11 +23,7 @@ Yes, I know this method is awful.
 Name and place your device tree image at boot/dt.img
 
 To build the boot image, run:
-mkbootimg --kernel arch/arm/boot/zImage --ramdisk boot/ramdisk/initrd.gz --dt boot/dt.img --base 0x80000000 --cmdline 'console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M' -o arch/arm/boot/boot.img
-
-If mkbootimg doesn't like the --dt option, try:
-mkbootimg --kernel arch/arm/boot/zImage --ramdisk boot/ramdisk/initrd.gz --second boot/dt.img --base 0x80000000 --cmdline 'console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M' -o arch/arm/boot/boot.img
-
+make bootimage -j10
 
 Now you can flash your boot image:
 fastboot flash boot arch/arm/boot/boot.img
