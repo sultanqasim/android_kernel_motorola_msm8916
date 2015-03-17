@@ -1451,6 +1451,9 @@ clean := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.clean obj
 
 endif	# skip-makefile
 
+# boot image builder
+include bootimage.mk
+
 PHONY += FORCE
 FORCE:
 
