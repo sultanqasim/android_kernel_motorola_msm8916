@@ -6,14 +6,28 @@ make msm8916_defconfig
 make -j10
 
 You now have a kernel zImage. You now need to build a boot.img
+
 You need an initial ramdisk for this. You can get one by extracting a stock
 boot.img using the unpack script from here:
 http://forum.xda-developers.com/showthread.php?t=2319018
 
 Name and place your ramdisk at boot/ramdisk/initrd.gz
 
+You also need a device tree. Currently, the easiest way to extract it
+is to look for the device tree in the stock boot.img and manually separate
+it with dd. It is located at a page boundary after the kernel zImage end,
+starts with the letters 'QCDT' and is around 4 megabytes in size (+- a bit).
+The end of the tree will be zero padded to make it a nice size.
+Yes, I know this method is awful.
+
+Name and place your device tree image at boot/dt.img
+
 To build the boot image, run:
-mkbootimg --kernel arch/arm/boot/zImage --ramdisk boot/ramdisk/initrd.gz --base 0x80000000 --cmdline 'console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M' -o arch/arm/boot/boot.img
+mkbootimg --kernel arch/arm/boot/zImage --ramdisk boot/ramdisk/initrd.gz --dt boot/dt.img --base 0x80000000 --cmdline 'console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M' -o arch/arm/boot/boot.img
+
+If mkbootimg doesn't like the --dt option, try:
+mkbootimg --kernel arch/arm/boot/zImage --ramdisk boot/ramdisk/initrd.gz --second boot/dt.img --base 0x80000000 --cmdline 'console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M' -o arch/arm/boot/boot.img
+
 
 Now you can flash your boot image:
 fastboot flash boot arch/arm/boot/boot.img
