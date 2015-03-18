@@ -1,2 +1,2 @@
 # Don't bundle the initial ramdisk with kernel source
-initrd.gz
+initramfs.cpio.gz
