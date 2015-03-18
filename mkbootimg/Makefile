@@ -15,14 +15,13 @@ else
     CLFAGS += -O3
 endif
 
-PRODUCT_NAME = mkbootimg
-SRC = $(wildcard *.c)
-OBJS = $(patsubst %.c,%.o,$(SRC))
+all: mkbootimg unpack-bootimg
 
-all: $(PRODUCT_NAME)
+mkbootimg: mkbootimg.c dsa_sig.o p256.o p256_ec.o p256_ecdsa.o rsa.o sha256.o sha.o bootimg.h
+	$(CC) $(LFLAGS) $^ -o $@
 
-$(PRODUCT_NAME): $(OBJS)
-	$(CC) $(LFLAGS) $(OBJS) -o $@
+unpack-bootimg: unpack-bootimg.c bootimg.h
+	$(CC) $(LFLAGS) $^ -o $@
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $@
@@ -30,4 +29,4 @@ $(PRODUCT_NAME): $(OBJS)
 .PHONY: clean
 
 clean:
-	rm -f *.o $(PRODUCT_NAME)
+	rm -f *.o mkbootimg unpack-bootimg

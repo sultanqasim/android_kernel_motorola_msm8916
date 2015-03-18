@@ -7,7 +7,7 @@ $(MKBOOTIMG):
 
 BOOT_IMAGE_OUT := arch/arm/boot/boot.img
 KERNEL_IMAGE := arch/arm/boot/zImage
-RAMDISK := boot/ramdisk/initrd.gz
+RAMDISK := boot/ramdisk/initramfs.cpio.gz
 DEVTREE := boot/dt.img
 KERNEL_BASE := 0x80000000
 KERNEL_CMDL := 'console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M'
