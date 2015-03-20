@@ -1,31 +1,27 @@
-How to build:
-export ARCH=arm
-export SUBARCH=arm
-export CROSS_COMPILE=arm-none-eabi-
-make msm8916_defconfig
-make -j10
+Upstream Info:
+Source code is from Motorola's published Styx LTE 5.0.2 kernel source at
+https://github.com/MotorolaMobilityLLC/kernel-msm/tree/lollipop-5.0.2-release-styxlte
 
-You now have a kernel zImage. You now need to build a boot.img
-To do this, you need an initial ramdisk and device tree image.
-You can get these by extracting an existing boot.img with the unpack-bootimg
-utility located at mkbootimg/unpack-bootimg
+Build tools required:
+- arm-none-eabi-gcc
+- gcc (for your host)
+
+You also need an initramfs image compatible with your ROM. You can obtain this
+by extracting your original boot.img with the unpack-bootimg utility located at
+tools/mkbootimg/unpack-bootimg
 
 Name and place your ramdisk at boot/ramdisk/initramfs.cpio.gz
-Name and place your device tree image at boot/dt.img
-
-You can get more tools for working with boot images at
-http://forum.xda-developers.com/showthread.php?t=2319018
-Note that the linked tools on XDA can't handle device tree images
-
-To build the boot image, run:
-make bootimage -j10
-
-Now you can flash your boot image:
-fastboot flash boot arch/arm/boot/boot.img
 
 To customize SELinux settings, see:
 https://source.android.com/devices/tech/security/selinux/implement.html
 
-Upstream Info:
-Source code is from Motorola's published Styx LTE 5.0.2 kernel source at
-https://github.com/MotorolaMobilityLLC/kernel-msm/tree/lollipop-5.0.2-release-styxlte
+How to build:
+export ARCH=arm
+export SUBARCH=arm
+export CROSS_COMPILE=arm-none-eabi-
+make clean
+make msm8916_defconfig
+make bootimage -j10
+
+Now you can flash your boot image:
+fastboot flash boot arch/arm/boot/boot.img
