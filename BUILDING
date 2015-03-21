@@ -19,7 +19,7 @@ How to build:
 export ARCH=arm
 export SUBARCH=arm
 export CROSS_COMPILE=arm-none-eabi-
-make clean
+make mrproper
 make msm8916_defconfig
 make bootimage -j10
 
