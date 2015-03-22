@@ -1,5 +1,7 @@
-# Run this after doing make modules_install INSTALL_MOD_PATH=squid_install
-#!bash
+#!/bin/bash
+rm -rf squid_install
+mkdir -p squid_install
+make modules_install -j10 INSTALL_MOD_PATH=squid_install
 mkdir -p cwm_flash_zip/system/lib/modules/pronto
 find squid_install/ -name '*.ko' -type f -exec cp '{}' cwm_flash_zip/system/lib/modules/ \;
 mv cwm_flash_zip/system/lib/modules/wlan.ko cwm_flash_zip/system/lib/modules/pronto/pronto_wlan.ko
