@@ -9,7 +9,7 @@ package_extract_dir("system", "/system");
 set_perm_recursive(0, 0, 0755, 0644, "/system/lib/modules");
 
 ui_print("Extracting Kernel files...");
-package_extract_file("boot.img", "/dev/block/platform/msm_sdcc.1/by-name/boot");
+package_extract_file("boot.img", "/dev/block/platform/soc.0/by-name/boot");
 ui_print("***********************************");
 ui_print("* Kernel Installation Completed!  *");
 ui_print("***********************************");
