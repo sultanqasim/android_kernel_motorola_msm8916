@@ -22,6 +22,10 @@ export CROSS_COMPILE=arm-none-eabi-
 make mrproper
 make msm8916_defconfig
 make bootimage -j10
+make modules -j10
+mkdir -p squid_install
+make modules_install -j10 INSTALL_MOD_PATH=squid_install
+./build_cwm_zip.sh
 
-Now you can flash your boot image:
-fastboot flash boot arch/arm/boot/boot.img
+You will now have a TWRP flashable zip at:
+arch/arm/boot/squid_kernel.zip
