@@ -83,3 +83,6 @@ signing_key.priv
 signing_key.x509
 x509.genkey
 
+# squid kernel build stuff
+squid_install
+cwm_flash_zip/boot.img
