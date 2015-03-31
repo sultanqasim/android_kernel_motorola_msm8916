@@ -7350,7 +7350,7 @@ static int bma2x2_probe(struct i2c_client *client,
 	data->cdev.sensors_enable = bma2x2_cdev_enable;
 	data->cdev.sensors_poll_delay = bma2x2_cdev_poll_delay;
 	data->cdev.sensors_self_test = bma2x2_self_calibration_xyz;
-	err = sensors_classdev_register(&client->dev, &data->cdev);
+	err = sensors_classdev_register(&data->input->dev, &data->cdev);
 	if (err) {
 		dev_err(&client->dev, "create class device file failed!\n");
 		err = -EINVAL;
