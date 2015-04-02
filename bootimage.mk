@@ -11,7 +11,8 @@ $(DTBTOOL):
 
 BOOT_IMAGE_OUT := arch/arm/boot/boot.img
 KERNEL_IMAGE := arch/arm/boot/zImage
-RAMDISK := boot/ramdisk/initramfs.cpio.gz
+RAMDISK_RAW := arch/arm/boot/initramfs.cpio
+RAMDISK := arch/arm/boot/initramfs.cpio.gz
 DEVTREE := arch/arm/boot/dt.img
 KERNEL_BASE := 0x80000000
 KERNEL_CMDL := 'console=ttyHSL0,115200,n8 androidboot.selinux=permissive androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M'
@@ -21,6 +22,12 @@ $(KERNEL_IMAGE): zImage
 
 .PHONY: dtimage
 dtimage: $(DEVTREE)
+
+$(RAMDISK_RAW): $(shell find boot/ramdisk -type f)
+	cd boot/ramdisk; find . | cpio -H newc -o > ../../$@
+
+$(RAMDISK): $(RAMDISK_RAW)
+	gzip -c -9 $< > $@
 
 $(DEVTREE): dtbs $(DTBTOOL)
 	$(call pretty,"Target dt image: $(DEVTREE)")

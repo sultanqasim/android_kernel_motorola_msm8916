@@ -1,2 +1,0 @@
-# Don't bundle the initial ramdisk with kernel source
-initramfs.cpio.gz

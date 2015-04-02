@@ -3,14 +3,8 @@ Source code is from Motorola's published Styx LTE 5.0.2 kernel source at
 https://github.com/MotorolaMobilityLLC/kernel-msm/tree/lollipop-5.0.2-release-styxlte
 
 Build tools required:
-- arm-none-eabi-gcc
+- Linaro GCC
 - gcc (for your host)
-
-You also need an initramfs image compatible with your ROM. You can obtain this
-by extracting your original boot.img with the unpack-bootimg utility located at
-tools/mkbootimg/unpack-bootimg
-
-Name and place your ramdisk at boot/ramdisk/initramfs.cpio.gz
 
 To customize SELinux settings, see:
 https://source.android.com/devices/tech/security/selinux/implement.html
@@ -18,7 +12,7 @@ https://source.android.com/devices/tech/security/selinux/implement.html
 How to build:
 export ARCH=arm
 export SUBARCH=arm
-export CROSS_COMPILE=arm-none-eabi-
+export CROSS_COMPILE=arm-linux-gnueabihf-
 make mrproper
 make msm8916_defconfig
 make bootimage -j10
