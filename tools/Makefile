@@ -35,7 +35,7 @@ help:
 cpupower: FORCE
 	$(call descend,power/$@)
 
-cgroup firewire guest usb virtio vm net mkbootimg dtbtool: FORCE
+cgroup firewire guest usb virtio vm net mkbootimg mkbootfs dtbtool: FORCE
 	$(call descend,$@)
 
 liblk: FORCE
@@ -69,7 +69,7 @@ install: cgroup_install cpupower_install firewire_install lguest_install \
 cpupower_clean:
 	$(call descend,power/cpupower,clean)
 
-cgroup_clean firewire_clean lguest_clean usb_clean virtio_clean vm_clean net_clean mkbootimg_clean dtbtool_clean:
+cgroup_clean firewire_clean lguest_clean usb_clean virtio_clean vm_clean net_clean mkbootimg_clean mkbootfs_clean dtbtool_clean:
 	$(call descend,$(@:_clean=),clean)
 
 liblk_clean:
