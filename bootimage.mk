@@ -9,6 +9,10 @@ DTBTOOL := tools/dtbtool/dtbtool
 $(DTBTOOL):
 	make -C tools/dtbtool
 
+MKBOOTFS := tools/mkbootfs/mkbootfs
+$(MKBOOTFS):
+	make -C tools/mkbootfs
+
 BOOT_IMAGE_OUT := arch/arm/boot/boot.img
 KERNEL_IMAGE := arch/arm/boot/zImage
 RAMDISK := arch/arm/boot/initramfs.cpio.gz
@@ -19,11 +23,14 @@ BOARD_KERNEL_PAGESIZE := 2048
 
 $(KERNEL_IMAGE): zImage
 
+.PHONY: ramdisk
+ramdisk: $(RAMDISK)
+
+$(RAMDISK): $(shell find boot/ramdisk -type f) $(MKBOOTFS)
+	$(MKBOOTFS) boot/ramdisk | gzip -9 -n >$@
+
 .PHONY: dtimage
 dtimage: $(DEVTREE)
-
-$(RAMDISK): $(shell find boot/ramdisk -type f)
-	cd boot/ramdisk && sudo true && sudo find . | sudo cpio -o -H newc | gzip -9 >../../$@
 
 $(DEVTREE): dtbs $(DTBTOOL)
 	$(call pretty,"Target dt image: $(DEVTREE)")
