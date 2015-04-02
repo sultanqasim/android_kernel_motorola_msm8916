@@ -6,7 +6,7 @@
 # http://opensource.org/licenses/BSD-2-Clause
 
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -std=c99 -I.
+CFLAGS = -Wall -Wextra -pedantic -std=gnu11 -I.
 LFLAGS = -lc -lm
 
 ifeq ($(DEBUG),1)
@@ -18,10 +18,10 @@ endif
 all: mkbootimg unpack-bootimg
 
 mkbootimg: mkbootimg.c dsa_sig.o p256.o p256_ec.o p256_ecdsa.o rsa.o sha256.o sha.o bootimg.h
-	$(CC) $(LFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(LFLAGS) $^ -o $@
 
 unpack-bootimg: unpack-bootimg.c bootimg.h
-	$(CC) $(LFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(LFLAGS) $< -o $@
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $@
