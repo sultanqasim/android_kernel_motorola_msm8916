@@ -11,7 +11,6 @@ $(DTBTOOL):
 
 BOOT_IMAGE_OUT := arch/arm/boot/boot.img
 KERNEL_IMAGE := arch/arm/boot/zImage
-RAMDISK_RAW := arch/arm/boot/initramfs.cpio
 RAMDISK := arch/arm/boot/initramfs.cpio.gz
 DEVTREE := arch/arm/boot/dt.img
 KERNEL_BASE := 0x80000000
@@ -23,11 +22,8 @@ $(KERNEL_IMAGE): zImage
 .PHONY: dtimage
 dtimage: $(DEVTREE)
 
-$(RAMDISK_RAW): $(shell find boot/ramdisk -type f)
-	cd boot/ramdisk; find . | cpio -H newc -o > ../../$@
-
-$(RAMDISK): $(RAMDISK_RAW)
-	gzip -c -9 $< > $@
+$(RAMDISK): $(shell find boot/ramdisk -type f)
+	cd boot/ramdisk && sudo true && sudo find . | sudo cpio -o -H newc | gzip -9 >../../$@
 
 $(DEVTREE): dtbs $(DTBTOOL)
 	$(call pretty,"Target dt image: $(DEVTREE)")
