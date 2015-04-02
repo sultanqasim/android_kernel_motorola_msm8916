@@ -11,7 +11,7 @@ $(DTBTOOL):
 
 MKBOOTFS := tools/mkbootfs/mkbootfs
 $(MKBOOTFS):
-	make -C tools/mkbootfs
+	make -j1 -C tools/mkbootfs
 
 BOOT_IMAGE_OUT := arch/arm/boot/boot.img
 KERNEL_IMAGE := arch/arm/boot/zImage
