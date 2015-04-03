@@ -2,10 +2,10 @@
  * Glue code for the SHA256 Secure Hash Algorithm assembly implementation
  * using NEON instructions.
  *
- * Copyright Â© 2015 Google Inc.
+ * Copyright © 2015 Google Inc.
  *
  * This file is based on sha512_neon_glue.c:
- *   Copyright Â© 2014 Jussi Kivilinna <jussi.kivilinna@iki.fi>
+ *   Copyright © 2014 Jussi Kivilinna <jussi.kivilinna@iki.fi>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -15,7 +15,6 @@
  */
 
 #include <crypto/internal/hash.h>
-#include <linux/module.h>
 #include <linux/cryptohash.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -119,7 +118,7 @@ static int sha256_neon_final(struct shash_desc *desc, u8 *out)
 		dst[i] = cpu_to_be32(sctx->state[i]);
 
 	/* Wipe context */
-	memset(sctx, 0, sizeof(*sctx));
+	memzero_explicit(sctx, sizeof(*sctx));
 
 	return 0;
 }
@@ -131,7 +130,7 @@ static int sha224_neon_final(struct shash_desc *desc, u8 *out)
 	sha256_neon_final(desc, D);
 
 	memcpy(out, D, SHA224_DIGEST_SIZE);
-	memset(D, 0, SHA256_DIGEST_SIZE);
+	memzero_explicit(D, SHA256_DIGEST_SIZE);
 
 	return 0;
 }

@@ -2,7 +2,7 @@
  * Glue code for the SHA256 Secure Hash Algorithm assembly implementation
  * using optimized ARM assembler and NEON instructions.
  *
- * Copyright Â© 2015 Google Inc.
+ * Copyright © 2015 Google Inc.
  *
  * This file is based on sha256_ssse3_glue.c:
  *   Copyright (C) 2013 Intel Corporation
@@ -151,7 +151,7 @@ static int sha224_final(struct shash_desc *desc, u8 *out)
 	sha256_final(desc, D);
 
 	memcpy(out, D, SHA224_DIGEST_SIZE);
-	memset(D, 0, SHA256_DIGEST_SIZE);
+	memzero_explicit(D, SHA256_DIGEST_SIZE);
 
 	return 0;
 }
@@ -243,4 +243,4 @@ module_exit(sha256_mod_fini);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SHA256 Secure Hash Algorithm (ARM), including NEON");
 
-MODULE_ALIAS("sha256");
+MODULE_ALIAS_CRYPTO("sha256");
