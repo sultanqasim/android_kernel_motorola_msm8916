@@ -2568,7 +2568,7 @@ static void wireless_insertion_work(struct work_struct *work)
 static int drop_usbin_rate(struct smb135x_chg *chip)
 {
 	int rc;
-	u8 reg;
+	u8 reg = 0;
 
 	rc = smb135x_read(chip, CFG_C_REG, &reg);
 	if (rc < 0)
@@ -2718,7 +2718,7 @@ static void toggle_usbin_aicl(struct smb135x_chg *chip)
 #define INPUT_CURR_CHECK_THRES 0x0C /*  1100 mA */
 static void heartbeat_work(struct work_struct *work)
 {
-	u8 reg;
+	u8 reg = 0;
 	int rc;
 	struct timespec bootup_time;
 	unsigned long float_timestamp;

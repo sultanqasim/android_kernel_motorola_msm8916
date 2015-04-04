@@ -947,8 +947,8 @@ static void max17042_set_temp_threshold(struct max17042_chip *chip,
 #define HYSTERISIS_DEGC 2
 static int max17042_check_temp(struct max17042_chip *chip)
 {
-	int batt_temp;
-	int hotspot;
+	int batt_temp = 0;
+	int hotspot = 0;
 	int max_t = 0;
 	int min_t = 0;
 	struct max17042_platform_data *pdata;

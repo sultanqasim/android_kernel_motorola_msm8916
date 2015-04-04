@@ -278,17 +278,20 @@ static int32_t msm_flash_gpio_init(
 	for (i = 0; i < flash_ctrl->torch_num_sources; i++)
 		flash_ctrl->torch_op_current[i] = LED_HALF;
 
-	for (i = 0; (i < flash_ctrl->torch_num_sources) && (i < MAX_LED_TRIGGERS); i++) {
+	for (i = 0; i < flash_ctrl->torch_num_sources; i++) {
 		if (!flash_ctrl->torch_trigger[i]) {
-			flash_ctrl->flash_num_sources = (flash_ctrl->flash_num_sources > MAX_LED_TRIGGERS) ?
-				MAX_LED_TRIGGERS : flash_ctrl->flash_num_sources;
 			if (i < flash_ctrl->flash_num_sources)
 				flash_ctrl->torch_trigger[i] =
 					flash_ctrl->flash_trigger[i];
-			else
-				flash_ctrl->torch_trigger[i] =
-					flash_ctrl->flash_trigger[
-					flash_ctrl->flash_num_sources - 1];
+			else {
+				// hack I don't fully understand to get rid of array index warning
+				struct led_trigger *temp;
+				int index = (int)flash_ctrl->flash_num_sources - 1;
+				if (index > MAX_LED_TRIGGERS) index = MAX_LED_TRIGGERS - 1;
+				if (index < 0) index = 0;
+				temp = flash_ctrl->flash_trigger[index];
+				flash_ctrl->torch_trigger[i] = temp;
+			}
 		}
 	}
 

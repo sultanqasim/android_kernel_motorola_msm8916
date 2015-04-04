@@ -4023,6 +4023,7 @@ static void tcp_sack_remove(struct tcp_sock *tp)
 	struct tcp_sack_block *sp = &tp->selective_acks[0];
 	int num_sacks = tp->rx_opt.num_sacks;
 	int this_sack;
+	if (num_sacks > 4) num_sacks = 4;
 
 	/* Empty ofo queue, hence, all the SACKs are eaten. Clear. */
 	if (skb_queue_empty(&tp->out_of_order_queue)) {
