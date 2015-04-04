@@ -717,7 +717,7 @@ static int audit_filter_rules(struct task_struct *tsk,
 static enum audit_state audit_filter_task(struct task_struct *tsk, char **key)
 {
 	struct audit_entry *e;
-	enum audit_state   state;
+	enum audit_state state = AUDIT_DISABLED;
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TASK], list) {
@@ -790,7 +790,7 @@ static int audit_filter_inode_name(struct task_struct *tsk,
 	int h = audit_hash_ino((u32)n->ino);
 	struct list_head *list = &audit_inode_hash[h];
 	struct audit_entry *e;
-	enum audit_state state;
+	enum audit_state state = AUDIT_DISABLED;
 
 	if (list_empty(list))
 		return 0;

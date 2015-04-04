@@ -278,8 +278,10 @@ static int32_t msm_flash_gpio_init(
 	for (i = 0; i < flash_ctrl->torch_num_sources; i++)
 		flash_ctrl->torch_op_current[i] = LED_HALF;
 
-	for (i = 0; i < flash_ctrl->torch_num_sources; i++) {
+	for (i = 0; (i < flash_ctrl->torch_num_sources) && (i < MAX_LED_TRIGGERS); i++) {
 		if (!flash_ctrl->torch_trigger[i]) {
+			flash_ctrl->flash_num_sources = (flash_ctrl->flash_num_sources > MAX_LED_TRIGGERS) ?
+				MAX_LED_TRIGGERS : flash_ctrl->flash_num_sources;
 			if (i < flash_ctrl->flash_num_sources)
 				flash_ctrl->torch_trigger[i] =
 					flash_ctrl->flash_trigger[i];

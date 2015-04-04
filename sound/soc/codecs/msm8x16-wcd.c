@@ -4499,7 +4499,7 @@ static int msm8x16_wcd_enable_static_supplies(struct msm8x16_wcd *msm8x16,
 		}
 	}
 
-	while (ret && --i)
+	while (ret && (--i > 0))
 		if (!pdata->regulator[i].ondemand)
 			regulator_disable(msm8x16->supplies[i].consumer);
 
