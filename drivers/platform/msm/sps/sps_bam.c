@@ -1435,8 +1435,8 @@ int sps_bam_pipe_transfer(struct sps_bam *dev,
 			 u32 pipe_index, struct sps_transfer *transfer)
 {
 	struct sps_iovec *iovec;
-	u32 count;
-	u32 flags;
+	u32 count = 0;
+	u32 flags = 0;
 	void *user;
 	int n;
 	int result;

@@ -130,6 +130,9 @@ static int get_tpkt_data(struct sk_buff *skb, unsigned int protoff,
 	int tpktlen;
 	int tpktoff;
 
+	*datalen = 0;
+	*dataoff = 0;
+
 	/* Get TCP header */
 	th = skb_header_pointer(skb, protoff, sizeof(_tcph), &_tcph);
 	if (th == NULL)

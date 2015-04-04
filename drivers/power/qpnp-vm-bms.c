@@ -1864,7 +1864,7 @@ low_soc_exit:
 static int calculate_soc_from_voltage(struct qpnp_bms_chip *chip)
 {
 	int voltage_range_uv, voltage_remaining_uv, voltage_based_soc;
-	int rc, vbat_uv;
+	int rc, vbat_uv = 0;
 
 	/* check if we have the averaged fifo data */
 	if (chip->voltage_soc_uv) {
@@ -1902,12 +1902,77 @@ static int calculate_soc_from_voltage(struct qpnp_bms_chip *chip)
 	return 0;
 }
 
+static void calculate_reported_soc(struct qpnp_bms_chip *chip)
+{
+	union power_supply_propval ret = {0,};
+
+	if (chip->reported_soc > chip->last_soc) {
+		/*send DISCHARGING status if the reported_soc drops from 100 */
+		if (chip->reported_soc == 100) {
+			ret.intval = POWER_SUPPLY_STATUS_DISCHARGING;
+			chip->batt_psy->set_property(chip->batt_psy,
+				POWER_SUPPLY_PROP_STATUS, &ret);
+			pr_debug("Report discharging status, reported_soc=%d, last_soc=%d\n",
+					chip->reported_soc, chip->last_soc);
+		}
+		/*
+		* reported_soc_delta is used to prevent
+		* the big change in last_soc,
+		* this is not used in high current mode
+		*/
+		if (chip->reported_soc_delta > 0)
+			chip->reported_soc_delta--;
+
+		if (chip->reported_soc_high_current)
+			chip->reported_soc--;
+		else
+			chip->reported_soc = chip->last_soc
+					+ chip->reported_soc_delta;
+
+		pr_debug("New reported_soc=%d, last_soc is=%d\n",
+					chip->reported_soc, chip->last_soc);
+	} else {
+		chip->reported_soc_in_use = false;
+		chip->reported_soc_high_current = false;
+		pr_debug("reported_soc equals last_soc,stop reported_soc process\n");
+	}
+	pr_debug("bms power_supply_changed\n");
+	power_supply_changed(&chip->bms_psy);
+}
+
+static int clamp_soc_based_on_voltage(struct qpnp_bms_chip *chip, int soc)
+{
+	int rc, vbat_uv = 0;
+
+	rc = get_battery_voltage(chip, &vbat_uv);
+	if (rc < 0) {
+		pr_err("adc vbat failed err = %d\n", rc);
+		return soc;
+	}
+
+	/* only clamp when discharging */
+	if (is_battery_charging(chip))
+		return soc;
+
+	if (soc <= 0 && vbat_uv > chip->dt.cfg_v_cutoff_uv) {
+		pr_debug("clamping soc to 1, vbat (%d) > cutoff (%d)\n",
+					vbat_uv, chip->dt.cfg_v_cutoff_uv);
+		return 1;
+	} else {
+		pr_debug("not clamping, using soc = %d, vbat = %d and cutoff = %d\n",
+				soc, vbat_uv, chip->dt.cfg_v_cutoff_uv);
+		return soc;
+	}
+}
+
+#define UI_SOC_CATCHUP_TIME	(60)
+
 static void monitor_soc_work(struct work_struct *work)
 {
 	struct qpnp_bms_chip *chip = container_of(work,
 				struct qpnp_bms_chip,
 				monitor_soc_work.work);
-	int rc, vbat_uv = 0, new_soc = 0, batt_temp;
+	int rc, vbat_uv = 0, new_soc = 0, batt_temp = 0;
 
 	bms_stay_awake(&chip->vbms_soc_wake_source);
 
