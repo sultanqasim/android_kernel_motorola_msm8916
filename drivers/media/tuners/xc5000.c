@@ -689,7 +689,7 @@ static void xc_debug_dump(struct xc5000_priv *priv)
 	u8 hw_majorversion = 0, hw_minorversion = 0;
 	u8 fw_majorversion = 0, fw_minorversion = 0;
 	u16 fw_buildversion = 0;
-	u16 regval;
+	u16 regval = 0;
 
 	/* Wait for stats to stabilize.
 	 * Frame Lines needs two frame times after initial lock

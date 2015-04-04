@@ -1067,7 +1067,7 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *newsk = NULL;
 	struct sock *other = NULL;
 	struct sk_buff *skb = NULL;
-	unsigned int hash;
+	unsigned int hash = 0;
 	int st;
 	int err;
 	long timeo;

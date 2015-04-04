@@ -2718,6 +2718,9 @@ static int wcd_cpe_lsm_lab_enable_disable(
 	struct cpe_lsm_control_lab cpe_lab_enable;
 	struct cpe_lsm_lab_enable *lab_enable = &cpe_lab_enable.lab_enable;
 
+	// avoid warnings about uninitialized stuff
+	memset(&cpe_lab_enable, 0, sizeof(cpe_lab_enable));
+
 	pr_debug("%s: enter payload_size = %d Enable %d\n",
 		 __func__, pld_size, enable);
 
