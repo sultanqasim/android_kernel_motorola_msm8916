@@ -229,6 +229,8 @@ static struct tcp_metrics_block *__tcp_get_metrics_req(struct request_sock *req,
 	unsigned int hash;
 	struct net *net;
 
+	memset(&addr, 0, sizeof(addr));
+
 	addr.family = req->rsk_ops->family;
 	switch (addr.family) {
 	case AF_INET:
@@ -262,6 +264,8 @@ static struct tcp_metrics_block *__tcp_get_metrics_tw(struct inet_timewait_sock 
 	struct inetpeer_addr addr;
 	unsigned int hash;
 	struct net *net;
+
+	memset(&addr, 0, sizeof(addr));
 
 	addr.family = tw->tw_family;
 	switch (addr.family) {
@@ -297,6 +301,8 @@ static struct tcp_metrics_block *tcp_get_metrics(struct sock *sk,
 	struct inetpeer_addr addr;
 	unsigned int hash;
 	struct net *net;
+
+	memset(&addr, 0, sizeof(addr));
 
 	addr.family = sk->sk_family;
 	switch (addr.family) {

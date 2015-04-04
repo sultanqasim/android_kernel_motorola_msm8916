@@ -121,8 +121,10 @@ struct phy_setting {
 	u32 setting;
 };
 
+#define MAX_NUM_SETTINGS 7
+
 /* A mapping of all SUPPORTED settings to speed/duplex */
-static const struct phy_setting settings[] = {
+static const struct phy_setting settings[MAX_NUM_SETTINGS] = {
 	{
 		.speed = 10000,
 		.duplex = DUPLEX_FULL,
@@ -159,8 +161,6 @@ static const struct phy_setting settings[] = {
 		.setting = SUPPORTED_10baseT_Half,
 	},
 };
-
-#define MAX_NUM_SETTINGS ARRAY_SIZE(settings)
 
 /**
  * phy_find_setting - find a PHY settings array entry that matches speed & duplex

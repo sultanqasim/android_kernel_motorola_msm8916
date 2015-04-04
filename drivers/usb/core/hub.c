@@ -1651,8 +1651,8 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_host_interface *desc;
 	struct usb_endpoint_descriptor *endpoint;
-	struct usb_device *hdev;
-	struct usb_hub *hub;
+	struct usb_device *hdev = NULL;
+	struct usb_hub *hub = NULL;
 
 	desc = intf->cur_altsetting;
 	hdev = interface_to_usbdev(intf);
@@ -3287,7 +3287,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	struct usb_port *port_dev;
 	int		port1 = udev->portnum;
 	int		status;
-	u16		portchange, portstatus;
+	u16		portchange = 0, portstatus = 0;
 
 	if (!hub)
 		return -ENODEV;
@@ -4692,8 +4692,8 @@ done:
 static int hub_handle_remote_wakeup(struct usb_hub *hub, unsigned int port,
 		u16 portstatus, u16 portchange)
 {
-	struct usb_device *hdev;
-	struct usb_device *udev;
+	struct usb_device *hdev = NULL;
+	struct usb_device *udev = NULL;
 	int connect_change = 0;
 	int ret;
 
@@ -4730,11 +4730,11 @@ static int hub_handle_remote_wakeup(struct usb_hub *hub, unsigned int port,
 
 static void hub_events(void)
 {
-	struct list_head *tmp;
-	struct usb_device *hdev;
-	struct usb_interface *intf;
-	struct usb_hub *hub;
-	struct device *hub_dev;
+	struct list_head *tmp = NULL;
+	struct usb_device *hdev = NULL;
+	struct usb_interface *intf = NULL;
+	struct usb_hub *hub = NULL;
+	struct device *hub_dev = NULL;
 	u16 hubstatus;
 	u16 hubchange;
 	u16 portstatus;
