@@ -449,7 +449,7 @@ int mdss_mdp_data_check(struct mdss_mdp_data *data,
 
 	for (i = 0; i < ps->num_planes; i++) {
 		curr = &data->p[i];
-		if (i >= data->num_planes) {
+		if ((i >= data->num_planes) && (i >= 1)) {
 			u32 psize = ps->plane_size[i-1];
 			prev = &data->p[i-1];
 			if (prev->len > psize) {
