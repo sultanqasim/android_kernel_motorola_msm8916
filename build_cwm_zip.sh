@@ -1,4 +1,6 @@
 #!/bin/bash
+make -j10 bootimage
+make -j10 modules
 rm -rf squid_install
 mkdir -p squid_install
 make -j10 modules_install INSTALL_MOD_PATH=squid_install INSTALL_MOD_STRIP=1
