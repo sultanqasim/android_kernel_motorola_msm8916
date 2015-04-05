@@ -1,6 +1,7 @@
 #
 # ADDITIONAL_DEFAULT_PROPERTIES
 #
+ro.carrier=sprint
 ro.secure=1
 ro.allow.mock.location=0
 ro.debuggable=0
