@@ -1151,6 +1151,7 @@ static inline void msm_ispif_read_irq_status(struct ispif_irq_status *out,
 static irqreturn_t msm_io_ispif_irq(int irq_num, void *data)
 {
 	struct ispif_irq_status irq[VFE_MAX];
+	memset(irq, 0, sizeof(irq));
 
 	msm_ispif_read_irq_status(irq, data);
 	return IRQ_HANDLED;
