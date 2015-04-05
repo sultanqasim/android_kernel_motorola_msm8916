@@ -23,11 +23,18 @@ BOARD_KERNEL_PAGESIZE := 2048
 
 $(KERNEL_IMAGE): zImage
 
-.PHONY: ramdisk
+.PHONY: ramdisk FORCE_RDISK
 ramdisk: $(RAMDISK)
+FORCE_RDISK:
 
-$(RAMDISK): $(shell find boot/ramdisk -type f) $(MKBOOTFS)
-	$(MKBOOTFS) boot/ramdisk | gzip -9 -n >$@
+ifeq ($(CDMA),1)
+RAMDISK_ROOT := boot/ramdisk_cdma
+else
+RAMDISK_ROOT := boot/ramdisk
+endif
+
+$(RAMDISK): $(MKBOOTFS) FORCE_RDISK
+	$(MKBOOTFS) $(RAMDISK_ROOT) | gzip -9 -n >$@
 
 .PHONY: dtimage
 dtimage: $(DEVTREE)
