@@ -1914,6 +1914,7 @@ static int msm_bus_bimc_limit_mport(struct msm_bus_node_device_type *info,
 
 		if (!info->node_info->lim_bw) {
 			struct msm_bus_bimc_qos_mode qmode;
+			memset(&qmode, 0, sizeof(qmode));
 			qmode.rl.qhealth[0].limit_commands = 1;
 			qmode.rl.qhealth[1].limit_commands = 0;
 			qmode.rl.qhealth[2].limit_commands = 0;
@@ -1961,6 +1962,7 @@ static int msm_bus_bimc_qos_init(struct msm_bus_node_device_type *info,
 {
 	int i;
 	struct msm_bus_bimc_qos_mode qmode;
+	memset(&qmode, 0, sizeof(qmode));
 
 	switch (info->node_info->qos_params.mode) {
 	case BIMC_QOS_MODE_FIXED:
