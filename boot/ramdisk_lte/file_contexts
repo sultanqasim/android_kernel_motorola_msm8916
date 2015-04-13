@@ -219,6 +219,9 @@
 /data/misc/wifi/hostapd(/.*)?   u:object_r:wpa_socket:s0
 /data/misc/zoneinfo(/.*)?       u:object_r:zoneinfo_data_file:s0
 
+# coredump directory for userdebug/eng devices
+/cores(/.*)?                    u:object_r:coredump_file:s0
+
 # Wallpaper file for other users
 /data/system/users/[0-9]+/wallpaper		u:object_r:wallpaper_file:s0
 #############################
@@ -306,6 +309,7 @@
 /dev/wcnss_wlan                                 u:object_r:wcnss_device:s0
 /dev/hbtp_input                                 u:object_r:hbtp_device:s0
 /dev/jdi-bu21150                                u:object_r:bu21150_device:s0
+/dev/voice_svc                                  u:object_r:voice_device:s0
 
 ###################################
 # Dev socket nodes
@@ -450,6 +454,7 @@
 /sys/bus/msm_subsys/devices/subsys3/restart_level                   u:object_r:sysfs_ssr_toggle:s0
 /sys/bus/msm_subsys/devices/subsys4/restart_level                   u:object_r:sysfs_ssr_toggle:s0
 /sys/devices/soc0/.*                                                u:object_r:sysfs_socinfo:s0
+/sys/devices/w1_bus_master1(/.*)?                                   u:object_r:sysfs_w1_bus:s0
 
 ###################################
 # data files
@@ -481,6 +486,7 @@
 /persist/data(/.*)?                                                 u:object_r:persist_drm_file:s0
 /persist/data/tz(/.*)?                                              u:object_r:persist_drm_file:s0
 /persist/data/sfs(/.*)?                                             u:object_r:persist_drm_file:s0
+/persist/camera(/.*)?                                               u:object_r:persist_camera_file:s0
 
 ###################################
 # oem files
@@ -508,15 +514,6 @@
 /dev/socket/mpctl              u:object_r:mpctl_socket:s0
 
 # Modem
-/dev/block/platform/soc.0/by-name/misc              u:object_r:misc_partition:s0
-/dev/block/platform/soc.0/by-name/mdm1m9kefs1       u:object_r:efs_boot_dev:s0
-/dev/block/platform/soc.0/by-name/mdm1m9kefs2       u:object_r:efs_boot_dev:s0
-/dev/block/platform/soc.0/by-name/mdm1m9kefs3       u:object_r:efs_boot_dev:s0
-/dev/block/platform/soc.0/by-name/mdm1m9kefsc       u:object_r:efs_boot_dev:s0
-/dev/block/platform/soc.0/by-name/fsg       u:object_r:modem_efs_partition_device:s0
-/dev/block/platform/soc.0/by-name/fsc       u:object_r:modem_efs_partition_device:s0
-/dev/block/platform/soc.0/by-name/ssd       u:object_r:modem_efs_partition_device:s0
-/dev/block/platform/soc.0/by-name/modemst[12] u:object_r:modem_efs_partition_device:s0
 /dev/mdm                                         u:object_r:radio_device:s0
 
 # Qualcomm MSM Audio devices
@@ -542,9 +539,15 @@
 /fsg(/.*)?                         u:object_r:fsg_file:s0
 /modem(/.*)?                       u:object_r:modem_file:s0
 
+###################################
+# Customize partition - MotoMaker #
+/customize(/.*)?                   u:object_r:user_config_file:s0
+
 # /data filesystem
 /data/adb(/.*)?                    u:object_r:adb_log_data_file:s0
+/data/adspd(/.*)?                  u:object_r:adspd_data_file:s0
 /data/aplogd(/.*)?                 u:object_r:aplog_data_file:s0
+/data/camera_dump(/.*)?            u:object_r:camera_dump_data_file:s0
 /data/bug2go(/.*)?                 u:object_r:bugreport_data_file:s0
 /data/misc/cutback(/.*)?           u:object_r:cutback_data_file:s0
 /data/misc/sensor(/.*)?            u:object_r:sensors_data_file:s0
@@ -558,7 +561,8 @@
 /data/local/moodle(/.*)?           u:object_r:moodle_data_file:s0
 /data/power_supply_logger(/.*)?    u:object_r:aplog_data_file:s0
 /data/system/dropbox-add(/.*)?     u:object_r:dropbox_data_file:s0
-/data/misc/akmd_set.txt            u:object_r:akmd_data_file:s0
+/data/misc/akmd(/.*)?              u:object_r:akmd_data_file:s0
+/data/misc/sensorhub(/.*)?         u:object_r:sensorhub_data_file:s0
 /data/fdAlbum                      u:object_r:camera_data_file:s0
 /data/chargeonlymode               u:object_r:chargeonly_data_file:s0
 
@@ -596,30 +600,33 @@
 /dev/tpapi(/.*)?                   u:object_r:tpapi_tmp:s0
 
 # mdm1hob, mdm1dhob,fsg
-/dev/block/platform/soc.0/by-name/hob       u:object_r:modem_hob_block_device:s0
-/dev/block/platform/soc.0/by-name/dhob      u:object_r:modem_hob_block_device:s0
+/dev/block/bootdevice/by-name/hob           u:object_r:modem_hob_block_device:s0
+/dev/block/bootdevice/by-name/dhob          u:object_r:modem_hob_block_device:s0
 
 #CID block
-/dev/block/platform/soc.0/by-name/cid       u:object_r:cid_block_device:s0
+/dev/block/bootdevice/by-name/cid           u:object_r:cid_block_device:s0
 
 # CLOGO
-/dev/block/platform/soc.0/by-name/clogo     u:object_r:clogo_block_device:s0
+/dev/block/bootdevice/by-name/clogo         u:object_r:clogo_block_device:s0
 
 #FRP
-/dev/block/platform/soc.0/by-name/frp       u:object_r:frp_block_device:s0
+/dev/block/bootdevice/by-name/frp           u:object_r:frp_block_device:s0
 
 # UTAGS
-/dev/block/platform/soc.0/by-name/utags          u:object_r:utags_block_device:s0
-/dev/block/platform/soc.0/by-name/utagsBackup    u:object_r:utags_block_device:s0
+/dev/block/bootdevice/by-name/utags              u:object_r:utags_block_device:s0
+/dev/block/bootdevice/by-name/utagsBackup        u:object_r:utags_block_device:s0
 
 # Bootloader Logs
-/dev/block/platform/soc.0/by-name/logs      u:object_r:bllogs_block_device:s0
+/dev/block/bootdevice/by-name/logs          u:object_r:bllogs_block_device:s0
 
-/dev/lis3dh                     u:object_r:sensors_device:s0
-/dev/l3g4200d                   u:object_r:sensors_device:s0
+/dev/lis3dh                      u:object_r:sensors_device:s0
+/dev/l3g4200d                    u:object_r:sensors_device:s0
 /dev/stml0xx                     u:object_r:sensors_device:s0
 /dev/stml0xx_as                  u:object_r:sensors_device:s0
 /dev/stml0xx_ms                  u:object_r:sensors_device:s0
+/dev/motosh                      u:object_r:sensors_device:s0
+/dev/motosh_as                   u:object_r:sensors_device:s0
+/dev/motosh_ms                   u:object_r:sensors_device:s0
 
 /dev/sec                        u:object_r:shwi_device:s0
 
@@ -657,9 +664,6 @@
 #tcmd socket
 /dev/socket/local_tcmd          u:object_r:localtcmd_socket:s0
 
-# Mobile TV
-/dev/isdbt                      u:object_r:isdbt_device:s0
-
 # system binaries
 /system/bin/adspd               u:object_r:adspd_exec:s0
 /system/bin/akmd8963            u:object_r:akmd_exec:s0
@@ -676,10 +680,11 @@
 /system/bin/kpgather            u:object_r:kpgather_exec:s0
 /system/bin/mbm_spy             u:object_r:mbm_spy_exec:s0
 /system/bin/stml0xx             u:object_r:sensor_hub_exec:s0
+/system/bin/motosh              u:object_r:sensor_hub_exec:s0
 /system/bin/tcmd                u:object_r:tcmd_exec:s0
 /system/bin/tcmdhelp            u:object_r:tcmdhelp_exec:s0
 /system/xbin/sudo               u:object_r:sudo_exec:s0
-/system/bin/jellyservice        u:object_r:jellyservice_exec:s0
+/system/bin/memtest_mode        u:object_r:memtest_exec:s0
 
 # QCOM services modified by Moto
 /system/bin/diag_mdlog-wrap     u:object_r:mdlog_exec:s0
@@ -690,3 +695,7 @@
 /sys/module/qpnp_bms(/.*)?              u:object_r:sysfs_batt:s0
 /sys/module/qpnp_charger(/.*)?          u:object_r:sysfs_batt:s0
 /sys/devices/platform/msm_ssbi.0/pm8921-core/pm8921-charger(/.*)? u:object_r:sysfs_batt:s0
+/sys/devices/virtual/stm401/stm401_as(/.*)?    u:object_r:sysfs_sensors:s0
+/sys/devices/virtual/stm401/stm401_ms(/.*)?    u:object_r:sysfs_sensors:s0
+/sys/kernel/aov(/.*)?                   u:object_r:sysfs_adspd:s0
+/sys/class/capsense(/.*)?               u:object_r:sysfs_capsense:s0

@@ -1,9 +1,10 @@
 #!/system/bin/sh
 
-block_by_name=/dev/block/platform/soc.0/by-name
+block_by_name=/dev/block/bootdevice/by-name
 utags=${block_by_name}/utags
 utags_backup=${block_by_name}/utagsBackup
 cid=${block_by_name}/cid
+clogo=${block_by_name}/clogo
 
 # Set correct permissions for UTAGS
 /system/bin/chown -L mot_tcmd:system $utags
@@ -23,3 +24,6 @@ dhob=${block_by_name}/dhob
 /system/bin/chmod -L 0660 $hob
 /system/bin/chmod -L 0660 $dhob
 
+#update clogo permissions to allow writing new SOL
+/system/bin/chown -L root:mot_tcmd $clogo
+/system/bin/chmod -L 0660 $clogo

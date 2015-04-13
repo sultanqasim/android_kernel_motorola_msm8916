@@ -103,7 +103,7 @@ sip                                       u:object_r:radio_service:s0
 statusbar                                 u:object_r:system_server_service:s0
 SurfaceFlinger                            u:object_r:surfaceflinger_service:s0
 task                                      u:object_r:system_server_service:s0
-telecom                                   u:object_r:radio_service:s0
+telecom                                   u:object_r:system_server_service:s0
 telephony.registry                        u:object_r:system_server_service:s0
 textservices                              u:object_r:system_server_service:s0
 trust                                     u:object_r:system_server_service:s0
@@ -134,6 +134,7 @@ dun                                            u:object_r:dun_service:s0
 DigitalPen                                     u:object_r:digitalpen_service:s0
 qti.ims.connectionmanagerservice               u:object_r:imscm_service:s0
 com.qti.snapdragon.sdk.display.IColorService   u:object_r:color_service:s0
+rcs                                            u:object_r:radio_service:s0
 #line 1 "motorola/security/sepolicy/common/service_contexts"
 iphonenvinfo                              u:object_r:radio_service:s0
 checkin_mot                               u:object_r:mot_app_service:s0

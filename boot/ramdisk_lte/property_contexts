@@ -50,6 +50,10 @@ selinux.                u:object_r:security_prop:s0
 vold.                   u:object_r:vold_prop:s0
 crypto.                 u:object_r:vold_prop:s0
 
+# ro.build.fingerprint is either set in /system/build.prop, or is
+# set at runtime by system_server.
+build.fingerprint       u:object_r:fingerprint_prop:s0
+
 # ctl properties
 ctl.bootanim            u:object_r:ctl_bootanim_prop:s0
 ctl.dumpstate           u:object_r:ctl_dumpstate_prop:s0
@@ -70,10 +74,12 @@ sys.ims.                   u:object_r:qcom_ims_prop:s0
 # Moto
 sys.listeners.registered   u:object_r:tee_prop:s0
 enablebtsoclog             u:object_r:bluetooth_prop:s0
+rmtfs.                     u:object_r:rmtfs_prop:s0
 # End Moto
 #line 1 "motorola/security/sepolicy/common/property_contexts"
 tcmd.                   u:object_r:tcmd_prop:s0
 debug.camera            u:object_r:camera_prop:s0
+camera.                 u:object_r:camera_prop:s0
 installd.               u:object_r:installd_prop:s0
 user.                   u:object_r:system_prop:s0
 
@@ -91,6 +97,7 @@ persist.log.aplogd.     u:object_r:aplogd_prop:s0
 ctl.atfwd               u:object_r:ctl_atfwd_prop:s0
 ctl.ftmipcd             u:object_r:ctl_ftmipcd_prop:s0
 ctl.hostapd             u:object_r:ctl_hostapd_prop:s0
+ctl.thermal-engine      u:object_r:ctl_thermal_engine_prop:s0
 
 #media props
 media.proxy.            u:object_r:media_proxy_prop:s0
