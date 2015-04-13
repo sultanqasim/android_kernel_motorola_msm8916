@@ -4,6 +4,7 @@ import init.mmi.overlay.rc
 import init.mmi.usb.rc
 import init.mmi.diag.rc
 import init.mmi.debug.rc
+import init.mmi.volte.rc
 
 on early-init
     # Create modem FSG mount point
@@ -18,6 +19,8 @@ on init
     chmod 0440 /sys/fs/pstore/console-ramoops
     chown system log /sys/fs/pstore/annotate-ramoops
     chmod 0640 /sys/fs/pstore/annotate-ramoops
+
+    copy /module_hashes /sys/kernel/module_whitelist
 
     # Setup kernel dropbox permissions so that dropboxd can utilize it
     chown root diag /sys/kernel/dropbox/event
@@ -37,10 +40,12 @@ on charger
     trigger post-fs-data
     trigger moto-charger
     class_stop main
+    class_stop late_start
 
 on moto-charger
     start charge_only_mode
     start batt_health
+    start thermal-com
     write /sys/module/lpm_levels/parameters/sleep_disabled 0
 
 on early-boot
@@ -60,6 +65,10 @@ on boot
     # Change the ownership of the notification LED interface
     chown system system /sys/class/leds/rgb/control
     chmod 0664 /sys/class/leds/rgb/control
+
+    # Change the ownership of the OneWire bus interface
+    chown camera camera /sys/devices/w1_bus_master1/w1_master_search
+    chmod 0664 /sys/devices/w1_bus_master1/w1_master_search
 
     # Change the ownership of the charging LED interface
     chown system system /sys/class/leds/charging/brightness
@@ -99,17 +108,18 @@ on boot
 
 on fs
     # Mount modem FSG partition
-    wait /dev/block/platform/soc.0/by-name/fsg
-    mount ext4 /dev/block/platform/soc.0/by-name/fsg /fsg ro nosuid nodev barrier=0 context=u:object_r:fsg_file:s0
+    wait /dev/block/bootdevice/by-name/fsg
+    mount ext4 /dev/block/bootdevice/by-name/fsg /fsg ro nosuid nodev barrier=0 context=u:object_r:fsg_file:s0
 
     # set up a symbolic link so the many references to the old location still work and the java code can remain platform agnostic.
-    symlink /dev/block/platform/soc.0 /dev/block/platform/msm_sdcc.1
+    symlink /dev/block/bootdevice /dev/block/platform/msm_sdcc.1
 
     # use /persist as phony PDS partition
     symlink /persist /pds
 
 on post-fs
     mkdir /persist/camera 0755 mot_tcmd mot_tcmd
+    mkdir /persist/camera/ledcal 0755 camera mot_tcmd
     mkdir /persist/factory 0755 mot_tcmd mot_tcmd
     mkdir /persist/public 0755 mot_tcmd mot_tcmd
     mkdir /persist/public/atvc 0770 mot_atvc shell
@@ -124,6 +134,7 @@ on post-fs
     mkdir /persist/wmdrm 0775 mot_drm mot_drm
     mkdir /persist/security 02770 mot_tpapi mot_tpapi
     mkdir /persist/batt_health 0755 mot_pwric mot_pwric
+    mkdir /persist/mdm 0770 radio radio
 
     chown mot_tcmd mot_tcmd /persist/factory/fti
     chmod 0660 /persist/factory/fti
@@ -177,6 +188,9 @@ on post-fs-data
     mkdir /data/power_log 0750 root log
     chmod 0660 /sys/module/power_supply_log/parameters/log_file
     write /sys/module/power_supply_log/parameters/log_file /data/power_log/power_off.log
+
+    # Setup folder for camera HAL subsystem
+    mkdir /data/camera_dump 0750 media media
 
 service mmi-block-perm /system/bin/sh /init.mmi.block_perm.sh
     class main
@@ -266,6 +280,7 @@ on property:tcmd.suspend=2
     stop sensors
     write /sys/kernel/factory_gsbi12_mode/install 1
     setprop debug.sf.nobootanimation 1
+    stop ptt_logging
 
 on property:persist.sys.diag_mdlog.on=1
     start diag_mdlog
@@ -288,7 +303,9 @@ service diag_mdlog /system/bin/diag_mdlog-wrap
 
 service tcmd /system/bin/tcmd
     class core
-    group mot_tcmd radio mot_pwric input system log camera graphics mot_accy sdcard_r sdcard_rw audio inet bluetooth wifi compass net_bt_admin mot_tombstone mot_tpapi mount net_raw net_admin media shell mot_usb nfc qcom_diag mot_dbvc cache media_rw
+#  Total number of supplementary groups below is 31 now. Limit defined in init.h is 32.
+#  Please update the current number if you add more groups.
+    group mot_tcmd radio mot_pwric input system log camera graphics mot_accy sdcard_r sdcard_rw audio inet bluetooth wifi compass net_bt_admin mot_tombstone mot_tpapi mount net_raw net_admin media shell mot_usb nfc qcom_diag mot_dbvc cache media_rw mot_dtv
     socket local_tcmd stream 0660 mot_tcmd mot_tcmd
     socket batch_socket stream 0600 mot_tcmd mot_tcmd
     oneshot
@@ -347,7 +364,7 @@ service mmi-boot-sh /system/bin/sh /init.mmi.boot.sh
     oneshot
 
 service mmi-touch-sh /system/bin/sh /init.mmi.touch.sh synaptics
-    class late_start
+    class core
     user root
     oneshot
 
@@ -428,3 +445,8 @@ service iprenew_eth0 /system/bin/dhcpcd -nBK
     class late_start
     disabled
     oneshot
+
+service thermal-com /system/bin/thermal-engine --minimode
+    class main
+    user root
+    disabled
