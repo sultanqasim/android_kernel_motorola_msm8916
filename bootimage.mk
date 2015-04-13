@@ -27,10 +27,14 @@ $(KERNEL_IMAGE): zImage
 ramdisk: $(RAMDISK)
 FORCE_RDISK:
 
-ifeq ($(CDMA),1)
-RAMDISK_ROOT := boot/ramdisk_cdma
-else
-RAMDISK_ROOT := boot/ramdisk
+ifeq ($(VARIANT),)
+$(error VARIANT not specified)
+endif
+
+RAMDISK_ROOT = "boot/ramdisk_$(VARIANT)"
+
+ifneq ($(shell test -d $(RAMDISK_ROOT); echo $$?),0)
+$(error Variant $(VARIANT) not found)
 endif
 
 $(RAMDISK): $(MKBOOTFS) FORCE_RDISK
