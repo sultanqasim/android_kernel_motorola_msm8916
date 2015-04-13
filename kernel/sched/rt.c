@@ -899,6 +899,7 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 			if (!once) {
 				once = true;
 				dump_throttled_rt_tasks(rt_rq);
+				printk_deferred("sched: RT throttling activated\n");
 			}
 		} else {
 			/*
