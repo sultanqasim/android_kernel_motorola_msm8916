@@ -261,8 +261,8 @@ nfqnl_zcopy(struct sk_buff *to, const struct sk_buff *from, int len, int hlen)
 	to->len += len + plen;
 	to->data_len += len + plen;
 
-	if (unlikely(skb_orphan_frags(from, GFP_ATOMIC))) {
-		skb_tx_error(from);
+	if (unlikely(skb_orphan_frags((struct sk_buff *)from, GFP_ATOMIC))) {
+		skb_tx_error((struct sk_buff *)from);
 		return -ENOMEM;
 	}
 
