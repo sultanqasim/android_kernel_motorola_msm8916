@@ -41,16 +41,16 @@ on fs
     # these partition flashed on the device. Failure to mount any partition in fstab file
     # results in failure to launch late-start class.
 
-    wait /dev/block/platform/soc.0/by-name/cache
-    mount ext4 /dev/block/platform/soc.0/by-name/cache /cache nosuid nodev barrier=1
+    wait /dev/block/bootdevice/by-name/cache
+    mount ext4 /dev/block/bootdevice/by-name/cache /cache nosuid nodev barrier=1
 
-    wait /dev/block/platform/soc.0/by-name/persist
-    mount ext4 /dev/block/platform/soc.0/by-name/persist /persist nosuid nodev barrier=1 defcontext=u:object_r:persist_file:s0
+    wait /dev/block/bootdevice/by-name/persist
+    mount ext4 /dev/block/bootdevice/by-name/persist /persist nosuid nodev barrier=1 defcontext=u:object_r:persist_file:s0
     mkdir /persist/data 0700  system system
     restorecon_recursive /persist
 
-    wait /dev/block/platform/soc.0/by-name/modem
-    mount ext4 /dev/block/platform/soc.0/by-name/modem /firmware ro nosuid nodev context=u:object_r:firmware_file:s0
+    wait /dev/block/bootdevice/by-name/modem
+    mount ext4 /dev/block/bootdevice/by-name/modem /firmware ro nosuid nodev context=u:object_r:firmware_file:s0
     #write /sys/kernel/boot_adsp/boot 1
 
 on post-fs-data
@@ -89,15 +89,17 @@ service qseecomd /system/bin/qseecomd
 #   user root
 #   disabled
 
-# PERFD not used
-#service perfd /system/bin/perfd
-#   class main
-#   user root
-#   disabled
+service perfd /system/bin/perfd
+   class main
+   user root
+   disabled
 
 service thermal-engine /system/bin/thermal-engine
    class main
    user root
+   socket thermal-send-client stream 0666 system system
+   socket thermal-recv-client stream 0660 system system
+   socket thermal-recv-passive-client stream 0666 system system
    group root
 
 service time_daemon /system/bin/time_daemon
@@ -113,6 +115,15 @@ service audiod /system/bin/audiod
 on boot
     start rmt_storage
     insmod /system/lib/modules/adsprpc.ko
+# access permission for secure touch
+    chmod 0660 /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0020/secure_touch_enable
+    chmod 0440 /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0020/secure_touch
+    chmod 0660 /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0070/secure_touch_enable
+    chmod 0440 /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0070/secure_touch
+    chown system drmrpc /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0020/secure_touch_enable
+    chown system drmrpc /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0020/secure_touch
+    chown system drmrpc /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0070/secure_touch_enable
+    chown system drmrpc /sys/devices/soc.0/78b9000.i2c/i2c-5/5-0070/secure_touch
 
 service ppd /system/bin/mm-pp-daemon
     class late_start
@@ -131,6 +142,7 @@ service wcnss-service /system/bin/wcnss_service
     class main
     user system
     group system wifi radio
+    oneshot
 
 #on charger
 #    wait /dev/block/bootdevice/by-name/system
