@@ -286,19 +286,26 @@ on property:persist.sys.diag_mdlog.on=1
     start diag_mdlog
 
 on property:persist.sys.diag_mdlog.on=0
-    stop diag_mdlog
+    start safe_stop_mdlog
 
 on property:log.diag_mdlog.invld_mode_stop=1
     stop diag_mdlog
 
 on property:persist.radio.usbdiag=1
-    stop diag_mdlog
+    setprop persist.sys.diag_mdlog.on 0
 
 service diag_mdlog /system/bin/diag_mdlog-wrap
     class main
     socket mdlog_cmd stream 0660 log diag
     user log
     group log sdcard_rw sdcard_r media_rw qcom_diag mount
+    disabled
+
+service safe_stop_mdlog /system/bin/diag_mdlog-getlogs -s
+    class late_start
+    user log
+    group log sdcard_rw sdcard_r media_rw qcom_diag mount
+    oneshot
     disabled
 
 service tcmd /system/bin/tcmd
