@@ -1,6 +1,5 @@
 Upstream Info:
-Source code is from Motorola's published Styx LTE 5.0.2 kernel source at
-https://github.com/MotorolaMobilityLLC/kernel-msm/tree/lollipop-5.0.2-release-styxlte
+ssh://gerrit.mot.com:29418/home/repo/dev/platform/android/kernel/msm-3.10
 
 Build tools required:
 - Linaro GCC
@@ -15,7 +14,7 @@ export SUBARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-
 export VARIANT=lte
 make mrproper
-make msm8916-squid_defconfig TARGET_BUILD_VARIANT=user
+make msm8916-squid_defconfig
 ./build_cwm_zip.sh
 
 Note: export VARIANT=cdma to build for the CDMA variant
