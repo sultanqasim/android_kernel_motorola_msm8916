@@ -1,4 +1,6 @@
 #!/bin/bash
+rm -f arch/arm/boot/dts/*.dtb
+rm -f arch/arm/boot/dt.img
 make -j10 bootimage
 make -j10 modules
 rm -rf squid_install
