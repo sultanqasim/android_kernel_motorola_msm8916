@@ -35,7 +35,6 @@
 		reg-names = "rbcpr", "rbcpr_clk", "efuse_addr";
 		interrupts = <0 15 0>;
 		regulator-name = "apc_corner";
-		qcom,cpr-fuse-corners = <3>;
 		regulator-min-microvolt = <1>;
 		regulator-max-microvolt = <3>;
 
@@ -127,7 +126,7 @@
 		};
 
 		pm8110_s1_corner: regulator-s1-corner {
-			compatible = "qcom,rpm-smd-regulator";
+			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8110_s1_corner";
 			qcom,set = <3>;
 			regulator-min-microvolt = <1>;
@@ -137,7 +136,7 @@
 		};
 
 		pm8110_s1_corner_ao: regulator-s1-corner-ao {
-			compatible = "qcom,rpm-smd-regulator";
+			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8110_s1_corner_ao";
 			qcom,set = <1>;
 			regulator-min-microvolt = <1>;
@@ -147,7 +146,7 @@
 		};
 
 		pm8110_s1_floor_corner: regulator-s1-floor-corner {
-			compatible = "qcom,rpm-smd-regulator";
+			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8110_s1_floor_corner";
 			qcom,set = <3>;
 			regulator-min-microvolt = <1>;
@@ -206,7 +205,7 @@
 		};
 
 		pm8110_l3_ao: regulator-l3-ao {
-			compatible = "qcom,rpm-smd-regulator";
+			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8110_l3_ao";
 			qcom,set = <1>;
 			regulator-min-microvolt = <750000>;
@@ -215,7 +214,7 @@
 		};
 
 		pm8110_l3_so: regulator-l3-so {
-			compatible = "qcom,rpm-smd-regulator";
+			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8110_l3_so";
 			qcom,set = <2>;
 			regulator-min-microvolt = <750000>;
@@ -296,7 +295,7 @@
 		};
 
 		pm8110_l10_ao: regulator-l10-ao {
-			compatible = "qcom,rpm-smd-regulator";
+			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8110_l10_ao";
 			qcom,set = <1>;
 			regulator-min-microvolt = <1800000>;
@@ -306,7 +305,7 @@
 		};
 
 		pm8110_l10_so: regulator-l10-so {
-			compatible = "qcom,rpm-smd-regulator";
+			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8110_l10_so";
 			qcom,set = <2>;
 			regulator-min-microvolt = <1800000>;

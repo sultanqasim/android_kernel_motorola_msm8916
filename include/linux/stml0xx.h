@@ -205,7 +205,7 @@
 #define M_LIFT			0x004000
 #define M_LOG_MSG		0x008000
 
-/*#define M_UNUSED		0x010000*/
+#define M_CHOPCHOP		0x010000
 /*#define M_UNUSED		0x020000*/
 /*#define M_UNUSED		0x040000*/
 /*#define M_UNUSED		0x080000*/
@@ -295,6 +295,7 @@ enum STML0XX_data_types {
 	DT_ACCEL2,
 	DT_FLUSH,
 	DT_LIFT,
+	DT_CHOPCHOP,
 };
 
 enum {
@@ -437,6 +438,7 @@ struct stm_response {
 #define CAMERA                          0x4C
 #define NFC                             0x4D
 #define SIM                             0x4E
+#define CHOPCHOP                        0x4F
 #define LIFT                            0x51
 
 #define SH_LOG_LEVEL_REG                0x55
@@ -576,6 +578,7 @@ struct stm_response {
 #define GRAV_Y		2
 #define GRAV_Z		4
 #define CAMERA_VALUE	0
+#define CHOP_VALUE	0
 #define SIM_DATA	0
 #define LIFT_DISTANCE	0
 #define LIFT_ROTATION	4
@@ -616,6 +619,7 @@ struct stml0xx_platform_data {
 	int ct406_undetect_threshold;
 	int ct406_recalibrate_threshold;
 	int ct406_pulse_count;
+	int ct406_prox_gain;
 	int headset_detect_enable;
 	int headset_hw_version;
 	int headset_insertion_debounce;

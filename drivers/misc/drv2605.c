@@ -177,6 +177,7 @@ static struct drv260x {
 	unsigned char default_sequence[4];
 	unsigned char rated_voltage;
 	unsigned char overdrive_voltage;
+	unsigned char rtp_overdrive_voltage;
 	struct regulator *vibrator_vdd;
 	int use_default_calibration;
 	unsigned char default_calibration[5];
@@ -318,6 +319,8 @@ static struct drv260x_platform_data *drv260x_of_init(struct i2c_client *client)
 	of_property_read_u32(np, "rated_voltage", &pdata->rated_voltage);
 	of_property_read_u32(np, "overdrive_voltage",
 				&pdata->overdrive_voltage);
+	of_property_read_u32(np, "rtp_overdrive_voltage",
+				&pdata->rtp_overdrive_voltage);
 	of_property_read_u32(np, "effects_library", &pdata->effects_library);
 	of_property_read_u32(np, "disable_calibration",
 						&pdata->disable_calibration);
@@ -402,7 +405,7 @@ static void drv260x_set_go_bit(char val)
 	drv260x_write_reg_val(go, sizeof(go));
 }
 
-static unsigned char drv260x_read_reg(unsigned char reg)
+static int drv260x_read_reg(unsigned char reg)
 {
 	int tries;
 	int ret;
@@ -483,7 +486,7 @@ static void drv260x_change_mode(char mode)
 	unsigned char tmp[] = {
 #ifdef RTP_CLOSED_LOOP_ENABLE
 		Control3_REG, NG_Thresh_2,
-		OVERDRIVE_CLAMP_VOLTAGE_REG, RTP_ERM_OVERDRIVE_CLAMP_VOLTAGE,
+		OVERDRIVE_CLAMP_VOLTAGE_REG, drv260x->rtp_overdrive_voltage,
 #endif
 		MODE_REG, mode
 	};
@@ -791,6 +794,17 @@ static int drv260x_probe(struct i2c_client *client,
 	/* Reset the chip */
 	drv260x_write_reg(MODE_REG, MODE_RESET);
 
+	udelay(850);
+	/* Read status */
+	err = drv260x_read_reg(STATUS_REG);
+
+	if (err < 0) {
+		pr_err("drv260x: HW init failed\n");
+		device_destroy(drv260x->class, drv260x->version);
+		class_destroy(drv260x->class);
+		return -ENODEV;
+	}
+
 	if (pdata->default_effect)
 		drv260x->default_sequence[0] = pdata->default_effect;
 	else
@@ -805,6 +819,12 @@ static int drv260x_probe(struct i2c_client *client,
 		drv260x->overdrive_voltage = pdata->overdrive_voltage;
 	else
 		drv260x->overdrive_voltage = ERM_OVERDRIVE_CLAMP_VOLTAGE;
+
+	if (pdata->rtp_overdrive_voltage)
+		drv260x->rtp_overdrive_voltage = pdata->rtp_overdrive_voltage;
+	else
+		drv260x->rtp_overdrive_voltage =
+					RTP_ERM_OVERDRIVE_CLAMP_VOLTAGE;
 
 	if (pdata->disable_calibration)
 		drv260x->disable_calibration = pdata->disable_calibration;
@@ -826,7 +846,7 @@ static int drv260x_probe(struct i2c_client *client,
 
 static void probe_work(struct work_struct *work)
 {
-	char status;
+	int status;
 
 	drv260x_update_init_sequence(ERM_autocal_sequence,
 					sizeof(ERM_autocal_sequence),
@@ -1001,6 +1021,10 @@ static ssize_t drv260x_read(struct file *filp, char *buff, size_t length,
 static ssize_t drv260x_write(struct file *filp, const char *buff, size_t len,
 			     loff_t * off)
 {
+
+	if (drv260x->client == NULL)
+		return len;
+
 	mutex_lock(&vibdata.lock);
 	hrtimer_cancel(&vibdata.timer);
 
@@ -1149,7 +1173,7 @@ static int drv260x_init(void)
 {
 	int reval = -ENOMEM;
 
-	drv260x = kmalloc(sizeof *drv260x, GFP_KERNEL);
+	drv260x = kzalloc(sizeof(struct drv260x), GFP_KERNEL);
 	if (!drv260x) {
 		printk(KERN_ALERT
 		       "drv260x: cannot allocate memory for drv260x driver\n");
