@@ -1457,7 +1457,11 @@ endif	# skip-makefile
 
 # boot image builder
 ifeq "$(TOP)" "./"
+ifeq ($(VARIANT),)
+$(info VARIANT not specified. Not loading bootimage building rules.)
+else
 include bootimage.mk
+endif
 endif
 
 PHONY += FORCE
