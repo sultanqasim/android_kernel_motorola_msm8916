@@ -27,10 +27,6 @@ $(KERNEL_IMAGE): zImage
 ramdisk: $(RAMDISK)
 FORCE_RDISK:
 
-ifeq ($(VARIANT),)
-$(error VARIANT not specified)
-endif
-
 RAMDISK_ROOT = "boot/ramdisk_$(VARIANT)"
 
 ifneq ($(shell test -d $(RAMDISK_ROOT); echo $$?),0)
