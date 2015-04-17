@@ -57,6 +57,7 @@ on boot
     chmod 0664 /sys/class/backlight/lcd-backlight:0/brightness
     chown system system /sys/class/backlight/lcd-backlight:0/max_brightness
     chmod 0664 /sys/class/backlight/lcd-backlight:0/max_brightness
+    chmod 0664 /sys/class/leds/lcd-backlight/brightness
 
     # Change ownership and permission for vibrator
     chown system system /sys/class/timed_output/vibrator/enable
@@ -156,6 +157,10 @@ on post-fs-data
 
     # Create directory for cutback
     mkdir /data/misc/cutback 0770 radio wifi
+
+    #setup folder for WLAN WAPI
+    mkdir /data/wapi_certificate 0750 system wifi
+    chown system wifi /data/wapi_certificate
 
     # Create directory used by power_supply_logger
     mkdir /data/power_supply_logger 0750 mot_pwric log
