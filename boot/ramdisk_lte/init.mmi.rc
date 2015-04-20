@@ -7,6 +7,9 @@ import init.mmi.debug.rc
 import init.mmi.volte.rc
 
 on early-init
+    # Set boot up stage I/O scheduler
+    write /sys/block/mmcblk0/queue/scheduler deadline
+
     # Create modem FSG mount point
     mkdir /fsg 755 root root
 
@@ -256,6 +259,8 @@ on property:persist.qe.trigger=1
 
 on property:sys.boot_completed=1
     start qe
+    # restore the default I/O scheduler for mobile device
+    write /sys/block/mmcblk0/queue/scheduler cfq
 
 # Start Sensor daemon
 service stml0xx /system/bin/stml0xx boot
@@ -285,7 +290,7 @@ on property:tcmd.suspend=2
     stop sensors
     write /sys/kernel/factory_gsbi12_mode/install 1
     setprop debug.sf.nobootanimation 1
-    stop ptt_logging
+    stop wlan_logging
 
 on property:persist.sys.diag_mdlog.on=1
     start diag_mdlog
