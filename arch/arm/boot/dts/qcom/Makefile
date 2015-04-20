@@ -28,7 +28,6 @@ dtb-$(CONFIG_ARCH_MSM8974) += msm8974-v1-cdp.dtb \
 	msm8974pro-ac-pm8941-liquid.dtb \
 	msm8974pro-ac-pm8941-mtp.dtb \
 	msm8974pro-ac-pma8084-pm8941-mtp.dtb
-
 dtb-$(CONFIG_ARCH_MSM8909) += msm8909-sim.dtb \
 	msm8909-rumi.dtb \
 	msm8909-qrd-skua.dtb \
@@ -40,7 +39,6 @@ dtb-$(CONFIG_ARCH_MSM8909) += msm8909-sim.dtb \
 	msm8909-1gb-qrd-skua.dtb \
 	msm8909-1gb-cdp.dtb \
 	msm8909-1gb-mtp.dtb
-
 # Do not include QC default DTBs if not needed
 ifneq ($(CONFIG_MMI_DEVICE_DTBS),y)
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-sim.dtb \
@@ -132,29 +130,22 @@ dtb-$(CONFIG_ARCH_MSM8226) += msm8226-sim.dtb \
 	apq8026-v2-720p-mtp.dtb \
 	apq8026-v2-320p-w-mtp.dtb \
 	apq8026-v2-1080p-mtp.dtb
-
-# Do not include QC default DTBs if not needed
-ifneq ($(CONFIG_MMI_DEVICE_DTBS),y)
-dtb-$(CONFIG_ARCH_MSM8610) += msm8610-v1-cdp.dtb \
+dtb-$(CONFIG_ARCH_MSM8610) += msm8610-rumi.dtb \
+	msm8610-v1-cdp.dtb \
 	msm8610-v2-cdp.dtb \
 	msm8610-v1-mtp.dtb \
 	msm8610-v2-mtp.dtb \
-	msm8610-rumi.dtb \
 	msm8610-sim.dtb \
 	msm8610-v1-qrd-skuaa.dtb \
 	msm8610-v1-qrd-skuab.dtb \
 	msm8610-v2-qrd-skuaa.dtb \
 	msm8610-v2-qrd-skuab.dtb
-endif
-
 dtb-$(CONFIG_ARCH_FSM9900) += fsm9900-rumi.dtb \
 	fsm9900-sim.dtb \
 	fsm9900-cdp.dtb \
 	fsm9900-mtp-v1.0.dtb \
 	fsm9900-mtp-v1.1.dtb
-
 dtb-$(CONFIG_ARCH_FSM9010) += fsm9010-rumi.dtb
-
 dtb-$(CONFIG_ARCH_MDM9630) += mdm9630-sim.dtb \
 	mdm9630-v1-cdp.dtb \
 	mdm9630-v1-mtp.dtb \
@@ -164,17 +155,14 @@ dtb-$(CONFIG_ARCH_MDM9630) += mdm9630-sim.dtb \
 	mdm9630-v2-gf-cdp.dtb  \
 	mdm9630-v2-tsmc-mtp.dtb \
 	mdm9630-v2-gf-mtp.dtb
-
 dtb-$(CONFIG_ARCH_MSMZIRC) += msmzirc-sim.dtb \
 	msmzirc-rumi.dtb \
 	msmzirc-cdp.dtb \
 	msmzirc-mtp.dtb
-
 dtb-$(CONFIG_ARCH_MDMFERRUM) += mdmferrum-sim.dtb \
 	mdmferrum-rumi.dtb \
 	mdmferrum-cdp.dtb \
 	mdmferrum-mtp.dtb
-
 dtb-$(CONFIG_ARCH_APQ8084) += apq8084-v1.0-old-pwr-grid-liquid.dtb \
 	apq8084-v1.1-old-pwr-grid-liquid.dtb \
 	apq8084-v1.1-liquid.dtb \
@@ -202,7 +190,6 @@ dtb-$(CONFIG_ARCH_APQ8084) += apq8084-v1.0-old-pwr-grid-liquid.dtb \
 	apq8084-v1.1-old-pwr-grid-mdm9x35-alt-cdp.dtb \
 	apq8084-v1.1-mdm9x35-alt-cdp.dtb \
 	apq8084-v1.1-sbc.dtb
-
 dtb-$(CONFIG_ARCH_MSM8994) += msm8994-v1-sim.dtb \
 	msm8994-rumi.dtb \
 	msm8994-v1-cdp.dtb \
@@ -240,8 +227,8 @@ dtb-$(CONFIG_ARCH_MSM8992) += msm8992-sim.dtb \
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p1bd.dtb
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p2a.dtb
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p2ad.dtb
-dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p2b.dtb
-dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p2bd.dtb
+#dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p2b.dtb
+#dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p2bd.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p3.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p3d.dtb
 
@@ -262,24 +249,6 @@ dtb-$(CONFIG_ARCH_MSM8916) += msm8916-osprey-p2bd.dtb
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p1b.dtb
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p1c.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p2a.dtb
-
-# MSM8610 Motorola Devices
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p0.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p0c.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p0c-v2.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p1b.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p1b-v2.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p1c.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p1c-v2.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p1d.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p1d-v2.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p2.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p2a1.dtb
-dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p2b.dtb
-dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p2b1.dtb
-#dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p1.dtb
-dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p2.dtb
-dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p2b.dtb
 
 ifeq ($(CONFIG_MMI_DEVICE_DTBS),y)
 # Add 1k of padding to the DTBs to allow for environment variables
