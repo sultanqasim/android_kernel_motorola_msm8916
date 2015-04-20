@@ -2409,7 +2409,7 @@ static inline int nr_big_tasks(struct rq *rq)
 
 #define sched_enable_power_aware 0
 
-static inline int select_best_cpu(struct task_struct *p, int target, int reason, int sync)
+static inline int select_best_cpu(struct task_struct *p, int target, int reason)
 {
 	return 0;
 }

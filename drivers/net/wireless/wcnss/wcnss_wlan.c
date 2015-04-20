@@ -2033,7 +2033,7 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 {
 	int len = 0;
 	int rc = 0;
-	unsigned char buf[sizeof(struct wcnss_version)] = {0};
+	unsigned char buf[sizeof(struct wcnss_version)];
 	unsigned char build[WCNSS_MAX_BUILD_VER_LEN+1];
 	struct smd_msg_hdr *phdr;
 	struct smd_msg_hdr smd_msg;
@@ -2056,9 +2056,6 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 		return;
 	}
 	len -= sizeof(struct smd_msg_hdr);
-
-    // avoid warnings
-    if (len < 0) len = 0;
 
 	phdr = (struct smd_msg_hdr *)buf;
 

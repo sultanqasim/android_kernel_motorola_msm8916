@@ -28,7 +28,7 @@
 #include <linux/module.h>
 
 #include <asm/setup.h>
-#include <soc/qcom/mmi_watchdog.h>
+#include <mach/mmi_watchdog.h>
 #include <linux/kmsg_dump.h>
 
 /* from kernel/printk.c */
