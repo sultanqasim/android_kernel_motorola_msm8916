@@ -15,6 +15,7 @@
 #include <linux/sched.h>
 #include <linux/ctype.h>
 #include <linux/dcache.h>
+#include <linux/namei.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -139,6 +140,9 @@ static int f2fs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	stat_inc_inline_inode(inode);
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
+
+	if (IS_DIRSYNC(dir))
+		f2fs_sync_fs(sbi->sb, 1);
 	return 0;
 out:
 	handle_failed_inode(inode);
@@ -165,6 +169,9 @@ static int f2fs_link(struct dentry *old_dentry, struct inode *dir,
 	f2fs_unlock_op(sbi);
 
 	d_instantiate(dentry, inode);
+
+	if (IS_DIRSYNC(dir))
+		f2fs_sync_fs(sbi->sb, 1);
 	return 0;
 out:
 	clear_inode_flag(F2FS_I(inode), FI_INC_LINK);
@@ -180,6 +187,44 @@ struct dentry *f2fs_get_parent(struct dentry *child)
 	if (!ino)
 		return ERR_PTR(-ENOENT);
 	return d_obtain_alias(f2fs_iget(child->d_inode->i_sb, ino));
+}
+
+static int __recover_dot_dentries(struct inode *dir, nid_t pino)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(dir);
+	struct qstr dot = {.len = 1, .name = "."};
+	struct qstr dotdot = {.len = 2, .name = ".."};
+	struct f2fs_dir_entry *de;
+	struct page *page;
+	int err = 0;
+
+	f2fs_lock_op(sbi);
+
+	de = f2fs_find_entry(dir, &dot, &page, 0);
+	if (de) {
+		f2fs_dentry_kunmap(dir, page);
+		f2fs_put_page(page, 0);
+	} else {
+		err = __f2fs_add_link(dir, &dot, NULL, dir->i_ino, S_IFDIR);
+		if (err)
+			goto out;
+	}
+
+	de = f2fs_find_entry(dir, &dotdot, &page, 0);
+	if (de) {
+		f2fs_dentry_kunmap(dir, page);
+		f2fs_put_page(page, 0);
+	} else {
+		err = __f2fs_add_link(dir, &dotdot, NULL, pino, S_IFDIR);
+	}
+out:
+	if (!err) {
+		clear_inode_flag(F2FS_I(dir), FI_INLINE_DOTS);
+		mark_inode_dirty(dir);
+	}
+
+	f2fs_unlock_op(sbi);
+	return err;
 }
 
 static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
@@ -201,6 +246,16 @@ static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
 		inode = f2fs_iget(dir->i_sb, ino);
 		if (IS_ERR(inode))
 			return ERR_CAST(inode);
+
+		if (f2fs_has_inline_dots(inode)) {
+			int err;
+
+			err = __recover_dot_dentries(inode, dir->i_ino);
+			if (err) {
+				iget_failed(inode);
+				return ERR_PTR(err);
+			}
+		}
 	}
 
 	return d_splice_alias(inode, dentry);
@@ -234,9 +289,29 @@ static int f2fs_unlink(struct inode *dir, struct dentry *dentry)
 
 	/* In order to evict this inode, we set it dirty */
 	mark_inode_dirty(inode);
+
+	if (IS_DIRSYNC(dir))
+		f2fs_sync_fs(sbi->sb, 1);
 fail:
 	trace_f2fs_unlink_exit(inode, err);
 	return err;
+}
+
+static void *f2fs_follow_link(struct dentry *dentry, struct nameidata *nd)
+{
+	struct page *page;
+
+	page = page_follow_link_light(dentry, nd);
+	if (IS_ERR(page))
+		return page;
+
+	/* this is broken symlink case */
+	if (*nd_get_link(nd) == 0) {
+		kunmap(page);
+		page_cache_release(page);
+		return ERR_PTR(-ENOENT);
+	}
+	return page;
 }
 
 static int f2fs_symlink(struct inode *dir, struct dentry *dentry,
@@ -267,6 +342,20 @@ static int f2fs_symlink(struct inode *dir, struct dentry *dentry,
 
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
+
+	/*
+	 * Let's flush symlink data in order to avoid broken symlink as much as
+	 * possible. Nevertheless, fsyncing is the best way, but there is no
+	 * way to get a file descriptor in order to flush that.
+	 *
+	 * Note that, it needs to do dir->fsync to make this recoverable.
+	 * If the symlink path is stored into inline_data, there is no
+	 * performance regression.
+	 */
+	filemap_write_and_wait_range(inode->i_mapping, 0, symlen - 1);
+
+	if (IS_DIRSYNC(dir))
+		f2fs_sync_fs(sbi->sb, 1);
 	return err;
 out:
 	handle_failed_inode(inode);
@@ -288,7 +377,7 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	inode->i_op = &f2fs_dir_inode_operations;
 	inode->i_fop = &f2fs_dir_operations;
 	inode->i_mapping->a_ops = &f2fs_dblock_aops;
-	mapping_set_gfp_mask(inode->i_mapping, GFP_F2FS_ZERO);
+	mapping_set_gfp_mask(inode->i_mapping, GFP_F2FS_HIGH_ZERO);
 
 	set_inode_flag(F2FS_I(inode), FI_INC_LINK);
 	f2fs_lock_op(sbi);
@@ -303,6 +392,8 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
 
+	if (IS_DIRSYNC(dir))
+		f2fs_sync_fs(sbi->sb, 1);
 	return 0;
 
 out_fail:
@@ -345,8 +436,12 @@ static int f2fs_mknod(struct inode *dir, struct dentry *dentry,
 	f2fs_unlock_op(sbi);
 
 	alloc_nid_done(sbi, inode->i_ino);
+
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
+
+	if (IS_DIRSYNC(dir))
+		f2fs_sync_fs(sbi->sb, 1);
 	return 0;
 out:
 	handle_failed_inode(inode);
@@ -459,6 +554,9 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 
 	f2fs_unlock_op(sbi);
+
+	if (IS_DIRSYNC(old_dir) || IS_DIRSYNC(new_dir))
+		f2fs_sync_fs(sbi->sb, 1);
 	return 0;
 
 put_out_dir:
@@ -500,7 +598,7 @@ const struct inode_operations f2fs_dir_inode_operations = {
 
 const struct inode_operations f2fs_symlink_inode_operations = {
 	.readlink       = generic_readlink,
-	.follow_link    = page_follow_link_light,
+	.follow_link    = f2fs_follow_link,
 	.put_link       = page_put_link,
 	.getattr	= f2fs_getattr,
 	.setattr	= f2fs_setattr,
