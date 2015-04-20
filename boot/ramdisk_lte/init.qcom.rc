@@ -542,7 +542,7 @@ service ptt_ffbm /system/bin/ptt_socket_app -f -d
 
 # This starts as root but later drops down to WIFI_AID just like
 #supplicant
-service ptt_logging /system/bin/ptt_socket_app -d
+service wlan_logging /system/bin/ptt_socket_app -d
     class main
     disabled
     group wifi log

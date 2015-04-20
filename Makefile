@@ -643,8 +643,6 @@ KBUILD_CFLAGS	+= -fomit-frame-pointer
 endif
 endif
 
-KBUILD_CFLAGS   += $(call cc-option, -fno-var-tracking-assignments)
-
 ifdef CONFIG_DEBUG_INFO
 KBUILD_CFLAGS	+= -g
 KBUILD_AFLAGS	+= -gdwarf-2
@@ -1459,7 +1457,11 @@ endif	# skip-makefile
 
 # boot image builder
 ifeq "$(TOP)" "./"
+ifeq ($(VARIANT),)
+$(info VARIANT not specified. Not loading bootimage building rules.)
+else
 include bootimage.mk
+endif
 endif
 
 PHONY += FORCE
