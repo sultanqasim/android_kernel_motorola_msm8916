@@ -9,20 +9,17 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-*/
-
-#ifndef __qmp_sphinx_RINGBUF_H__
-#define __qmp_sphinx_RINGBUF_H__
-
-/*
- * This header exports pingpong's API
  */
 
-int ringbuf_init(struct qmp_sphinx_logk_dev *sdev);
-struct qmp_sphinx_logk_blk *ringbuf_fetch_wr_block
-(struct qmp_sphinx_logk_dev *sdev);
-void ringbuf_finish_writer(struct qmp_sphinx_logk_dev *sdev);
-void ringbuf_cleanup(struct qmp_sphinx_logk_dev *sdev);
-int ringbuf_count_marked(struct qmp_sphinx_logk_dev *sdev);
+#ifndef __SOC_QCOM_CORE_CTL_H
+#define __SOC_QCOM_CORE_CTL_H
+
+extern void core_ctl_block_hotplug(void);
+extern void core_ctl_unblock_hotplug(void);
+extern s64 core_ctl_get_time(void);
+extern struct cpufreq_policy *core_ctl_get_policy(int cpu);
+extern void core_ctl_put_policy(struct cpufreq_policy *policy);
+extern struct device *core_ctl_find_cpu_device(unsigned cpu);
+extern int core_ctl_online_core(unsigned int cpu);
 
 #endif

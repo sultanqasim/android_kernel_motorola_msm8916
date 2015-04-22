@@ -17,6 +17,11 @@
 #include <net/sock.h>
 #include <net/fib_rules.h>
 
+#define uid_valid(uid) ((uid) != -1)
+#define uid_lte(a, b) ((a) <= (b))
+#define uid_eq(a, b) ((a) == (b))
+#define uid_gte(a, b) ((a) >= (b))
+
 int fib_default_rule_add(struct fib_rules_ops *ops,
 			 u32 pref, u32 table, u32 flags)
 {
@@ -630,6 +635,13 @@ static int fib_nl_fill_rule(struct sk_buff *skb, struct fib_rule *rule,
 	    (uid_valid(rule->uid_end) &&
 	     nla_put_uid(skb, FRA_UID_END, rule->uid_end)))
 		goto nla_put_failure;
+
+	if (uid_valid(rule->uid_start))
+	     nla_put_uid(skb, FRA_UID_START, rule->uid_start);
+
+	if (uid_valid(rule->uid_end))
+	     nla_put_uid(skb, FRA_UID_END, rule->uid_end);
+
 	if (ops->fill(rule, skb, frh) < 0)
 		goto nla_put_failure;
 
