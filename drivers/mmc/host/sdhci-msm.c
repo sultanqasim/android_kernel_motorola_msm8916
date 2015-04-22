@@ -3464,6 +3464,11 @@ static void sdhci_set_default_hw_caps(struct sdhci_msm_host *msm_host,
 	caps = readl_relaxed(host->ioaddr + SDHCI_CAPABILITIES);
 	caps &= ~CORE_SYS_BUS_SUPPORT_64_BIT;
 	writel_relaxed(caps, host->ioaddr + CORE_VENDOR_SPEC_CAPABILITIES0);
+	/* enable the quirk SDHCI_QUIRK2_USE_RESET_WORKAROUND */
+	host->quirks2 |= SDHCI_QUIRK2_USE_RESET_WORKAROUND;
+	val = readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+	writel_relaxed((val | CORE_ONE_MID_EN),
+		host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
 }
 
 static int sdhci_msm_probe(struct platform_device *pdev)
