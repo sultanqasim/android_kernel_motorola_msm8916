@@ -838,7 +838,7 @@
                 qcom,recharge-thresh-mv = <200>;
                 qcom,iterm-disabled;
                 qcom,aicl-disabled;
-                qcom,ir-comp-mv = <175>;
+                qcom,ir-comp-mv = <100>;
                 regulator-name = "smb1357_otg_vreg";
                 qcom,soft-vfloat-comp-disabled;
                 /* therm-bias-supply = <&pma8084_lvs2>; */
@@ -1003,10 +1003,10 @@
 		headset_removal_debounce = <0x0080>;
 		headset_button_down_debounce = <0x0032>;
 		headset_button_up_debounce = <0x0032>;
-		headset_button_0-1_threshold = <0x00B6>;
-		headset_button_1-2_threshold = <0x015B>;
-		headset_button_2-3_threshold = <0x021D>;
-		headset_button_3-upper_threshold = <0x0384>;
+		headset_button_0-1_threshold = <0x009D>;
+		headset_button_1-2_threshold = <0x0145>;
+		headset_button_2-3_threshold = <0x0201>;
+		headset_button_3-upper_threshold = <0x03B0>;
 		headset_button_1_keycode = <0xE2>;  /* KEY_MEDIA        */
 		headset_button_2_keycode = <0x246>; /* KEY_VOICECOMMAND */
 		headset_button_3_keycode = <0x73>;  /* KEY_VOLUMEUP     */
