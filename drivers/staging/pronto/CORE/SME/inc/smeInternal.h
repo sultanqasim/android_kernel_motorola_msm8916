@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -74,6 +74,7 @@ typedef enum eSmeCommandType
     eSmeCommandRemoveKey,
     eSmeCommandAddStaSession,
     eSmeCommandDelStaSession,
+    eSmeCommandPnoReq,
 #ifdef FEATURE_WLAN_TDLS
     //eSmeTdlsCommandMask = 0x80000,  //To identify TDLS commands <TODO>
     //These can be considered as csr commands. 
@@ -159,6 +160,7 @@ typedef struct tagSmeStruct
    int  extScanStartReqId;
    void *pEXTScanCallbackContext;
 #endif /* WLAN_FEATURE_EXTSCAN */
+   void (*pBtCoexTDLSNotification) (void *pAdapter, int);
 
 } tSmeStruct, *tpSmeStruct;
 

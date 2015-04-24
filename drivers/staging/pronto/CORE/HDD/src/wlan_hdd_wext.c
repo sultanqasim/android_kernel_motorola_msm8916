@@ -4397,19 +4397,18 @@ static int __iw_setint_getnone(struct net_device *dev,
     hdd_wext_state_t  *pWextState =  WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
     int cmd_len = wrqu->data.length;
     int *value = (int *) kmalloc(cmd_len+1, GFP_KERNEL);
-    int sub_cmd;
-    int set_value;
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    int sub_cmd = value[0];
+    int set_value = value[1];
     int ret = 0; /* success */
     int enable_pbm, enable_mp;
 #ifdef CONFIG_HAS_EARLYSUSPEND
     v_U8_t nEnableSuspendOld;
 #endif
-    INIT_COMPLETION(pWextState->completion_var);
 
-    if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
+    if (0 != wlan_hdd_validate_context(pHddCtx))
     {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                                  "%s:LOGP in Progress. Ignore!!!", __func__);
+        hddLog(VOS_TRACE_LEVEL_ERROR, FL("HDD context is not valid"));
         return -EBUSY;
     }
     if(value == NULL)
@@ -4424,6 +4423,8 @@ static int __iw_setint_getnone(struct net_device *dev,
      sub_cmd = value[0];
      set_value = value[1];
      kfree(value);
+
+    INIT_COMPLETION(pWextState->completion_var);
 
     switch(sub_cmd)
     {
@@ -7814,7 +7815,7 @@ VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
      overflow.  This API is only invoked via ioctl, so it is
      serialized by the kernel rtnl_lock and hence does not need to be
      reentrant */
-  static tSirPNOScanReq pnoRequest;
+  tSirPNOScanReq pnoRequest = {0};
   char *ptr;
   v_U8_t i,j, ucParams, ucMode;
   eHalStatus status = eHAL_STATUS_FAILURE;
@@ -7921,6 +7922,18 @@ VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
   }
 
   ptr += nOffset;
+
+  pnoRequest.aNetworks =
+           vos_mem_malloc(sizeof(tSirNetworkType)*pnoRequest.ucNetworksCount);
+  if (pnoRequest.aNetworks == NULL)
+  {
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+           FL("failed to allocate memory aNetworks %u"),
+               (uint32)sizeof(tSirNetworkType)*pnoRequest.ucNetworksCount);
+       goto error;
+  }
+  vos_mem_zero(pnoRequest.aNetworks,
+               sizeof(tSirNetworkType)*pnoRequest.ucNetworksCount);
 
   for ( i = 0; i < pnoRequest.ucNetworksCount; i++ )
   {
@@ -8108,6 +8121,24 @@ VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
   {
      pnoRequest.modePNO = SIR_PNO_MODE_ON_SUSPEND;
   }
+  pnoRequest.p24GProbeTemplate = vos_mem_malloc(SIR_PNO_MAX_PB_REQ_SIZE);
+  if (pnoRequest.p24GProbeTemplate == NULL){
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+          FL("failed to allocate memory p24GProbeTemplate %u"),
+              SIR_PNO_MAX_PB_REQ_SIZE);
+      goto error;
+  }
+
+  pnoRequest.p5GProbeTemplate = vos_mem_malloc(SIR_PNO_MAX_PB_REQ_SIZE);
+  if (pnoRequest.p5GProbeTemplate == NULL){
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+          FL("failed to allocate memory p5GProbeTemplate %u"),
+              SIR_PNO_MAX_PB_REQ_SIZE);
+      goto error;
+  }
+
+  vos_mem_zero(pnoRequest.p24GProbeTemplate, SIR_PNO_MAX_PB_REQ_SIZE);
+  vos_mem_zero(pnoRequest.p5GProbeTemplate, SIR_PNO_MAX_PB_REQ_SIZE);
 
   // IKHSS7-5797: set PNO intervals
   /* A set value represents the amount of time that PNO will wait between
@@ -8146,6 +8177,12 @@ error:
     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                 "%s: Failed to enable PNO", __func__);
     pHddCtx->isPnoEnable = FALSE;
+    if (pnoRequest.aNetworks)
+        vos_mem_free(pnoRequest.aNetworks);
+    if (pnoRequest.p24GProbeTemplate)
+        vos_mem_free(pnoRequest.p24GProbeTemplate);
+    if (pnoRequest.p5GProbeTemplate)
+        vos_mem_free(pnoRequest.p5GProbeTemplate);
     return VOS_STATUS_E_FAILURE;
 }/*iw_set_pno*/
 

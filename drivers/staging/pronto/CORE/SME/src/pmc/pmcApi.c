@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2941,10 +2941,12 @@ eHalStatus pmcSetPreferredNetworkList
 )
 {
     tpSirPNOScanReq pRequestBuf;
-    vos_msg_t msg;
     tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
     tANI_U8 ucDot11Mode;
+    tSmeCmd *pCommand;
+    tANI_U8 *tmp = NULL;
+    tANI_U16 len = 0;
 
     if (NULL == pSession)
     {
@@ -2952,108 +2954,124 @@ eHalStatus pmcSetPreferredNetworkList
                   "%s: pSession is NULL", __func__);
         return eHAL_STATUS_FAILURE;
     }
-    VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-               "%s: SSID = 0x%08x%08x%08x%08x%08x%08x%08x%08x, "
-               "0x%08x%08x%08x%08x%08x%08x%08x%08x", __func__,
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[0]),
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[4]),
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[8]),
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[12]),
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[16]),
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[20]),
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[24]),
-               *((v_U32_t *) &pRequest->aNetworks[0].ssId.ssId[28]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[0]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[4]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[8]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[12]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[16]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[20]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[24]),
-               *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[28]));
-    if (!pSession)
-    {
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-            "%s: pSessionis NULL", __func__);
-        return eHAL_STATUS_FAILURE;
-    }
 
-    pRequestBuf = vos_mem_malloc(sizeof(tSirPNOScanReq));
-    if (NULL == pRequestBuf)
+    pCommand = csrGetCommandBuffer(pMac);
+    if(NULL == pCommand)
     {
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to allocate memory for PNO request", __func__);
-        return eHAL_STATUS_FAILED_ALLOC;
+        smsLog( pMac, LOGE, FL(" fail to get command buffer") );
+        return eHAL_STATUS_RESOURCES;
     }
-
+    pRequestBuf = &(pCommand->u.pnoInfo);
     vos_mem_copy(pRequestBuf, pRequest, sizeof(tSirPNOScanReq));
-
-    /*Must translate the mode first*/
-    ucDot11Mode = (tANI_U8) csrTranslateToWNICfgDot11Mode(pMac, 
+    if (pRequestBuf->enable == 1)
+    {
+        if (pRequestBuf->ucNetworksCount == 0)
+        {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                      FL("Network count is 0"));
+            csrReleaseCommand(pMac, pCommand);
+            return eHAL_STATUS_FAILURE;
+        }
+        /*Must translate the mode first*/
+        ucDot11Mode = (tANI_U8) csrTranslateToWNICfgDot11Mode(pMac,
                                        csrFindBestPhyMode( pMac, pMac->roam.configParam.phyMode ));
 
-    /*Prepare a probe request for 2.4GHz band and one for 5GHz band*/
-    if (eSIR_SUCCESS == pmcPrepareProbeReqTemplate(pMac, SIR_PNO_24G_DEFAULT_CH,
-                              ucDot11Mode, pSession->selfMacAddr,
-                              pRequestBuf->p24GProbeTemplate,
-                              &pRequestBuf->us24GProbeTemplateLen))
-    {
-        /* Append IE passed by supplicant(if any) to probe request */
-        if ((0 < pRequest->us24GProbeTemplateLen) &&
-            ((pRequestBuf->us24GProbeTemplateLen +
-              pRequest->us24GProbeTemplateLen) < SIR_PNO_MAX_PB_REQ_SIZE ))
+        if (pRequestBuf->us24GProbeTemplateLen ||
+                 pRequestBuf->us5GProbeTemplateLen)
         {
-            vos_mem_copy((tANI_U8 *)&pRequestBuf->p24GProbeTemplate +
-                          pRequestBuf->us24GProbeTemplateLen,
-                          (tANI_U8 *)&pRequest->p24GProbeTemplate,
-                          pRequest->us24GProbeTemplateLen);
-            pRequestBuf->us24GProbeTemplateLen +=
-                                                pRequest->us24GProbeTemplateLen;
-            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                   "%s: pRequest->us24GProbeTemplateLen = %d", __func__,
-                    pRequest->us24GProbeTemplateLen);
+            tmp = vos_mem_malloc(SIR_PNO_MAX_PB_REQ_SIZE);
+            if (tmp == NULL)
+            {
+                VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                    FL("failed to allocate memory"));
+            }
+            /* Continue even mem alloc fails as driver can still go ahead
+             * without supplicant IE's in probe req.
+             */
         }
-        else
+
+        if (NULL != tmp)
         {
-            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+            len = pRequestBuf->us24GProbeTemplateLen;
+            if (0 != len && len <= SIR_PNO_MAX_PB_REQ_SIZE)
+            {
+                vos_mem_copy(tmp, pRequestBuf->p24GProbeTemplate, len);
+            }
+        }
+
+        /*Prepare a probe request for 2.4GHz band and one for 5GHz band*/
+        if (eSIR_SUCCESS == pmcPrepareProbeReqTemplate(pMac, SIR_PNO_24G_DEFAULT_CH,
+                                  ucDot11Mode, pSession->selfMacAddr,
+                                  pRequestBuf->p24GProbeTemplate,
+                                  &pRequestBuf->us24GProbeTemplateLen))
+        {
+            /* Append IE passed by supplicant(if any) to probe request */
+            if ((0 < len) &&((pRequestBuf->us24GProbeTemplateLen + len)
+                              < SIR_PNO_MAX_PB_REQ_SIZE ))
+            {
+                vos_mem_copy((tANI_U8 *)&pRequestBuf->p24GProbeTemplate +
+                              pRequestBuf->us24GProbeTemplateLen,
+                              tmp,
+                              len);
+                pRequestBuf->us24GProbeTemplateLen += len;
+                VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                     "%s: us24GProbeTemplateLen = %d", __func__,
+                      pRequestBuf->us24GProbeTemplateLen);
+            }
+            else
+            {
+                VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                    "%s: Extra ie discarded on 2.4G, IE length = %d Max IE length is %d",
-                   __func__, pRequest->us24GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
+                   __func__, pRequestBuf->us24GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
+            }
         }
-    }
 
-    if (eSIR_SUCCESS == pmcPrepareProbeReqTemplate(pMac, SIR_PNO_5G_DEFAULT_CH,
-                               ucDot11Mode, pSession->selfMacAddr,
-                               pRequestBuf->p5GProbeTemplate,
-                               &pRequestBuf->us5GProbeTemplateLen))
-    {
-        /* Append IE passed by supplicant(if any) to probe request */
-        if ((0 < pRequest->us5GProbeTemplateLen ) &&
-            ((pRequestBuf->us5GProbeTemplateLen +
-              pRequest->us5GProbeTemplateLen) < SIR_PNO_MAX_PB_REQ_SIZE ))
+        len = 0;
+        if (NULL != tmp)
         {
-            vos_mem_copy((tANI_U8 *)&pRequestBuf->p5GProbeTemplate +
+            len = pRequestBuf->us5GProbeTemplateLen;
+            if (0 != len && len <= SIR_PNO_MAX_PB_REQ_SIZE)
+            {
+                vos_mem_copy(tmp, pRequestBuf->p5GProbeTemplate, len);
+            }
+        }
+
+        if (eSIR_SUCCESS == pmcPrepareProbeReqTemplate(pMac, SIR_PNO_5G_DEFAULT_CH,
+                                   ucDot11Mode, pSession->selfMacAddr,
+                                   pRequestBuf->p5GProbeTemplate,
+                                   &pRequestBuf->us5GProbeTemplateLen))
+        {
+            /* Append IE passed by supplicant(if any) to probe request */
+            if ((0 < len) &&((pRequestBuf->us5GProbeTemplateLen + len)
+                              < SIR_PNO_MAX_PB_REQ_SIZE))
+            {
+                vos_mem_copy((tANI_U8 *)&pRequestBuf->p5GProbeTemplate +
                           pRequestBuf->us5GProbeTemplateLen,
-                          (tANI_U8 *)&pRequest->p5GProbeTemplate,
-                          pRequest->us5GProbeTemplateLen);
-            pRequestBuf->us5GProbeTemplateLen += pRequest->us5GProbeTemplateLen;
-            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                    "%s: pRequestBuf->us5GProbeTemplateLen = %d", __func__,
-                     pRequest->us5GProbeTemplateLen);
+                          tmp,
+                          len);
+                pRequestBuf->us5GProbeTemplateLen += len;
+                VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                    "%s: us5GProbeTemplateLen = %d", __func__,
+                     pRequestBuf->us5GProbeTemplateLen);
+            }
+            else
+            {
+                VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                       "%s: Extra IE discarded on 5G, IE length = %d Max IE length is %d",
+                        __func__, pRequestBuf->us5GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
+            }
         }
-        else
-        {
-            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                   "%s: Extra IE discarded on 5G, IE length = %d Max IE length is %d",
-                    __func__, pRequest->us5GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
-        }
+        if (NULL != tmp)
+            vos_mem_free(tmp);
     }
+    pCommand->command = eSmeCommandPnoReq;
+    pCommand->sessionId = (tANI_U8)sessionId;
 
-    msg.type     = WDA_SET_PNO_REQ;
-    msg.reserved = 0;
-    msg.bodyptr  = pRequestBuf;
-    if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(VOS_MODULE_ID_WDA, &msg)))
+    if (!HAL_STATUS_SUCCESS(csrQueueSmeCommand(pMac, pCommand, TRUE)))
     {
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to post WDA_SET_PNO_REQ message to WDA", __func__);
-        vos_mem_free(pRequestBuf);
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                  FL("failed to post eSmeCommandPnoReq command"));
+        csrReleaseCommand(pMac, pCommand);
         return eHAL_STATUS_FAILURE;
     }
 

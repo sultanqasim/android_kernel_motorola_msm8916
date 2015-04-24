@@ -199,11 +199,13 @@ int hdd_hostapd_stop (struct net_device *dev)
 {
    ENTER();
 
-   //Stop all tx queues
-   netif_tx_disable(dev);
-   
-   //Turn OFF carrier state
-   netif_carrier_off(dev);
+   if(NULL != dev) {
+       //Stop all tx queues
+       netif_tx_disable(dev);
+
+       //Turn OFF carrier state
+       netif_carrier_off(dev);
+   }
 
    EXIT();
    return 0;
@@ -628,7 +630,7 @@ void hdd_clear_all_sta(hdd_adapter_t *pHostapdAdapter, v_PVOID_t usrDataForCallb
     }
 }
 
-static int hdd_stop_p2p_link(hdd_adapter_t *pHostapdAdapter,v_PVOID_t usrDataForCallback)
+static int hdd_stop_bss_link(hdd_adapter_t *pHostapdAdapter,v_PVOID_t usrDataForCallback)
 {
     struct net_device *dev;
     hdd_context_t     *pHddCtx = NULL;
@@ -648,7 +650,7 @@ static int hdd_stop_p2p_link(hdd_adapter_t *pHostapdAdapter,v_PVOID_t usrDataFor
     {
         if ( VOS_STATUS_SUCCESS == (status = WLANSAP_StopBss((WLAN_HDD_GET_CTX(pHostapdAdapter))->pvosContext) ) )
         {
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, FL("Deleting P2P link!!!!!!"));
+            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, FL("Deleting SAP/P2P link!!!!!!"));
         }
         clear_bit(SOFTAP_BSS_STARTED, &pHostapdAdapter->event_flags);
         wlan_hdd_decr_active_session(pHddCtx, pHostapdAdapter->device_mode);
@@ -721,7 +723,10 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 //@@@ need wep logic here to set privacy bit
                 vos_status = hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
                 if (!VOS_IS_STATUS_SUCCESS(vos_status))
+                {
                     hddLog(LOGW, FL("Failed to register BC STA %d"), vos_status);
+                    hdd_stop_bss_link(pHostapdAdapter, usrDataForCallback);
+                }
             }
             
             if (0 != (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff)
@@ -1067,10 +1072,10 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             return VOS_STATUS_SUCCESS;
 
         case eSAP_MAC_TRIG_STOP_BSS_EVENT :
-            vos_status = hdd_stop_p2p_link(pHostapdAdapter, usrDataForCallback);
+            vos_status = hdd_stop_bss_link(pHostapdAdapter, usrDataForCallback);
             if (!VOS_IS_STATUS_SUCCESS(vos_status))
             {
-                hddLog(LOGW, FL("hdd_stop_p2p_link failed %d"), vos_status);
+                hddLog(LOGW, FL("hdd_stop_bss_link failed %d"), vos_status);
             }
             return VOS_STATUS_SUCCESS;
 
@@ -1505,7 +1510,9 @@ void hdd_hostapd_ch_avoid_cb
    /* Get SAP context first
     * SAP and P2PGO would not concurrent */
    pHostapdAdapter = hdd_get_adapter(hddCtxt, WLAN_HDD_SOFTAP);
-   if ((pHostapdAdapter) && (unsafeChannelCount))
+   if ((pHostapdAdapter) &&
+       (test_bit(SOFTAP_BSS_STARTED, &pHostapdAdapter->event_flags)) &&
+       (unsafeChannelCount))
    {
       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                 "%s : Current operation channel %d",
@@ -1542,17 +1549,27 @@ static __iw_softap_setparam(struct net_device *dev,
     hdd_adapter_t *pHostapdAdapter = (netdev_priv(dev));
     tHalHandle hHal;
     int *value = (int *)(wrqu->data.pointer);
+    hdd_context_t *pHddCtx = NULL;
     int sub_cmd = value[0];
     int set_value = value[1];
     eHalStatus status;
     int ret = 0; /* success */
     v_CONTEXT_t pVosContext;
 
-    if (!pHostapdAdapter || !pHostapdAdapter->pHddCtx)
+    if (NULL == pHostapdAdapter)
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  "%s: either hostapd Adapter is null or HDD ctx is null",
+                  "%s: hostapd Adapter is null",
                   __func__);
+        return -1;
+    }
+
+    pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (0 != ret)
+    {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               "%s: HDD context is not valid (%d)", __func__, ret);
         return -1;
     }
 
@@ -3988,6 +4005,12 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
     v_U16_t unsafeChannelList[NUM_20MHZ_RF_CHANNELS];
     v_U16_t unsafeChannelCount;
 #endif /* FEATURE_WLAN_CH_AVOID */
+
+    if (pHddCtx->isLogpInProgress) {
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                       "%s:LOGP in Progress. Ignore!!!",__func__);
+       status = VOS_STATUS_E_FAILURE;
+    }
 
     ENTER();
        // Allocate the Wireless Extensions state structure   

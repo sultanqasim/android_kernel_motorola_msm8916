@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1926,6 +1926,7 @@ vos_fetch_tl_cfg_parms
   pTLConfig->ucAcWeights[1] = pConfig->WfqBeWeight;
   pTLConfig->ucAcWeights[2] = pConfig->WfqViWeight;
   pTLConfig->ucAcWeights[3] = pConfig->WfqVoWeight;
+  pTLConfig->ucAcWeights[4] = pConfig->WfqVoWeight;
   pTLConfig->ucReorderAgingTime[0] = pConfig->BkReorderAgingTime;/*WLANTL_AC_BK*/
   pTLConfig->ucReorderAgingTime[1] = pConfig->BeReorderAgingTime;/*WLANTL_AC_BE*/
   pTLConfig->ucReorderAgingTime[2] = pConfig->ViReorderAgingTime;/*WLANTL_AC_VI*/
@@ -2231,4 +2232,28 @@ VOS_STATUS  vos_randomize_n_bytes(void *start_addr, tANI_U32 n)
     get_random_bytes( start_addr, n);
 
     return eHAL_STATUS_SUCCESS;
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief vos_is_wlan_in_badState() - get isFatalError flag from WD Ctx
+
+  \param  - VOS_MODULE_ID   - module id
+          - moduleContext   - module context
+
+  \return -  isFatalError value if WDCtx is valid otherwise true
+
+  --------------------------------------------------------------------------*/
+v_BOOL_t vos_is_wlan_in_badState(VOS_MODULE_ID moduleId,
+                                 v_VOID_t *moduleContext)
+{
+    struct _VosWatchdogContext *pVosWDCtx = get_vos_watchdog_ctxt();
+
+    if (pVosWDCtx == NULL){
+        VOS_TRACE(moduleId, VOS_TRACE_LEVEL_ERROR,
+                "%s: global wd context is null", __func__);
+
+        return TRUE;
+    }
+    return pVosWDCtx->isFatalError;
 }

@@ -3801,6 +3801,20 @@ typedef struct
 }WDI_EnterImpsReqParamsType;
 
 /*---------------------------------------------------------------------------
+  WDI_ExitImpsReqParamsType
+  Exit IMPS parameters passed to WDI from WDA
+----------------------------------------------------------------------------*/
+typedef struct
+{
+   /*Request status callback offered by UMAC */
+   WDI_ReqStatusCb         wdiReqStatusCB;
+   /*The user data passed in by UMAC, it will be sent back when the above
+   function pointer will be called */
+   void*                   pUserData;
+
+}WDI_ExitImpsReqParamsType;
+
+/*---------------------------------------------------------------------------
   WDI_EnterBmpsReqParamsType
   Enter BMPS parameters passed from WDI to WDA
 ---------------------------------------------------------------------------*/
@@ -9022,6 +9036,7 @@ WDI_EnterImpsReq
 WDI_Status 
 WDI_ExitImpsReq
 (
+   WDI_ExitImpsReqParamsType *pwdiExitImpsReqParams,
    WDI_ExitImpsRspCb  wdiExitImpsRspCb,
    void*                   pUserData
 );

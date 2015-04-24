@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -76,7 +76,6 @@
 #include "sapApi.h"
 #include "macTrace.h"
 
-
 #ifdef DEBUG_ROAM_DELAY
 #include "vos_utils.h"
 #endif
@@ -96,6 +95,7 @@ extern eHalStatus pmcPrepareCommand( tpAniSirGlobal pMac, eSmeCommandType cmdTyp
                             tANI_U32 size, tSmeCmd **ppCmd );
 extern void pmcReleaseCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand );
 extern void qosReleaseCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand );
+extern void csrReleaseRocReqCommand( tpAniSirGlobal pMac);
 extern eHalStatus p2pProcessRemainOnChannelCmd(tpAniSirGlobal pMac, tSmeCmd *p2pRemainonChn);
 extern eHalStatus sme_remainOnChnRsp( tpAniSirGlobal pMac, tANI_U8 *pMsg);
 extern eHalStatus sme_mgmtFrmInd( tHalHandle hHal, tpSirSmeMgmtFrameInd pSmeMgmtFrm);
@@ -458,12 +458,24 @@ tSmeCmd *smeGetCommandBuffer( tpAniSirGlobal pMac )
         csrLLUnlock(&pMac->roam.roamCmdPendingList);
     }
 
+    if( pRetCmd )
+    {
+         vos_mem_set((tANI_U8 *)&pRetCmd->command, sizeof(pRetCmd->command), 0);
+         vos_mem_set((tANI_U8 *)&pRetCmd->sessionId, sizeof(pRetCmd->sessionId), 0);
+         vos_mem_set((tANI_U8 *)&pRetCmd->u, sizeof(pRetCmd->u), 0);
+    }
+
     return( pRetCmd );
 }
 
 
 void smePushCommand( tpAniSirGlobal pMac, tSmeCmd *pCmd, tANI_BOOLEAN fHighPriority )
 {
+    if (!SME_IS_START(pMac))
+    {
+       smsLog( pMac, LOGE, FL("Sme in stop state"));
+       return;
+    }
     if ( fHighPriority )
     {
         csrLLInsertHead( &pMac->sme.smeCmdPendingList, &pCmd->Link, LL_ACCESS_LOCK );
@@ -689,6 +701,30 @@ tANI_BOOLEAN smeProcessScanQueue(tpAniSirGlobal pMac)
 end:
     csrLLUnlock(&pMac->sme.smeScanCmdActiveList);
     return status;
+}
+
+eHalStatus smeProcessPnoCommand(tpAniSirGlobal pMac, tSmeCmd *pCmd)
+{
+    tpSirPNOScanReq pnoReqBuf;
+    tSirMsgQ msgQ;
+
+    pnoReqBuf = vos_mem_malloc(sizeof(tSirPNOScanReq));
+    if ( NULL == pnoReqBuf )
+    {
+        smsLog(pMac, LOGE, FL("failed to allocate memory"));
+        return eHAL_STATUS_FAILURE;
+    }
+
+    vos_mem_copy(pnoReqBuf, &(pCmd->u.pnoInfo), sizeof(tSirPNOScanReq));
+
+    smsLog(pMac, LOG1, FL("post WDA_SET_PNO_REQ comamnd"));
+    msgQ.type = WDA_SET_PNO_REQ;
+    msgQ.reserved = 0;
+    msgQ.bodyptr = pnoReqBuf;
+    msgQ.bodyval = 0;
+    wdaPostCtrlMsg( pMac, &msgQ);
+
+    return eHAL_STATUS_SUCCESS;
 }
 
 tANI_BOOLEAN smeProcessCommand( tpAniSirGlobal pMac )
@@ -990,7 +1026,22 @@ sme_process_cmd:
                                 }
                             }
                             break;
+                        case eSmeCommandPnoReq:
+                            csrLLUnlock( &pMac->sme.smeCmdActiveList );
+                            status = smeProcessPnoCommand(pMac, pCommand);
+                            if (!HAL_STATUS_SUCCESS(status)){
+                                smsLog(pMac, LOGE,
+                                  FL("failed to post SME PNO SCAN %d"), status);
+                            }
+                            //We need to re-run the command
+                            fContinue = eANI_BOOLEAN_TRUE;
 
+                            if (csrLLRemoveEntry(&pMac->sme.smeCmdActiveList,
+                                              &pCommand->Link, LL_ACCESS_LOCK))
+                            {
+                                csrReleaseCommand(pMac, pCommand);
+                            }
+                            break;
                         case eSmeCommandAddTs:
                         case eSmeCommandDelTs:
                             csrLLUnlock( &pMac->sme.smeCmdActiveList );
@@ -1456,6 +1507,7 @@ eHalStatus sme_UpdateConfig(tHalHandle hHal, tpSmeConfigParams pSmeConfigParams)
          pSmeConfigParams->csrConfig.isCoalesingInIBSSAllowed;
    pMac->fEnableDebugLog = pSmeConfigParams->fEnableDebugLog;
    pMac->fDeferIMPSTime = pSmeConfigParams->fDeferIMPSTime;
+   pMac->fBtcEnableIndTimerVal = pSmeConfigParams->fBtcEnableIndTimerVal;
 
    return status;
 }
@@ -3751,6 +3803,7 @@ eHalStatus sme_GetConfigParam(tHalHandle hHal, tSmeConfigParams *pParam)
          return status;
       }
 #endif
+      pParam->fBtcEnableIndTimerVal = pMac->fBtcEnableIndTimerVal;
       sme_ReleaseGlobalLock( &pMac->sme );
    }
 
@@ -6759,13 +6812,12 @@ eHalStatus sme_SetPowerParams(tHalHandle hHal, tSirSetPowerParamsReq* pwParams, 
     \param  hHal - The handle returned by macOpen.
     \param  sessionId - sessionId on which we need to abort scan.
     \param  reason - Reason to abort the scan.
-    \return VOS_STATUS
-            VOS_STATUS_E_FAILURE - failure
-            VOS_STATUS_SUCCESS  success
+    \return tSirAbortScanStatus Abort scan status
   ---------------------------------------------------------------------------*/
-eHalStatus sme_AbortMacScan(tHalHandle hHal, tANI_U8 sessionId,
-                            eCsrAbortReason reason)
+tSirAbortScanStatus sme_AbortMacScan(tHalHandle hHal, tANI_U8 sessionId,
+                                        eCsrAbortReason reason)
 {
+    tSirAbortScanStatus scanAbortStatus = eSIR_ABORT_SCAN_FAILURE;
     eHalStatus status;
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
 
@@ -6774,12 +6826,12 @@ eHalStatus sme_AbortMacScan(tHalHandle hHal, tANI_U8 sessionId,
     status = sme_AcquireGlobalLock( &pMac->sme );
     if ( HAL_STATUS_SUCCESS( status ) )
     {
-       status = csrScanAbortMacScan(pMac, sessionId, reason);
+       scanAbortStatus = csrScanAbortMacScan(pMac, sessionId, reason);
 
        sme_ReleaseGlobalLock( &pMac->sme );
     }
 
-    return ( status );
+    return ( scanAbortStatus );
 }
 
 /* ----------------------------------------------------------------------------
@@ -10471,6 +10523,20 @@ VOS_STATUS sme_isSta_p2p_clientConnected(tHalHandle hHal)
     return VOS_STATUS_E_FAILURE;
 }
 
+/*
+ * SME API to check if any sessoion connected.
+ */
+VOS_STATUS sme_is_any_session_connected(tHalHandle hHal)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    if(csrIsAnySessionConnected(pMac))
+    {
+
+        return VOS_STATUS_SUCCESS;
+    }
+    return VOS_STATUS_E_FAILURE;
+}
+
 
 #ifdef FEATURE_WLAN_LPHB
 /* ---------------------------------------------------------------------------
@@ -11697,3 +11763,59 @@ void sme_disable_dfs_channel(tHalHandle hHal, bool disbale_dfs)
     csrDisableDfsChannel(pMac);
 
 }
+
+/* ---------------------------------------------------------------------------
+    \fn sme_RegisterBtCoexTDLSCallback
+    \brief  Used to plug in callback function
+            Which notify btcoex on or off.
+            Notification come from FW.
+    \param  hHal
+    \param  pCallbackfn : callback function pointer should be plugged in
+    \- return eHalStatus
+    -------------------------------------------------------------------------*/
+eHalStatus sme_RegisterBtCoexTDLSCallback
+(
+   tHalHandle hHal,
+   void (*pCallbackfn)(void *pAdapter, int )
+)
+{
+    eHalStatus          status    = eHAL_STATUS_SUCCESS;
+    tpAniSirGlobal      pMac      = PMAC_STRUCT(hHal);
+
+    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+              "%s: Plug in BtCoex TDLS CB", __func__);
+
+    status = sme_AcquireGlobalLock(&pMac->sme);
+    if (eHAL_STATUS_SUCCESS == status)
+    {
+        if (NULL != pCallbackfn)
+        {
+           pMac->sme.pBtCoexTDLSNotification = pCallbackfn;
+        }
+        sme_ReleaseGlobalLock(&pMac->sme);
+    }
+    return(status);
+}
+
+/* ---------------------------------------------------------------------------
+
+    \fn smeNeighborRoamIsHandoffInProgress
+
+    \brief  This function is a wrapper to call csrNeighborRoamIsHandoffInProgress
+
+    \param hHal - The handle returned by macOpen.
+
+    \return eANI_BOOLEAN_TRUE if reassoc in progress, eANI_BOOLEAN_FALSE otherwise
+
+---------------------------------------------------------------------------*/
+tANI_BOOLEAN smeNeighborRoamIsHandoffInProgress(tHalHandle hHal)
+{
+    return (csrNeighborRoamIsHandoffInProgress(PMAC_STRUCT(hHal)));
+}
+
+void sme_SetDefDot11Mode(tHalHandle hHal)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    csrSetDefaultDot11Mode(pMac);
+}
+
