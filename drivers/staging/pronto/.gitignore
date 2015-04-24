@@ -1,0 +1,6 @@
+*.o
+*.o.cmd
+*.ko
+*.ko.cmd
+modules.order
+wlan.mod.c
