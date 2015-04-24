@@ -25,6 +25,9 @@
 #include <linux/platform_data/leds-isl98611.h>
 #include <linux/of.h>
 #include <linux/regulator/consumer.h>
+#include <linux/notifier.h>
+#include <linux/fb.h>
+#include <linux/dropbox.h>
 
 #define ISL98611_NAME				"isl98611"
 #define ISL98611_QUEUE_NAME			"backlight-workqueue"
@@ -75,6 +78,7 @@
 #define PFM_MASK		0xFF
 #define BRGHT_LSB_MASK		0x07
 #define VLED_EN_MASK		0x08
+#define RESET_MASK		0x80
 
 #define VLED_ON_VAL		0x08
 #define VLED_OFF_VAL		0x00
@@ -83,6 +87,7 @@
 #define VPOFF_VAL		0x00
 #define VNOFF_VAL		0x00
 #define RESET_VAL		0x00
+#define NO_RESET_VAL		0x80
 #define CABC_VAL		0x80
 
 struct isl98611_chip {
@@ -93,6 +98,7 @@ struct isl98611_chip {
 	struct workqueue_struct *ledwq;
 	struct work_struct ledwork;
 	struct led_classdev cdev;
+	struct notifier_block fb_notif;
 };
 
 static const struct regmap_config isl98611_regmap = {
@@ -137,10 +143,9 @@ static int isl98611_update(struct isl98611_chip *pchip,
 }
 
 /* initialize chip */
-static int isl98611_chip_init(struct i2c_client *client)
+static int isl98611_chip_init(struct isl98611_chip *pchip)
 {
 	int rval = 0;
-	struct isl98611_chip *pchip = i2c_get_clientdata(client);
 	struct isl98611_platform_data *pdata = pchip->pdata;
 
 	if (!pdata->no_reset)
@@ -238,15 +243,15 @@ static void isl98611_brightness_set(struct work_struct *work)
 
 	if (level != old_level && old_level == 0) {
 		rc = isl98611_update(pchip, REG_ENABLE,
-			VLED_EN_MASK, VLED_ON_VAL);
+			VLED_EN_MASK | RESET_MASK, VLED_ON_VAL | NO_RESET_VAL);
 		printk_ratelimited(KERN_INFO
-			"isl98611 backlight on %s", (rc?"FAILED":""));
+			"isl98611 backlight on %s\n", (rc ? "FAILED" : ""));
 	}
 	 else if (level == 0 && old_level != 0) {
 		rc = isl98611_update(pchip, REG_ENABLE,
-			VLED_EN_MASK, VLED_OFF_VAL);
+			VLED_EN_MASK | RESET_MASK, VLED_OFF_VAL | NO_RESET_VAL);
 		printk_ratelimited(KERN_INFO
-			"isl98611 backlight off %s", (rc?"FAILED":""));
+			"isl98611 backlight off %s\n", (rc ? "FAILED" : ""));
 	}
 	old_level = level;
 
@@ -368,6 +373,60 @@ static const struct of_device_id of_isl98611_leds_match;
 
 #endif
 
+void isl98611_dropbox_report_recovery(struct isl98611_chip *pchip)
+{
+	char dropbox_entry[REG_MAX*7+1];
+	size_t size = sizeof(dropbox_entry);
+	char *cur = dropbox_entry;
+	u8 buf[REG_MAX+1];
+	int i = 0;
+
+	regmap_bulk_read(pchip->regmap, REG_STATUS, buf, REG_MAX);
+
+	for (i = 0; i <= REG_MAX; i++) {
+		int len = scnprintf(cur, size, "%02x: %02x\n", i, buf[i]);
+		cur += len;
+		size -= len;
+	}
+
+	pr_err("%s: dump:\n%s\n", __func__, dropbox_entry);
+	dropbox_queue_event_text("isl98611_reset_recovery", dropbox_entry,
+		strlen(dropbox_entry));
+}
+
+static int isl98611_fb_notifier_callback(struct notifier_block *self,
+	unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	struct isl98611_chip *pchip = container_of(self, struct isl98611_chip,
+		fb_notif);
+	int blank;
+
+	dev_dbg(pchip->dev, "%s+\n", __func__);
+
+	blank = *(int *)evdata->data;
+
+	if (event == FB_EVENT_BLANK && blank == FB_BLANK_UNBLANK) {
+		int regval;
+		regval = isl98611_read(pchip, REG_BRGHT_LSB);
+		if (regval) {
+			dev_err(pchip->dev,
+				"%s: REG_BRGHT_LSB is an unexpected value: %d\n",
+				__func__, regval);
+			dev_err(pchip->dev, "%s: Re-initialize the chip\n",
+				__func__);
+			isl98611_dropbox_report_recovery(pchip);
+			pchip->cdev.brightness = 0;
+			isl98611_write(pchip, REG_BRGHT_MSB, 0);
+			isl98611_chip_init(pchip);
+		}
+	}
+
+	dev_dbg(pchip->dev, "%s-\n", __func__);
+
+	return 0;
+}
+
 static int isl98611_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -428,7 +487,7 @@ static int isl98611_probe(struct i2c_client *client,
 	}
 
 	/* chip initialize */
-	rc = isl98611_chip_init(client);
+	rc = isl98611_chip_init(pchip);
 	if (rc < 0) {
 		dev_err(&client->dev, "fail : init chip");
 		return rc;
@@ -463,11 +522,21 @@ static int isl98611_probe(struct i2c_client *client,
 	if (pdata->default_on)
 		isl98611_led_set(&pchip->cdev, pdata->init_level);
 
+	pchip->fb_notif.notifier_call = isl98611_fb_notifier_callback;
+	rc = fb_register_client(&pchip->fb_notif);
+	if (rc) {
+		dev_err(&client->dev,
+			"Error registering fb_notifier: %d\n", rc);
+		goto fberr;
+	}
+
 	status = isl98611_read(pchip, REG_STATUS);
 	dev_info(pchip->dev, "probe success chip hw status %#x", status);
 
 	return 0;
 
+fberr:
+	led_classdev_unregister(&pchip->cdev);
 classerr:
 	destroy_workqueue(pchip->ledwq);
 	return rc;
@@ -477,6 +546,7 @@ static int isl98611_remove(struct i2c_client *client)
 {
 	struct isl98611_chip *pchip = i2c_get_clientdata(client);
 
+	fb_unregister_client(&pchip->fb_notif);
 	led_classdev_unregister(&pchip->cdev);
 	destroy_workqueue(pchip->ledwq);
 
