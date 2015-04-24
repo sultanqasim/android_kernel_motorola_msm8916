@@ -220,6 +220,16 @@
 #define CFG_IMPS_MAXIMUM_SLEEP_TIME_MAX        ( 65535 )
 #define CFG_IMPS_MAXIMUM_SLEEP_TIME_DEFAULT    ( 15 )
 
+/*If there is scan on STA interface back to back with
+ *time diff nDeferScanTimeInterval, driver will not
+ *issue a new scan. Driver will return cached result to kernel.
+ *the interval is in msec
+ */
+#define CFG_DEFER_SCAN_TIME_INTERVAL            "gDeferScanTimeInterval"
+#define CFG_DEFER_SCAN_TIME_INTERVAL_MIN        ( 0 )
+#define CFG_DEFER_SCAN_TIME_INTERVAL_MAX        ( 65535 )
+#define CFG_DEFER_SCAN_TIME_INTERVAL_DEFAULT    ( 2000  )
+
 //BMPS = BeaconModePowerSave
 #define CFG_ENABLE_BMPS_NAME                   "gEnableBmps"
 #define CFG_ENABLE_BMPS_MIN                    ( 0 )
@@ -2390,6 +2400,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_BURST_MODE_BE_TXOP_VALUE_MAX       ( 12288 )
 #define CFG_BURST_MODE_BE_TXOP_VALUE_DEFAULT   ( 0 )
 
+#define CFG_BTC_ENABLE_IND_TIMER_VALUE          "gBtcEnableIndTimerVal"
+#define CFG_BTC_ENABLE_IND_TIMER_VALUE_MIN     ( 5 )
+#define CFG_BTC_ENABLE_IND_TIMER_VALUE_MAX     ( 60 )
+#define CFG_BTC_ENABLE_IND_TIMER_VALUE_DEFAULT ( 60 )
+
 /*--------------------------------------------------------------------------- 
   Type declarations
   -------------------------------------------------------------------------*/ 
@@ -2409,6 +2424,7 @@ typedef struct
    v_BOOL_t      ShortSlotTimeEnabled;
    v_BOOL_t      Is11dSupportEnabled;
    v_BOOL_t      Is11hSupportEnabled;
+   v_U32_t       nDeferScanTimeInterval;
    v_BOOL_t      fEnforce11dChannels;
    v_BOOL_t      fSupplicantCountryCodeHasPriority;
    v_BOOL_t      fEnforceCountryCodeMatch;
@@ -2878,6 +2894,7 @@ typedef struct
    v_U8_t                      acsScanBandPreference;
    v_U16_t                     acsBandSwitchThreshold;
    v_U32_t                     enableDynamicRAStartRate;
+   v_U8_t                      btcEnableIndTimerVal;
    v_BOOL_t                    btcFastWlanConnPref;
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 

@@ -2489,7 +2489,7 @@ limAddSta(
     {
         /* peer STA get the LDPC capability from pStaDs, which populated from 
          * HT/VHT capability*/
-        if(pAddStaParams->vhtTxBFCapable && pMac->lim.disableLDPCWithTxbfAP)
+        if(pMac->lim.disableLDPCWithTxbfAP)
         {
             pAddStaParams->htLdpcCapable = 0;
             pAddStaParams->vhtLdpcCapable = 0;
@@ -3795,7 +3795,7 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
             }
 
             pAddBssParams->staContext.maxAmpduSize= pAssocRsp->HTCaps.maxRxAMPDUFactor;
-            if( pAddBssParams->staContext.vhtTxBFCapable && pMac->lim.disableLDPCWithTxbfAP )
+            if( pMac->lim.disableLDPCWithTxbfAP )
             {
                 pAddBssParams->staContext.htLdpcCapable = 0;
                 pAddBssParams->staContext.vhtLdpcCapable = 0;
@@ -4238,7 +4238,7 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
             }
 
             pAddBssParams->staContext.maxAmpduSize= pBeaconStruct->HTCaps.maxRxAMPDUFactor;
-            if( pAddBssParams->staContext.vhtTxBFCapable && pMac->lim.disableLDPCWithTxbfAP )
+            if( pMac->lim.disableLDPCWithTxbfAP )
             {
                 pAddBssParams->staContext.htLdpcCapable = 0;
                 pAddBssParams->staContext.vhtLdpcCapable = 0;

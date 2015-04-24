@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -510,31 +510,40 @@ int wlan_hdd_ipv6_changed(struct notifier_block *nb,
 {
     struct inet6_ifaddr *ifa = (struct inet6_ifaddr *)arg;
     struct net_device *ndev = ifa->idev->dev;
-    hdd_adapter_t *pAdapter =
-             container_of(nb, struct hdd_adapter_s, ipv6_notifier);
+    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
     hdd_context_t *pHddCtx;
+    VOS_STATUS vos_status;
     int status;
 
-    if (pAdapter && pAdapter->dev == ndev)
+    pHddCtx = container_of(nb, hdd_context_t, ipv6_notifier);
+    status = wlan_hdd_validate_context(pHddCtx);
+    if (0 != status)
     {
-        pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-        status = wlan_hdd_validate_context(pHddCtx);
-        if (0 != status)
-        {
-            hddLog(LOGE, FL("HDD context is invalid"));
-            return NOTIFY_DONE;
-        }
+        hddLog(LOGE, FL("HDD context is invalid"));
+        return NOTIFY_DONE;
+    }
 
-       if (pHddCtx->cfg_ini->nEnableSuspend ==
+    vos_status = hdd_get_front_adapter(pHddCtx, &pAdapterNode);
+    while (NULL != pAdapterNode && VOS_STATUS_SUCCESS == vos_status)
+    {
+        if (pAdapterNode->pAdapter && pAdapterNode->pAdapter->dev == ndev &&
+             (pAdapterNode->pAdapter->device_mode == WLAN_HDD_INFRA_STATION ||
+              pAdapterNode->pAdapter->device_mode == WLAN_HDD_P2P_CLIENT))
+        {
+            if (pHddCtx->cfg_ini->nEnableSuspend ==
                   WLAN_MAP_SUSPEND_TO_MCAST_BCAST_FILTER)
-       {
-           schedule_work(&pAdapter->ipv6NotifierWorkQueue);
-       }
-       else
-       {
-           hddLog(LOG1, FL("Not scheduling ipv6 wq nEnableSuspend = %d"),
-                            pHddCtx->cfg_ini->nEnableSuspend);
-       }
+            {
+                schedule_work(&pAdapterNode->pAdapter->ipv6NotifierWorkQueue);
+            }
+            else
+            {
+                hddLog(LOG1, FL("Not scheduling ipv6 wq nEnableSuspend = %d"),
+                             pHddCtx->cfg_ini->nEnableSuspend);
+            }
+            break;
+        }
+        vos_status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
+        pAdapterNode = pNext;
     }
 
     return NOTIFY_DONE;
@@ -968,45 +977,57 @@ int wlan_hdd_ipv4_changed(struct notifier_block *nb,
     struct in_device *in_dev;
 
     struct net_device *ndev = ifa->ifa_dev->dev;
-    hdd_adapter_t *pAdapter =
-             container_of(nb, struct hdd_adapter_s, ipv4_notifier);
+    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
     hdd_context_t *pHddCtx;
+    VOS_STATUS vos_status;
     int status;
-    if (pAdapter && pAdapter->dev == ndev)
+
+    pHddCtx = container_of(nb, hdd_context_t, ipv4_notifier);
+    status = wlan_hdd_validate_context(pHddCtx);
+    if (0 != status)
     {
-       pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-       status = wlan_hdd_validate_context(pHddCtx);
-       if (0 != status)
-       {
-           hddLog(LOGE, FL("HDD context is invalid"));
-           return NOTIFY_DONE;
-       }
+        hddLog(LOGE, FL("HDD context is invalid"));
+        return NOTIFY_DONE;
+    }
 
-       if ((pHddCtx->cfg_ini->nEnableSuspend !=
+    vos_status = hdd_get_front_adapter(pHddCtx, &pAdapterNode);
+    while (NULL != pAdapterNode && VOS_STATUS_SUCCESS == vos_status)
+    {
+        if (pAdapterNode->pAdapter && pAdapterNode->pAdapter->dev == ndev &&
+             (pAdapterNode->pAdapter->device_mode == WLAN_HDD_INFRA_STATION ||
+              pAdapterNode->pAdapter->device_mode == WLAN_HDD_P2P_CLIENT))
+        {
+            if ((pHddCtx->cfg_ini->nEnableSuspend !=
                   WLAN_MAP_SUSPEND_TO_MCAST_BCAST_FILTER)
-           || (!pHddCtx->cfg_ini->fhostArpOffload))
-       {
-           hddLog(LOG1, FL("Offload not enabled MCBC=%d, ARPOffload=%d"),
-                          pHddCtx->cfg_ini->nEnableSuspend,
-                          pHddCtx->cfg_ini->fhostArpOffload);
-           return NOTIFY_DONE;
-       }
+               || (!pHddCtx->cfg_ini->fhostArpOffload))
+            {
+                hddLog(LOG1, FL("Offload not enabled MCBC=%d, ARPOffload=%d"),
+                              pHddCtx->cfg_ini->nEnableSuspend,
+                              pHddCtx->cfg_ini->fhostArpOffload);
+                return NOTIFY_DONE;
+            }
 
-       if ((in_dev = __in_dev_get_rtnl(pAdapter->dev)) != NULL)
-       {
-           for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
-                   ifap = &ifa->ifa_next)
-           {
-               if (!strcmp(pAdapter->dev->name, ifa->ifa_label))
-               {
-                   break; /* found */
-               }
-           }
-       }
-       if(ifa && ifa->ifa_local)
-       {
-           schedule_work(&pAdapter->ipv4NotifierWorkQueue);
-       }
+            if ((in_dev =
+                  __in_dev_get_rtnl(pAdapterNode->pAdapter->dev)) != NULL)
+            {
+                for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
+                       ifap = &ifa->ifa_next)
+                {
+                    if (!strcmp(pAdapterNode->pAdapter->dev->name,
+                          ifa->ifa_label))
+                    {
+                        break; /* found */
+                    }
+                }
+            }
+            if(ifa && ifa->ifa_local)
+            {
+                schedule_work(&pAdapterNode->pAdapter->ipv4NotifierWorkQueue);
+            }
+            break;
+        }
+        vos_status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
+        pAdapterNode = pNext;
     }
 
     return NOTIFY_DONE;
@@ -1352,6 +1373,13 @@ void hdd_suspend_wlan(void)
       return;
    }
 
+   if (pHddCtx->hdd_wlan_suspended)
+   {
+      hddLog(VOS_TRACE_LEVEL_ERROR,
+             "%s: Ignore suspend wlan, Already suspended!", __func__);
+      return;
+   }
+
    pHddCtx->hdd_wlan_suspended = TRUE;
    hdd_set_pwrparams(pHddCtx);
    status =  hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
@@ -1642,6 +1670,13 @@ void hdd_resume_wlan(void)
    {
       hddLog(VOS_TRACE_LEVEL_INFO,
              "%s: Ignore resume wlan, LOGP in progress!", __func__);
+      return;
+   }
+
+   if (!pHddCtx->hdd_wlan_suspended)
+   {
+      hddLog(VOS_TRACE_LEVEL_ERROR,
+             "%s: Ignore resume wlan, Already resumed!", __func__);
       return;
    }
 
@@ -1985,6 +2020,9 @@ VOS_STATUS hdd_wlan_re_init(void)
 #ifdef HAVE_WCNSS_CAL_DOWNLOAD
    int              max_retries = 0;
 #endif
+#ifdef HAVE_CBC_DONE
+   int              max_cbc_retries = 0;
+#endif
 #ifdef WLAN_BTAMP_FEATURE
    hdd_config_t     *pConfig = NULL;
    WLANBAP_ConfigType btAmpConfig;
@@ -2002,6 +2040,15 @@ VOS_STATUS hdd_wlan_re_init(void)
    if (max_retries >= 10) {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: WCNSS driver not ready", __func__);
       goto err_re_init;
+   }
+#endif
+
+#ifdef HAVE_CBC_DONE
+   while (!wcnss_cbc_complete() && 20 >= ++max_cbc_retries) {
+       msleep(1000);
+   }
+   if (max_cbc_retries >= 20) {
+      hddLog(VOS_TRACE_LEVEL_FATAL, "%s:CBC not completed", __func__);
    }
 #endif
 
@@ -2193,8 +2240,6 @@ err_vosclose:
        /* If we hit this, it means wlan driver is in bad state and needs
        * driver unload and load.
        */
-       if (pHddCtx)
-           pHddCtx->isLogpInProgress = FALSE;
        vos_set_reinit_in_progress(VOS_MODULE_ID_VOSS, FALSE);
        return VOS_STATUS_E_FAILURE;
    }

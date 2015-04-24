@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3759,6 +3759,7 @@ WDI_EnterImpsReq
 WDI_Status
 WDI_ExitImpsReq
 (
+   WDI_ExitImpsReqParamsType *pwdiExitImpsReqParams,
    WDI_ExitImpsRspCb  wdiExitImpsRspCb,
    void*                   pUserData
 )
@@ -3781,8 +3782,8 @@ WDI_ExitImpsReq
     Fill in Event data and post to the Main FSM
   ------------------------------------------------------------------------*/
   wdiEventData.wdiRequest      = WDI_EXIT_IMPS_REQ;
-  wdiEventData.pEventData      = NULL;
-  wdiEventData.uEventDataSize  = 0;
+  wdiEventData.pEventData      = pwdiExitImpsReqParams;
+  wdiEventData.uEventDataSize  = sizeof(*pwdiExitImpsReqParams);
   wdiEventData.pCBfnc          = wdiExitImpsRspCb;
   wdiEventData.pUserData       = pUserData;
 
@@ -13797,13 +13798,16 @@ WDI_ProcessExitImpsReq
    wpt_uint8*               pSendBuffer         = NULL;
    wpt_uint16               usDataOffset        = 0;
    wpt_uint16               usSendSize          = 0;
+   WDI_ExitImpsReqParamsType *pwdiExitImpsReqParams = NULL;
    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
    /*-------------------------------------------------------------------------
      Sanity check
    -------------------------------------------------------------------------*/
    if (( NULL == pEventData ) ||
-       ( NULL == (wdiExitImpsRspCb   = (WDI_ExitImpsRspCb)pEventData->pCBfnc)))
+       ( NULL == (wdiExitImpsRspCb   = (WDI_ExitImpsRspCb)pEventData->pCBfnc)) ||
+        (NULL == (pwdiExitImpsReqParams =
+                 (WDI_ExitImpsReqParamsType*)pEventData->pEventData)))
    {
       WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_WARN,
                   "%s: Invalid parameters", __func__);
@@ -13826,7 +13830,8 @@ WDI_ProcessExitImpsReq
       WDI_ASSERT(0);
       return WDI_STATUS_E_FAILURE;
    }
-
+   pWDICtx->wdiReqStatusCB = pwdiExitImpsReqParams->wdiReqStatusCB;
+   pWDICtx->pReqStatusUserData = pwdiExitImpsReqParams->pUserData;
    /*-------------------------------------------------------------------------
      Send Get STA Request to HAL
    -------------------------------------------------------------------------*/
@@ -22083,7 +22088,8 @@ WDI_SendMsg
                 WDI_getRespMsgString(pWDICtx->wdiExpectedResponse),
                 pWDICtx->wdiExpectedResponse);
 
-     wdiStatus = WDI_STATUS_E_FAILURE;
+     wdiStatus = (ret == eWLAN_PAL_STATUS_E_FAILURE) ?
+                  WDI_STATUS_DEV_INTERNAL_FAILURE : WDI_STATUS_E_FAILURE;
    }
    else
    {
@@ -22116,8 +22122,10 @@ WDI_SendMsg
      (wdiStatus) to WDI_STATUS_PENDING. This makes sure that WDA doesnt
      end up repeating the functonality in the req callback  for the
      WDI_STATUS_E_FAILURE case*/
-     if (wdiStatus == WDI_STATUS_E_FAILURE)
+     if (wdiStatus != WDI_STATUS_SUCCESS)
+     {
        wdiStatus = WDI_STATUS_PENDING;
+     }
    }
 
   if ( wdiStatus == WDI_STATUS_SUCCESS )
@@ -22133,10 +22141,6 @@ WDI_SendMsg
   {
      /*Inform upper stack layers that a transport fatal error occurred*/
      WDI_DetectedDeviceError(pWDICtx, WDI_ERR_TRANSPORT_FAILURE);
-     if (eWLAN_PAL_STATUS_E_FAILURE == ret)
-     {
-         wdiStatus = WDI_STATUS_DEV_INTERNAL_FAILURE;
-     }
   }
 
   return wdiStatus;
@@ -24594,7 +24598,6 @@ WDI_CopyWDIStaCtxToHALStaCtx
 #endif
    /*Lightweight function - no sanity checks and no unecessary code to increase
     the chances of getting inlined*/
-
   wpalMemoryCopy(phalConfigSta->bssId,
                   pwdiConfigSta->macBSSID, WDI_MAC_ADDR_LEN);
 
@@ -24624,7 +24627,11 @@ WDI_CopyWDIStaCtxToHALStaCtx
   phalConfigSta->us32MaxAmpduDuration    = pwdiConfigSta->us32MaxAmpduDuratio;
   phalConfigSta->fDsssCckMode40Mhz       = pwdiConfigSta->ucDsssCckMode40Mhz;
   phalConfigSta->encryptType             = pwdiConfigSta->ucEncryptType;
-
+  if (phalConfigSta_V1 == NULL)
+  {
+      /* Set reserved bit only when hardware doesn't support 11AC */
+      phalConfigSta->reserved             = pwdiConfigSta->ucHtLdpcEnabled;
+  }
   phalConfigSta->mimoPS = WDI_2_HAL_MIMO_PS(pwdiConfigSta->wdiMIMOPS);
 
   phalConfigSta->supportedRates.opRateMode =

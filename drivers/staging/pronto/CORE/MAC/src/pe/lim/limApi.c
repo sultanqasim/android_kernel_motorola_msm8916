@@ -991,6 +991,7 @@ tSirRetStatus peOpen(tpAniSirGlobal pMac, tMacOpenParameters *pMacOpenParam)
         return eSIR_SUCCESS;
     pMac->lim.maxBssId = pMacOpenParam->maxBssId;
     pMac->lim.maxStation = pMacOpenParam->maxStation;
+    vos_spin_lock_init( &pMac->sys.lock );
 
     if ((pMac->lim.maxBssId == 0) || (pMac->lim.maxStation == 0))
     {
@@ -1087,7 +1088,9 @@ tSirRetStatus peClose(tpAniSirGlobal pMac)
 
     if (ANI_DRIVER_TYPE(pMac) == eDRIVER_TYPE_MFG)
         return eSIR_SUCCESS;
-    
+
+    vos_spin_lock_destroy( &pMac->sys.lock );
+
     for(i =0; i < pMac->lim.maxBssId; i++)
     {
         if(pMac->lim.gpSession[i].valid == TRUE)
@@ -1339,7 +1342,7 @@ tSirRetStatus peProcessMessages(tpAniSirGlobal pMac, tSirMsgQ* pMsg)
     return eSIR_SUCCESS;
 }
 
-
+#define RSRVD_MGMT_RX_PACKETS 10
 
 // ---------------------------------------------------------------------------
 /**
@@ -1413,12 +1416,45 @@ VOS_STATUS peHandleMgmtFrame( v_PVOID_t pvosGCtx, v_PVOID_t vosBuff)
     msg.bodyptr = vosBuff;
     msg.bodyval = 0;
 
+    vos_spin_lock_acquire( &pMac->sys.lock );
+    if( pMac->sys.gSysBbtPendingMgmtCount > (vos_pkt_get_num_of_rx_raw_pkts()/4) )
+    {
+        vos_spin_lock_release( &pMac->sys.lock );
+        // drop all management packets
+        limLog( pMac, LOGW,
+                FL ( "Management queue 1/4th full, dropping management packets" ));
+        vos_pkt_return_packet(pVosPkt);
+        return  VOS_STATUS_SUCCESS;
+    }
+
+    if( pMac->sys.gSysBbtPendingMgmtCount > ( vos_pkt_get_num_of_rx_raw_pkts()/4
+                                              - RSRVD_MGMT_RX_PACKETS ))
+    {
+        // drop all probereq, proberesp and beacons
+        if( mHdr->fc.subType == SIR_MAC_MGMT_BEACON ||  mHdr->fc.subType ==
+            SIR_MAC_MGMT_PROBE_REQ ||  mHdr->fc.subType == SIR_MAC_MGMT_PROBE_RSP )
+        {
+            vos_spin_lock_release( &pMac->sys.lock );
+            limLog( pMac, LOGW,
+                    FL ( "Dropping probe req, probe resp or beacon" ));
+            vos_pkt_return_packet(pVosPkt);
+            return  VOS_STATUS_SUCCESS;
+        }
+    }
+    pMac->sys.gSysBbtPendingMgmtCount++;
+    vos_spin_lock_release( &pMac->sys.lock );
+
     if( eSIR_SUCCESS != sysBbtProcessMessageCore( pMac,
                                                   &msg,
                                                   mHdr->fc.type,
                                                   mHdr->fc.subType ))
     {
         vos_pkt_return_packet(pVosPkt);
+
+        /* Decrement gSysBbtPendingMgmtCount if packet
+         * is dropped before posting to LIM
+         */
+        limDecrementPendingMgmtCount(pMac);
         limLog( pMac, LOGW,
                 FL ( "sysBbtProcessMessageCore failed to process SIR_BB_XPORT_MGMT_MSG" ));
         return VOS_STATUS_E_FAILURE;
@@ -1764,8 +1800,12 @@ tAniBool limEncTypeMatched(tpAniSirGlobal pMac, tpSchBeaconStruct  pBeacon,
     /* WEP */
     if ( (pBeacon->capabilityInfo.privacy == 1) && (pBeacon->wpaPresent == 0) &&
             (pBeacon->rsnPresent == 0) &&
-            ( (pSession->encryptType == eSIR_ED_WEP40) ||
-                     (pSession->encryptType == eSIR_ED_WEP104)))
+            ( ( pSession->encryptType == eSIR_ED_WEP40 ) ||
+              ( pSession->encryptType == eSIR_ED_WEP104 )
+#ifdef FEATURE_WLAN_WAPI
+              || ( pSession->encryptType == eSIR_ED_WPI )
+#endif
+             ))
         return eSIR_TRUE;
 
     /* WPA OR RSN*/
@@ -1835,10 +1875,7 @@ limDetectChangeInApCapabilities(tpAniSirGlobal pMac,
           (eSIR_FALSE == securityCapsMatched)
           ) ) )
     {
-        /* No need to send probe request if security
-         * capability doesnt match, Disconnect directly.*/
-        if( (false == psessionEntry->fWaitForProbeRsp) &&
-                              (eSIR_TRUE == securityCapsMatched))
+        if ( false == psessionEntry->fWaitForProbeRsp )
         {
             /* If Beacon capabilities is not matching with the current capability,
              * then send unicast probe request to AP and take decision after
