@@ -10,7 +10,7 @@ ifeq ($(KERNEL_BUILD),1)
 	# These are provided in Android-based builds
 	# Need to explicitly define for Kernel-based builds
 	MODNAME := wlan
-	WLAN_ROOT := drivers/staging/pronto
+	WLAN_ROOT := drivers/staging/prima
 	CONFIG_PRIMA_WLAN_LFR := y
 	CONFIG_QCOM_TDLS := y
 	CONFIG_PRIMA_WLAN_OKC := y
