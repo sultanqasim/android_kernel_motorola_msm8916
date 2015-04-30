@@ -942,6 +942,12 @@
 		ct406_recalibrate_threshold = <0x0064>;
 		ct406_pulse_count = <0x02>;
 		ct406_prox_gain = <0x02>;
+		ct406_als_lux1_c0_mult = <0x294>;
+		ct406_als_lux1_c1_mult = <0x55A>;
+		ct406_als_lux1_div = <0x64>;
+		ct406_als_lux2_c0_mult = <0xDA>;
+		ct406_als_lux2_c1_mult = <0x186>;
+		ct406_als_lux2_div = <0x64>;
 		dsp_iface_enable = <0>;
 		headset_detect_enable = <1>;
 		headset_hw_version = <2>;
@@ -958,6 +964,7 @@
 		headset_button_3_keycode = <0x73>;  /* KEY_VOLUMEUP     */
 		headset_button_4_keycode = <0x72>;  /* KEY_VOLUMEDOWN   */
 		cover_detect_polarity = <1>;
+		reset_hw_type = <0>;
 		accel_swap = <0>;
 		sensor1-supply = <&pm8916_l6>;
 		sensor2-supply = <&pm8916_l17>;
