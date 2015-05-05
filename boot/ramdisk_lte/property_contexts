@@ -75,6 +75,7 @@ sys.ims.                   u:object_r:qcom_ims_prop:s0
 sys.listeners.registered   u:object_r:tee_prop:s0
 enablebtsoclog             u:object_r:bluetooth_prop:s0
 rmtfs.                     u:object_r:rmtfs_prop:s0
+persist.ims.               u:object_r:qcom_ims_prop:s0
 # End Moto
 #line 1 "motorola/security/sepolicy/common/property_contexts"
 tcmd.                   u:object_r:tcmd_prop:s0

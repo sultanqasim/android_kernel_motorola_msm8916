@@ -33,6 +33,7 @@ enum cabc_mode {
 	CABC_UI_MODE = 0,
 	CABC_ST_MODE,
 	CABC_MV_MODE,
+	CABC_DIS_MODE,
 	CABC_OFF_MODE,
 	CABC_MODE_MAX_NUM
 };
@@ -188,6 +189,7 @@ struct mdss_intf_recovery {
  * @MDSS_EVENT_REGISTER_RECOVERY_HANDLER: Event to recover the interface in
  *					case there was any errors detected.
  * @MDSS_EVENT_SET_CABC: Set CABC mode, for Motorola "Dynamic CABC" feature.
+ * @MDSS_EVENT_ENABLE_HBM: Enable Motorola High Brightness Mode feature.
  */
 enum mdss_intf_events {
 	MDSS_EVENT_RESET = 1,
@@ -212,6 +214,7 @@ enum mdss_intf_events {
 	MDSS_EVENT_REGISTER_RECOVERY_HANDLER,
 	MDSS_EVENT_ENABLE_TE,
 	MDSS_EVENT_SET_CABC,
+	MDSS_EVENT_ENABLE_HBM,
 };
 
 struct lcd_panel_info {
@@ -436,6 +439,8 @@ struct mdss_panel_info {
 
 	bool dynamic_cabc_enabled;
 	enum cabc_mode cabc_mode;
+	bool hbm_feature_enabled;
+	bool hbm_state;
 };
 
 struct mdss_panel_data {
@@ -644,7 +649,7 @@ bool mdss_is_ready(void);
  * returns name if mapping succeeds, else returns NULL.
  */
 static const char *cabc_mode_names[CABC_MODE_MAX_NUM] = {
-	"UI", "ST", "MV", "OFF"
+	"UI", "ST", "MV", "DIS", "OFF"
 };
 static inline const char *mdss_panel_map_cabc_name(int mode)
 {
