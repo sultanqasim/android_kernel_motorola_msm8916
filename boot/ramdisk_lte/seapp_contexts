@@ -14,3 +14,4 @@ user=system seinfo=platform name=com.qualcomm.location.XT domain=location_app ty
 user=log domain=system_app type=log_app_data_file
 user=smartcard domain=system_app type=smartcard_data_file
 user=sprint_extension domain=system_app type=system_app_data_file
+user=fake domain=tcmd type=log_app_data_file
