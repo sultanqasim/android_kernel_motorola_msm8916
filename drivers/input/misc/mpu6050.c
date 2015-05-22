@@ -590,11 +590,11 @@ static irqreturn_t mpu6050_interrupt_thread(int irq, void *data)
 		mpu6050_remap_accel_data(&sensor->axis, sensor->pdata->place);
 		shift = mpu_accel_fs_shift[sensor->cfg.accel_fs];
 		input_report_abs(sensor->accel_dev, ABS_X,
-			(sensor->axis.x >> shift));
+			(sensor->axis.x << shift));
 		input_report_abs(sensor->accel_dev, ABS_Y,
-			(sensor->axis.y >> shift));
+			(sensor->axis.y << shift));
 		input_report_abs(sensor->accel_dev, ABS_Z,
-			(sensor->axis.z >> shift));
+			(sensor->axis.z << shift));
 		input_sync(sensor->accel_dev);
 	}
 
