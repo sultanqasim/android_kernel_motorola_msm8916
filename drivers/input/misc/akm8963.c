@@ -53,6 +53,8 @@
 #define REG_CNTL1_MODE(reg_cntl1)	(reg_cntl1 & 0x0F)
 
 #define POLL_MS_100HZ 10
+/*Max Single Measure mode supported frequency */
+#define MAX_SNG_MEASURE_SUPPORTED 20
 
 /* Save last device state for power down */
 struct akm_sensor_state {
@@ -101,6 +103,7 @@ struct akm_compass_data {
 	int	gpio_rstn;
 	bool	power_enabled;
 	bool	use_poll;
+	bool	use_sng_measure;
 	struct	regulator		*vdd;
 	struct	regulator		*vio;
 	struct	akm_sensor_state		state;
@@ -460,7 +463,7 @@ static int AKECS_GetData_Poll(
 
 	/* Check ST bit */
 	if (!(AKM_DRDY_IS_HIGH(buffer[0])))
-		return -EAGAIN;
+		dev_dbg(&akm->i2c->dev, "DRDY is low. Use last value.\n");
 
 	/* Read rest data */
 	buffer[1] = AKM_REG_STATUS + 1;
@@ -879,8 +882,18 @@ static int akm_enable_set(struct sensors_classdev *sensors_cdev,
 
 	if (akm->use_poll && akm->pdata->auto_report) {
 		if (enable) {
-			AKECS_SetMode(akm,
-				AKM_MODE_SNG_MEASURE | AKM8963_BIT_OP_16);
+
+			if (akm->delay[MAG_DATA_FLAG] <
+					MAX_SNG_MEASURE_SUPPORTED) {
+				AKECS_SetMode(akm,
+					AK8963_MODE_CONT2_MEASURE);
+				akm->use_sng_measure = false;
+			} else {
+				AKECS_SetMode(akm,
+							AKM_MODE_SNG_MEASURE
+							| AKM8963_BIT_OP_16);
+				akm->use_sng_measure = true;
+			}
 			ktime = ktime_set(0,
 				akm->delay[MAG_DATA_FLAG] * NSEC_PER_MSEC);
 			hrtimer_start(&akm->mag_timer, ktime, HRTIMER_MODE_REL);
@@ -1456,6 +1469,8 @@ static int akm_compass_suspend(struct device *dev)
 
 	akm->state.power_on = akm->power_enabled;
 	if (akm->state.power_on) {
+		if (!akm->use_sng_measure)
+			AKECS_Set_PowerDown(akm);
 		akm_compass_power_set(akm, false);
 		/* Clear status */
 		akm->is_busy = 0;
@@ -1744,6 +1759,7 @@ static int akm8963_pinctrl_init(struct akm_compass_data *s_akm)
 
 	return 0;
 }
+
 static enum hrtimer_restart mag_timer_handle(struct hrtimer *hrtimer)
 {
 	struct akm_compass_data *sensor;
@@ -1870,10 +1886,13 @@ static int mag_poll_thread(void *data)
 			mag_x, mag_y, mag_z);
 
 exit:
-		ret = AKECS_SetMode(akm,
-			AKM_MODE_SNG_MEASURE | AKM8963_BIT_OP_16);
-		if (ret < 0)
-			dev_warn(&akm->i2c->dev, "Failed to set mode\n");
+		if (akm->use_sng_measure) {
+			ret = AKECS_SetMode(akm,
+				AKM_MODE_SNG_MEASURE | AKM8963_BIT_OP_16);
+			if (ret < 0)
+				dev_warn(&akm->i2c->dev,
+					"Failed to set mode\n");
+		}
 	}
 	return ret;
 }
@@ -2063,6 +2082,8 @@ int akm8963_compass_probe(
 				"%s: create sysfs failed.", __func__);
 		goto err_free_irq;
 	}
+
+	input_set_events_per_packet(s_akm->input, 60);
 
 	s_akm->cdev = sensors_cdev;
 	s_akm->cdev.sensors_enable = akm_enable_set;
