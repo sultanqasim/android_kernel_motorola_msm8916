@@ -3059,7 +3059,6 @@ int wm_adsp_stream_start(struct wm_adsp *adsp)
 		if (adsp->host_buf_ptr)
 			break;
 
-		msleep(1);
 	}
 	if (!adsp->host_buf_ptr)
 		return -EIO;
