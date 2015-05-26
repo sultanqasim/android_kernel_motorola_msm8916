@@ -232,6 +232,7 @@ ifeq ($(CONFIG_MMI_LUX_DTB),y)
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p1b.dtb
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p1c.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p2a.dtb
+dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p2c.dtb
 endif
 
 ifeq ($(CONFIG_MMI_OSPREY_DTB),y)
