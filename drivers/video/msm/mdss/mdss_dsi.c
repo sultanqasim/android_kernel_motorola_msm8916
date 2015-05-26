@@ -77,7 +77,6 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev)
 			}
 		}
 	}
-
 	return rc;
 }
 

@@ -2317,7 +2317,8 @@ static int mpu6050_probe(struct i2c_client *client,
 	sensor->accel_cdev.sensors_poll_delay = mpu6050_accel_cdev_poll_delay;
 	sensor->accel_cdev.sensors_enable_wakeup =
 					mpu6050_accel_cdev_enable_wakeup;
-	ret = sensors_classdev_register(&client->dev, &sensor->accel_cdev);
+	ret = sensors_classdev_register(&sensor->accel_dev->dev,
+			&sensor->accel_cdev);
 	if (ret) {
 		dev_err(&client->dev,
 			"create accel class device file failed!\n");
@@ -2329,7 +2330,8 @@ static int mpu6050_probe(struct i2c_client *client,
 	sensor->gyro_cdev.delay_msec = sensor->gyro_poll_ms;
 	sensor->gyro_cdev.sensors_enable = mpu6050_gyro_cdev_enable;
 	sensor->gyro_cdev.sensors_poll_delay = mpu6050_gyro_cdev_poll_delay;
-	ret = sensors_classdev_register(&client->dev, &sensor->gyro_cdev);
+	ret = sensors_classdev_register(&sensor->gyro_dev->dev,
+			&sensor->gyro_cdev);
 	if (ret) {
 		dev_err(&client->dev,
 			"create accel class device file failed!\n");

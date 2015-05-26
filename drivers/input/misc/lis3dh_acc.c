@@ -2177,7 +2177,7 @@ static int lis3dh_acc_probe(struct i2c_client *client,
 		acc->cdev.fifo_reserved_event_count = LIS3DH_FIFO_SIZE;
 		acc->cdev.fifo_max_event_count = LIS3DH_FIFO_SIZE;
 	}
-	err = sensors_classdev_register(&client->dev, &acc->cdev);
+	err = sensors_classdev_register(&acc->input_dev->dev, &acc->cdev);
 	if (err) {
 		dev_err(&client->dev,
 			"class device create failed: %d\n", err);

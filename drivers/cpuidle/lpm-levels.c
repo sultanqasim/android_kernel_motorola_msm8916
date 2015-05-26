@@ -214,7 +214,13 @@ int set_l2_mode(struct low_power_ops *ops, int mode, bool notify_rpm)
 		lpm = MSM_SPM_MODE_DISABLED;
 		break;
 	}
-	rc = msm_spm_config_low_power_mode(ops->spm, lpm, true);
+
+	/* Do not program L2 SPM enable bit. This will be set by TZ */
+	if (lpm_wa_get_skip_l2_spm())
+		rc = msm_spm_config_low_power_mode_addr(ops->spm, lpm,
+							true);
+	else
+		rc = msm_spm_config_low_power_mode(ops->spm, lpm, true);
 
 	if (rc)
 		pr_err("%s: Failed to set L2 low power mode %d, ERR %d",
@@ -589,13 +595,6 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 	level = &cluster->levels[cluster->last_level];
 	if (level->notify_rpm) {
 		msm_rpm_exit_sleep();
-
-		/* If RPM bumps up CX to turbo, unvote CX turbo vote
-		 * during exit of rpm assisted power collapse to
-		 * reduce the power impact
-		 */
-
-		lpm_wa_cx_unvote_send();
 		msm_mpm_exit_sleep(from_idle);
 	}
 
