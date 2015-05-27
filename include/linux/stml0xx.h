@@ -29,6 +29,10 @@
 #include <linux/switch.h>
 #include <linux/wakelock.h>
 
+#ifdef CONFIG_MMI_HALL_NOTIFICATIONS
+#include <linux/mmi_hall_notifier.h>
+#endif
+
 /* Log macros */
 #define ENABLE_VERBOSE_LOGGING 0
 
@@ -410,6 +414,10 @@ struct stml0xx_data {
 	bool pending_wake_work;
 
 	struct led_classdev led_cdev;
+
+#ifdef CONFIG_MMI_HALL_NOTIFICATIONS
+	struct mmi_hall_data *hall_data;
+#endif
 };
 
 #ifndef ts_to_ns
