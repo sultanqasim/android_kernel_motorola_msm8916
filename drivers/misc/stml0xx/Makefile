@@ -8,4 +8,5 @@ stml0xx-objs := stml0xx_core.o \
 		stml0xx_spi.o \
 		stml0xx_spi_crc.o
 obj-$(CONFIG_STML0XX_LED) += stml0xx_led.o
+obj-$(CONFIG_MMI_HALL_NOTIFICATIONS) += stml0xx_mmi_notifications.o
 obj-$(CONFIG_SENSORS_STML0XX) += stml0xx.o
