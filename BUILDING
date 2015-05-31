@@ -8,7 +8,4 @@ export SUBARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-
 make mrproper
 make msm8916-squid_defconfig
-./build_cwm_zip.sh
-
-You will now have a TWRP flashable zip at:
-arch/arm/boot/squid_kernel.zip
+make -j5
