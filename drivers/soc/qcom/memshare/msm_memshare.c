@@ -28,7 +28,7 @@
 /* Macros */
 #define MEMSHARE_DEV_NAME "memshare"
 #define MEMSHARE_CHILD_DEV_NAME "memshare_child"
-DEFINE_DMA_ATTRS(attrs);
+static DEFINE_DMA_ATTRS(attrs);
 
 #define MEM_SHARE_SERVICE_SVC_ID 0x00000034
 #define MEM_SHARE_SERVICE_INS_ID 1

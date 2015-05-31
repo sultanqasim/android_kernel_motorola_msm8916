@@ -28,6 +28,7 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #define PARK_LENS_MID_STEP 5
 #define PARK_LENS_SMALL_STEP 3
 #define MAX_QVALUE 4096
+
 static struct v4l2_file_operations msm_actuator_v4l2_subdev_fops;
 static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl);
 static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl);
@@ -944,17 +945,16 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 		step_boundary =
 			a_ctrl->region_params[region_index].
 			step_bound[MOVE_NEAR];
-		for (; step_index <= step_boundary;
-			step_index++) {
+		for (; step_index <= step_boundary; step_index++) {
 			if (qvalue > 1 && qvalue <= MAX_QVALUE)
 				cur_code = step_index * code_per_step / qvalue;
 			else
 				cur_code = step_index * code_per_step;
 			cur_code += set_info->af_tuning_params.initial_code;
-			if (cur_code < max_code_size)
+			if (cur_code < max_code_size){
 				a_ctrl->step_position_table[step_index] =
 					cur_code;
-			else {
+			} else {
 				for (; step_index <
 					set_info->af_tuning_params.total_steps;
 					step_index++)
@@ -989,6 +989,7 @@ static int32_t msm_actuator_vreg_control(struct msm_actuator_ctrl_t *a_ctrl,
 {
 	int rc = 0, i, cnt;
 	struct msm_actuator_vreg *vreg_cfg;
+	struct device *dev = NULL;
 
 	vreg_cfg = &a_ctrl->vreg_cfg;
 	cnt = vreg_cfg->num_vreg;
@@ -1000,8 +1001,18 @@ static int32_t msm_actuator_vreg_control(struct msm_actuator_ctrl_t *a_ctrl,
 		return -EINVAL;
 	}
 
+	if (a_ctrl->act_device_type == MSM_CAMERA_I2C_DEVICE)
+		dev = &(a_ctrl->i2c_client.client->dev);
+	else if (a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE)
+		dev = &(a_ctrl->pdev->dev);
+
+	if (dev == NULL) {
+		pr_err("%s:a_ctrl device structure got corrupted\n", __func__);
+		return -EINVAL;
+	}
+
 	for (i = 0; i < cnt; i++) {
-		rc = msm_camera_config_single_vreg(&(a_ctrl->pdev->dev),
+		rc = msm_camera_config_single_vreg(dev,
 			&vreg_cfg->cam_vreg[i],
 			(struct regulator **)&vreg_cfg->data[i],
 			config);
@@ -1459,6 +1470,8 @@ static long msm_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 		return msm_actuator_get_subdev_id(a_ctrl, argp);
 	case VIDIOC_MSM_ACTUATOR_CFG:
 		return msm_actuator_config(a_ctrl, argp);
+	case MSM_SD_NOTIFY_FREEZE:
+		return 0;
 	case MSM_SD_SHUTDOWN:
 		msm_actuator_close(sd, NULL);
 		return 0;

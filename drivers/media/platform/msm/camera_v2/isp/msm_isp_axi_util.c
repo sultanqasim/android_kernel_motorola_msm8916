@@ -505,8 +505,13 @@ void msm_isp_sof_notify(struct vfe_device *vfe_dev,
 	struct msm_isp_event_data sof_event;
 	switch (frame_src) {
 	case VFE_PIX_0:
-		ISP_DBG("%s: PIX0 frame id: %u\n", __func__,
-			vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id);
+		if (vfe_dev->isp_sof_debug < 5)
+			pr_err("%s: PIX0 frame id: %u\n", __func__,
+				vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id);
+		else
+			ISP_DBG("%s: PIX0 frame id: %u\n", __func__,
+				vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id);
+		vfe_dev->isp_sof_debug++;
 		vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id++;
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id == 0)
 			vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id = 1;
@@ -2005,4 +2010,31 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
 		}
 	}
 	return;
+}
+int msm_isp_user_buf_done(struct vfe_device *vfe_dev,
+	struct msm_isp_event_data *buf_cmd)
+{
+	int rc = 0;
+	struct msm_isp_event_data buf_event;
+	memset(&buf_event, 0, sizeof(buf_event));
+	buf_event.input_intf = buf_cmd->input_intf;
+	buf_event.frame_id = buf_cmd->frame_id;
+	buf_event.timestamp = buf_cmd->timestamp;
+	buf_event.u.buf_done.session_id =
+	  buf_cmd->u.buf_done.session_id;
+	buf_event.u.buf_done.stream_id =
+	  buf_cmd->u.buf_done.stream_id;
+	buf_event.u.buf_done.output_format =
+	  buf_cmd->u.buf_done.output_format;
+	buf_event.u.buf_done.buf_idx =
+	  buf_cmd->u.buf_done.buf_idx;
+	buf_event.u.buf_done.handle =
+	   buf_cmd->u.buf_done.handle;
+
+	vfe_dev->buf_mgr->ops->buf_done(vfe_dev->buf_mgr,
+			buf_event.u.buf_done.handle,
+			buf_event.u.buf_done.buf_idx,
+			&buf_event.timestamp, buf_event.frame_id,
+			buf_event.u.buf_done.output_format);
+	return rc;
 }

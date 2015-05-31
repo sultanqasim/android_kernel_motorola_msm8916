@@ -1066,8 +1066,8 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 		}
 	}
 
-	src_w = pipe->src.w >> pipe->horz_deci;
-	src_h = pipe->src.h >> pipe->vert_deci;
+	src_w = DECIMATED_DIMENSION(pipe->src.w, pipe->horz_deci);
+	src_h = DECIMATED_DIMENSION(pipe->src.h, pipe->vert_deci);
 
 	chroma_sample = pipe->src_fmt->chroma_sample;
 	if (pipe->flags & MDP_SOURCE_ROTATED_90) {
@@ -5587,6 +5587,9 @@ int mdss_mdp_calib_mode(struct msm_fb_data_type *mfd,
 		return -EINVAL;
 	mutex_lock(&mdss_pp_mutex);
 	mfd->calib_mode = cfg->calib_mask;
+	mutex_lock(&mfd->bl_lock);
+	mfd->calib_mode_bl = mfd->bl_level;
+	mutex_unlock(&mfd->bl_lock);
 	mutex_unlock(&mdss_pp_mutex);
 	return 0;
 }
