@@ -79,8 +79,6 @@
 static struct mutex slim_tx_lock;
 static struct mutex slim_rx_lock;
 
-static struct snd_soc_codec *arizona_codec;
-
 static int arizona_spk_ev(struct snd_soc_dapm_widget *w,
 			  struct snd_kcontrol *kcontrol,
 			  int event)
@@ -162,13 +160,6 @@ static irqreturn_t arizona_thermal_shutdown(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
-
-int arizona_init_codec(struct snd_soc_codec *codec)
-{
-	arizona_codec = codec;
-	return 0;
-}
-EXPORT_SYMBOL_GPL(arizona_init_codec);
 
 static const struct snd_soc_dapm_widget arizona_spkl =
 	SND_SOC_DAPM_PGA_E("OUT4L", SND_SOC_NOPM,
@@ -799,81 +790,6 @@ int arizona_put_anc_input(struct snd_kcontrol *kcontrol,
 }
 EXPORT_SYMBOL_GPL(arizona_put_anc_input);
 
-static const char * const arizona_anc_ng_texts[] = {
-	"None",
-	"Internal",
-};
-
-const struct soc_enum arizona_anc_ng_enum =
-	SOC_ENUM_SINGLE(0, 0, ARRAY_SIZE(arizona_anc_ng_texts),
-		 arizona_anc_ng_texts);
-EXPORT_SYMBOL_GPL(arizona_anc_ng_enum);
-
-int arizona_get_anc_ng(struct snd_kcontrol *kcontrol,
-		struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct arizona *arizona = dev_get_drvdata(codec->dev->parent);
-
-	ucontrol->value.enumerated.item[0] = arizona->anc_ng;
-	return 0;
-}
-EXPORT_SYMBOL_GPL(arizona_get_anc_ng);
-
-int arizona_put_anc_ng(struct snd_kcontrol *kcontrol,
-		struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct arizona *arizona = dev_get_drvdata(codec->dev->parent);
-	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
-	int sel = ucontrol->value.enumerated.item[0];
-	int ret;
-	struct snd_soc_dapm_route routes[2] = {
-		{ "RXANCL", NULL, "RXANC NG Clock" },
-		{ "RXANCR", NULL, "RXANC NG Clock" },
-	};
-
-	if (sel >= e->max)
-		return -EINVAL;
-
-	if (sel == arizona->anc_ng)
-		return 0;
-
-	switch (sel) {
-	case 0:
-		snd_soc_dapm_del_routes(&codec->dapm, routes,
-			ARRAY_SIZE(routes));
-		/*
-		* As the clock is a supply widget this call simply ensures
-		* we add it to the dirty list.
-		*/
-		snd_soc_dapm_enable_pin(&codec->dapm, "RXANC NG Clock");
-		break;
-	case 1:
-		snd_soc_dapm_add_routes(&codec->dapm, routes,
-			ARRAY_SIZE(routes));
-		/*
-		* As the clock is a supply widget this call simply ensures
-		* we add it to the dirty list.
-		*/
-		snd_soc_dapm_disable_pin(&codec->dapm, "RXANC NG Clock");
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	ret = snd_soc_dapm_sync(&codec->dapm);
-	if (ret) {
-		dev_err(arizona->dev, "Failed to sync DAPM for ANC NG: %d\n",
-			ret);
-		return ret;
-	}
-
-	arizona->anc_ng = sel;
-	return 0;
-}
-EXPORT_SYMBOL_GPL(arizona_put_anc_ng);
-
 const struct soc_enum arizona_anc_input_src[] = {
 	SOC_VALUE_ENUM_SINGLE(ARIZONA_FCL_ADC_REFORMATTER_CONTROL,
 			      ARIZONA_FCL_MIC_MODE_SEL_SHIFT, 0,
@@ -1388,12 +1304,11 @@ static int arizona_slim_get_la(struct slim_device *dev, u8 *la)
 #define RX_STREAM_3 152
 
 static u32 rx_porth1[2], rx_porth2[1], rx_porth3[2], rx_porth1m[1];
-static u32 tx_porth1[4], tx_porth2[1], tx_porth3[1];
+static u32 tx_porth1[2], tx_porth2[1], tx_porth3[1], tx_porth1s[2];
 static u16 rx_handles1[] = { RX_STREAM_1, RX_STREAM_1 + 1 };
 static u16 rx_handles2[] = { RX_STREAM_2 };
 static u16 rx_handles3[] = { RX_STREAM_3, RX_STREAM_3 + 1 };
-static u16 tx_handles1[] = { TX_STREAM_1, TX_STREAM_1 + 1,
-			     TX_STREAM_1 + 2, TX_STREAM_1 + 3 };
+static u16 tx_handles1[] = { TX_STREAM_1, TX_STREAM_1 + 1 };
 static u16 tx_handles2[] = { TX_STREAM_2 };
 static u16 tx_handles3[] = { TX_STREAM_3 };
 static u16 rx_group1, rx_group2, rx_group3;
@@ -1420,6 +1335,14 @@ int arizona_slim_tx_ev(struct snd_soc_dapm_widget *w,
 		handles = tx_handles1;
 		group = &tx_group1;
 		chcnt = ARRAY_SIZE(tx_porth1);
+		break;
+	case ARIZONA_SLIMTX3_ENA_SHIFT:
+		dev_dbg(codec->dev, "TX1S\n");
+		mutex_lock(&slim_tx_lock);
+		porth = tx_porth1s;
+		handles = tx_handles1;
+		group = &tx_group1;
+		chcnt = ARRAY_SIZE(tx_porth1s);
 		break;
 	case ARIZONA_SLIMTX5_ENA_SHIFT:
 		dev_dbg(codec->dev, "TX2\n");
@@ -1493,6 +1416,8 @@ int arizona_slim_tx_ev(struct snd_soc_dapm_widget *w,
 		/* Cargo culted from QC */
 		usleep_range(15000, 15000);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1506,13 +1431,10 @@ int arizona_slim_rx_ev(struct snd_soc_dapm_widget *w,
 	struct arizona_priv *priv = snd_soc_codec_get_drvdata(codec);
 	struct arizona *arizona = priv->arizona;
 	struct slim_ch prop;
-	int ret, i, j = 0;
+	int ret, i;
 	u32 *porth;
 	u16 *handles, *group;
 	int chcnt;
-	unsigned int slim_status;
-	bool slim_enabled = false;
-	bool slim_rx_good = false;
 
 	/* BODGE: should do this per port */
 	switch (w->shift) {
@@ -1558,9 +1480,11 @@ int arizona_slim_rx_ev(struct snd_soc_dapm_widget *w,
 	prop.auxf = SLIM_CH_AUXF_NOT_APPLICABLE;
 	prop.ratem = (48000/4000);
 	prop.sampleszbits = 16;
+	mutex_unlock(&slim_rx_lock);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+	case SND_SOC_DAPM_POST_PMU:
 		dev_dbg(arizona->dev, "Start slimbus\n");
 		ret = slim_define_ch(slim_audio_dev, &prop, handles, chcnt,
 				     true, group);
@@ -1576,8 +1500,7 @@ int arizona_slim_rx_ev(struct snd_soc_dapm_widget *w,
 						handles[i]);
 			if (ret != 0) {
 				mutex_unlock(&slim_rx_lock);
-				dev_err(arizona->dev,
-					"sink connect fail %d: %d\n",
+				dev_err(arizona->dev, "sink connect fail %d: %d\n",
 					i, ret);
 				return ret;
 			}
@@ -1585,81 +1508,13 @@ int arizona_slim_rx_ev(struct snd_soc_dapm_widget *w,
 
 		ret = slim_control_ch(slim_audio_dev, *group,
 					SLIM_CH_ACTIVATE, true);
-		mutex_unlock(&slim_rx_lock);
 		if (ret != 0) {
+			mutex_unlock(&slim_rx_lock);
 			dev_err(arizona->dev, "Failed to activate: %d\n", ret);
 			return ret;
 		}
 		break;
 
-	case SND_SOC_DAPM_POST_PMU:
-		while (!slim_rx_good && j < 5) {
-			slim_status = snd_soc_read(codec,
-					ARIZONA_SLIMBUS_RX_PORT_STATUS);
-			slim_enabled = !!((slim_status) & (1 << w->shift));
-			if (!slim_enabled) {
-				msleep(100);
-				dev_err(arizona->dev,
-					"Re-enabling SLIMRX%d Try %d\n",
-					w->shift, j);
-				ret = slim_control_ch(slim_audio_dev, *group,
-					SLIM_CH_REMOVE, true);
-				if (ret != 0)
-					dev_err(arizona->dev,
-						"Failed to remove rx: %d\n",
-					ret);
-
-				/* Cargo culted from QC */
-				usleep_range(15000, 15000);
-
-				snd_soc_update_bits(codec,
-					ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
-						1 << w->shift, 0);
-
-				ret = slim_define_ch(slim_audio_dev, &prop,
-					handles, chcnt, true, group);
-				if (ret != 0) {
-					dev_err(arizona->dev,
-						"slim_define_ch() failed: %d\n",
-						ret);
-					return ret;
-				}
-
-				for (i = 0; i < chcnt; i++) {
-					ret = slim_connect_sink(slim_audio_dev,
-						&porth[i], 1,
-						handles[i]);
-					if (ret != 0) {
-						dev_err(arizona->dev,
-						"sink connect fail %d: %d\n",
-						i, ret);
-						return ret;
-					}
-				}
-
-				ret = slim_control_ch(slim_audio_dev, *group,
-					SLIM_CH_ACTIVATE, true);
-				if (ret != 0) {
-					dev_err(arizona->dev,
-						"Failed to activate: %d\n",
-						ret);
-					return ret;
-				}
-
-				snd_soc_update_bits(codec,
-					ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
-						1 << w->shift, 1 << w->shift);
-			}  else {
-				slim_rx_good = true;
-			}
-			j++;
-		}
-		mutex_unlock(&slim_rx_lock);
-		if (!slim_rx_good)
-			dev_err(arizona->dev,
-				"CANNOT Establish slim rx%d link.\n", w->shift);
-
-		break;
 	case SND_SOC_DAPM_POST_PMD:
 	case SND_SOC_DAPM_PRE_PMD:
 		dev_dbg(arizona->dev, "Stop slimbus Rx %x\n", *group);
@@ -1671,6 +1526,8 @@ int arizona_slim_rx_ev(struct snd_soc_dapm_widget *w,
 
 		/* Cargo culted from QC */
 		usleep_range(15000, 15000);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -1711,6 +1568,11 @@ static int arizona_get_channel_map(struct snd_soc_dai *dai,
 	for (i = 0; i < ARRAY_SIZE(tx_porth1); i++) {
 		slim_get_slaveport(laddr, i + 8,
 				   &tx_porth1[i], SLIM_SRC);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(tx_porth1s); i++) {
+		slim_get_slaveport(laddr, i + 10,
+				   &tx_porth1s[i], SLIM_SRC);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(tx_porth2); i++) {
@@ -1790,11 +1652,9 @@ static int arizona_get_channel_map(struct snd_soc_dai *dai,
 		*rx_num = 2;
 		rx_slot[0] = RX_STREAM_1;
 		rx_slot[1] = RX_STREAM_1 + 1;
-		*tx_num = 4;
+		*tx_num = 2;
 		tx_slot[0] = TX_STREAM_1;
 		tx_slot[1] = TX_STREAM_1 + 1;
-		tx_slot[2] = TX_STREAM_1 + 2;
-		tx_slot[3] = TX_STREAM_1 + 3;
 		break;
 	case ARIZONA_SLIM2:
 		*rx_num = 1;
@@ -1841,7 +1701,6 @@ int arizona_anc_ev(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		val = 1 << (w->shift + 1);
-		break;
 	default:
 		return 0;
 	}
@@ -3179,21 +3038,6 @@ int arizona_set_fll_refclk(struct arizona_fll *fll, int source,
 }
 EXPORT_SYMBOL_GPL(arizona_set_fll_refclk);
 
-int arizona_get_fll(struct arizona_fll *fll, int *source,
-		    unsigned int *Fref, unsigned int *Fout)
-{
-	if (!fll || !source || !Fref || !Fout)
-		return -EINVAL;
-
-	mutex_lock(&fll->lock);
-	*source = fll->sync_src;
-	*Fref = fll->sync_freq;
-	*Fout = fll->fout;
-	mutex_unlock(&fll->lock);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(arizona_get_fll);
-
 int arizona_set_fll(struct arizona_fll *fll, int source,
 		    unsigned int Fref, unsigned int Fout)
 {
@@ -3215,11 +3059,9 @@ int arizona_set_fll(struct arizona_fll *fll, int source,
 			return ret;
 	}
 
-	mutex_lock(&fll->lock);
 	fll->sync_src = source;
 	fll->sync_freq = Fref;
 	fll->fout = Fout;
-	mutex_unlock(&fll->lock);
 
 	if (Fout)
 		ret = arizona_enable_fll(fll);
@@ -3241,7 +3083,6 @@ int arizona_init_fll(struct arizona *arizona, int id, int base, int lock_irq,
 	fll->base = base;
 	fll->arizona = arizona;
 	fll->sync_src = ARIZONA_FLL_SRC_NONE;
-	mutex_init(&fll->lock);
 
 	/* Configure default refclk to 32kHz if we have one */
 	regmap_read(arizona->regmap, ARIZONA_CLOCK_32K_1, &val);
@@ -3377,22 +3218,6 @@ static int arizona_slim_audio_probe(struct slim_device *slim)
 	return 0;
 }
 
-static int arizona_slim_device_up(struct slim_device *slim)
-{
-	dev_crit(&slim->dev, "****%s****\n", __func__);
-	snd_soc_card_change_online_state(arizona_codec->card, 1);
-	msleep(100);
-	return 0;
-}
-
-static int arizona_slim_device_down(struct slim_device *slim)
-{
-	dev_crit(&slim->dev, "****%s****\n", __func__);
-	snd_soc_card_change_online_state(arizona_codec->card, 0);
-	msleep(100);
-	return 0;
-}
-
 static const struct slim_device_id arizona_slim_id[] = {
 	{ "florida-slim-audio", 0 },
 	{ },
@@ -3405,8 +3230,6 @@ static struct slim_driver arizona_slim_audio = {
 	},
 
 	.probe = arizona_slim_audio_probe,
-	.device_up = arizona_slim_device_up,
-	.device_down = arizona_slim_device_down,
 	.id_table = arizona_slim_id,
 };
 
