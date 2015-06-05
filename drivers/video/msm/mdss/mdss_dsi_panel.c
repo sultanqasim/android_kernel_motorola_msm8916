@@ -1645,6 +1645,8 @@ static int mdss_panel_parse_dt(struct device_node *np,
 				pr_err("TE-ESD not valid for video mode\n");
 		}
 	}
+	pinfo->mipi.force_clk_lane_hs = of_property_read_bool(np,
+		"qcom,mdss-dsi-force-clock-lane-hs");
 
 	rc = mdss_dsi_parse_panel_features(np, ctrl_pdata);
 	if (rc) {
