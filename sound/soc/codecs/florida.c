@@ -18,6 +18,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/wakelock.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -62,6 +63,7 @@ struct florida_priv {
 	struct florida_compr compr_info[FLORIDA_NUM_COMPR_DEVICES];
 
 	struct mutex fw_lock;
+	struct wake_lock wakelock;
 };
 
 static const struct wm_adsp_region florida_dsp1_regions[] = {
@@ -2175,6 +2177,8 @@ static irqreturn_t adsp2_irq(int irq, void *data)
 				regmap_write(arizona->regmap, reg, scratch_reg);
 				if (adsp2_ez2ctrl_trigger(florida, i)) {
 					pr_debug("Calling AOV callback\n");
+					wake_lock_timeout(&florida->wakelock,
+						msecs_to_jiffies(500));
 					adsp2_ez2ctrl_set_trigger(florida);
 				}
 			}
@@ -2482,6 +2486,7 @@ static int florida_codec_probe(struct snd_soc_codec *codec)
 			"Failed to set DSP IRQ to wake source: %d\n",
 			ret);
 
+	wake_lock_init(&priv->wakelock, 0, "aov_wakelock");
 	mutex_lock(&codec->card->dapm_mutex);
 	snd_soc_dapm_enable_pin(&codec->dapm, "DRC2 Signal Activity");
 	mutex_unlock(&codec->card->dapm_mutex);
@@ -2506,6 +2511,7 @@ static int florida_codec_remove(struct snd_soc_codec *codec)
 
 	irq_set_irq_wake(arizona->irq, 0);
 	arizona_free_irq(arizona, ARIZONA_IRQ_DSP_IRQ1, priv);
+	wake_lock_destroy(&priv->wakelock);
 	regmap_update_bits(arizona->regmap, ARIZONA_IRQ2_STATUS_3_MASK,
 			   ARIZONA_IM_DRC2_SIG_DET_EINT2,
 			   ARIZONA_IM_DRC2_SIG_DET_EINT2);
