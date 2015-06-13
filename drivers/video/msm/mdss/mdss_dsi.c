@@ -1642,8 +1642,7 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	return 0;
 
 error_pan_node:
-	if (BL_WLED == ctrl_pdata->bklt_ctrl)
-		led_trigger_unregister_simple(bl_led_trigger);
+	mdss_dsi_unregister_bl_settings(ctrl_pdata);
 	of_node_put(dsi_pan_node);
 error_vreg:
 	for (i = DSI_MAX_PM - 1; i >= 0; i--)
