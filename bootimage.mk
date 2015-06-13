@@ -18,7 +18,7 @@ KERNEL_IMAGE := arch/arm/boot/zImage
 RAMDISK := arch/arm/boot/initramfs.cpio.gz
 DEVTREE := arch/arm/boot/dt.img
 KERNEL_BASE := 0x80000000
-KERNEL_CMDL := 'console=ttyHSL0,115200,n8 androidboot.selinux=permissive androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M'
+KERNEL_CMDL := 'console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.bootdevice=7824900.sdhci utags.blkdev=/dev/block/bootdevice/by-name/utags utags.backup=/dev/block/bootdevice/by-name/utagsBackup movablecore=160M'
 BOARD_KERNEL_PAGESIZE := 2048
 
 $(KERNEL_IMAGE): zImage
