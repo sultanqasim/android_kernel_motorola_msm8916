@@ -515,6 +515,7 @@ void msm_iommu_pagetable_unmap_range(struct msm_iommu_pt *pt, unsigned int va,
 	u32 fl_offset;
 	u32 *sl_table;
 	u32 sl_start, sl_end;
+	u32 *temp;
 	int used;
 
 	BUG_ON(len & (SZ_4K - 1));
@@ -534,6 +535,10 @@ void msm_iommu_pagetable_unmap_range(struct msm_iommu_pt *pt, unsigned int va,
 			if (sl_end > NUM_SL_PTE)
 				sl_end = NUM_SL_PTE;
 			n_entries = sl_end - sl_start;
+
+			for (temp = sl_table + sl_start;
+					temp < sl_table + sl_end; temp++)
+				BUG_ON(!*temp);
 
 			memset(sl_table + sl_start, 0, n_entries * 4);
 			clean_pte(sl_table + sl_start, sl_table + sl_end,
