@@ -31,10 +31,13 @@
 #define VFE40_STATS_BURST_LEN_8916_VERSION 2
 #define VFE40_UB_SIZE 1536 /* 1536 * 128 bits = 24KB */
 #define VFE40_UB_SIZE_8916 2048 /* 2048 * 128 bits = 32KB */
+#define VFE40_UB_SIZE_8939 3072 /* 3072 * 128 bits = 48KB */
 #define VFE40_EQUAL_SLICE_UB 190 /* (UB_SIZE - STATS SIZE)/6 */
 #define VFE40_EQUAL_SLICE_UB_8916 276
+#define VFE40_EQUAL_SLICE_UB_8939 446
 #define VFE40_TOTAL_WM_UB 1144 /* UB_SIZE - STATS SIZE */
 #define VFE40_TOTAL_WM_UB_8916 1656
+#define VFE40_TOTAL_WM_UB_8939 2680
 #define VFE40_WM_BASE(idx) (0x6C + 0x24 * idx)
 #define VFE40_RDI_BASE(idx) (0x2E8 + 0x4 * idx)
 #define VFE40_XBAR_BASE(idx) (0x58 + 0x4 * (idx / 2))
@@ -437,7 +440,7 @@ static void msm_vfe40_process_camif_irq(struct vfe_device *vfe_dev,
 	uint32_t irq_status0, uint32_t irq_status1,
 	struct msm_isp_timestamp *ts)
 {
-	int cnt;
+	int cnt = 0, pix_cnt = 0;
 
 	if (!(irq_status0 & 0xF))
 		return;
@@ -445,7 +448,8 @@ static void msm_vfe40_process_camif_irq(struct vfe_device *vfe_dev,
 	if (irq_status0 & (1 << 0)) {
 		ISP_DBG("%s: SOF IRQ\n", __func__);
 		cnt = vfe_dev->axi_data.src_info[VFE_PIX_0].raw_stream_count;
-		if (cnt > 0) {
+		pix_cnt = vfe_dev->axi_data.src_info[VFE_PIX_0].pix_stream_count;
+		if (cnt > 0 && (pix_cnt == 0)) {
 			msm_isp_sof_notify(vfe_dev, VFE_RAW_0, ts);
 			if (vfe_dev->axi_data.stream_update)
 				msm_isp_axi_stream_update(vfe_dev,
@@ -1276,6 +1280,9 @@ static void msm_vfe40_cfg_axi_ub_equal_default(
 	if (vfe_dev->vfe_hw_version == VFE40_8916_VERSION) {
 		vfe_dev->ub_info->wm_ub = VFE40_TOTAL_WM_UB_8916;
 		total_wm_ub = VFE40_TOTAL_WM_UB_8916;
+	} else if (vfe_dev->vfe_hw_version == VFE40_8939_VERSION){
+		vfe_dev->ub_info->wm_ub = VFE40_TOTAL_WM_UB_8939;
+		total_wm_ub = VFE40_TOTAL_WM_UB_8939;
 	} else {
 		vfe_dev->ub_info->wm_ub = VFE40_TOTAL_WM_UB;
 		total_wm_ub = VFE40_TOTAL_WM_UB;
@@ -1318,6 +1325,9 @@ static void msm_vfe40_cfg_axi_ub_equal_slicing(
 	if (vfe_dev->vfe_hw_version == VFE40_8916_VERSION) {
 		vfe_dev->ub_info->wm_ub = VFE40_EQUAL_SLICE_UB_8916;
 		equal_slice_ub = VFE40_EQUAL_SLICE_UB_8916;
+	} else if (vfe_dev->vfe_hw_version == VFE40_8939_VERSION){
+		vfe_dev->ub_info->wm_ub = VFE40_EQUAL_SLICE_UB_8939;
+		equal_slice_ub = VFE40_EQUAL_SLICE_UB_8939;
 	} else {
 		vfe_dev->ub_info->wm_ub = VFE40_EQUAL_SLICE_UB;
 		equal_slice_ub = VFE40_EQUAL_SLICE_UB;
@@ -1587,10 +1597,12 @@ static void msm_vfe40_stats_cfg_ub(struct vfe_device *vfe_dev)
 		16, /*MSM_ISP_STATS_BHIST*/
 	};
 
-	if (vfe_dev->vfe_hw_version == VFE40_8916_VERSION ||
-	    vfe_dev->vfe_hw_version == VFE40_8939_VERSION) {
+	if (vfe_dev->vfe_hw_version == VFE40_8916_VERSION ) {
 		stats_burst_len = VFE40_STATS_BURST_LEN_8916_VERSION;
 		ub_offset = VFE40_UB_SIZE_8916;
+	} else if (vfe_dev->vfe_hw_version == VFE40_8939_VERSION) {
+		stats_burst_len = VFE40_STATS_BURST_LEN_8916_VERSION;
+		ub_offset = VFE40_UB_SIZE_8939;
 	} else {
 		stats_burst_len = VFE40_STATS_BURST_LEN;
 		ub_offset = VFE40_UB_SIZE;
