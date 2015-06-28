@@ -1,18 +1,12 @@
-Upstream Info:
-ssh://gerrit.mot.com:29418/home/repo/dev/platform/android/kernel/msm-3.10
-
 Build tools required:
-- Linaro GCC
-- gcc (for your host)
-
-To customize SELinux settings, see:
-https://source.android.com/devices/tech/security/selinux/implement.html
+- Linaro GCC for 32-bit ARM
+- GCC for your host
 
 How to build:
 export ARCH=arm
 export SUBARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-
-export VARIANT=lte
+export VARIANT=gsm
 make mrproper
 make msm8916-squid_defconfig
 ./build_cwm_zip.sh
