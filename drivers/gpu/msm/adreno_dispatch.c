@@ -816,13 +816,14 @@ static void _adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
 			/*
 			 * Check to seen if the context had been requeued while
 			 * we were processing it (probably by another thread
-			 * pushing commands). If it has then do a put to make
-			 * sure the reference counting stays accurate.
-			 * If the dispatch_q is full then put it on the
-			 * busy list so it gets first preference when space
-			 * becomes available.
-			 * Otherwise put it on the requeue list since it may
-			 * have more commands.
+			 * pushing commands). If it has then shift it to the
+			 * requeue list if it was not able to submit commands
+			 * due to the dispatch_q being full. Also, do a put to
+			 * make sure the reference counting stays accurate.
+			 * If the node is empty then we will put it on the
+			 * requeue list and not touch the refcount since we
+			 * already hold it from the first time it went on the
+			 * list.
 			 */
 
 			if (!plist_node_empty(&drawctxt->pending)) {
