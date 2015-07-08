@@ -2603,6 +2603,7 @@ static int
 wcnss_trigger_config(struct platform_device *pdev)
 {
 	int ret;
+	struct clk *snoc_qosgen;
 	struct qcom_wcnss_opts *pdata;
 	struct resource *res;
 	int is_pronto_vt;
@@ -2933,6 +2934,18 @@ wcnss_trigger_config(struct platform_device *pdev)
 	} else {
 		INIT_DELAYED_WORK(&penv->vbatt_work, wcnss_update_vbatt);
 		penv->fw_vbatt_state = WCNSS_CONFIG_UNSPECIFIED;
+	}
+
+	snoc_qosgen = clk_get(&pdev->dev, "snoc_qosgen");
+
+	if (IS_ERR(snoc_qosgen)) {
+		pr_err("Couldn't get snoc_qosgen\n");
+	} else {
+		if (clk_prepare_enable(snoc_qosgen)) {
+			pr_err("snoc_qosgen enable failed\n");
+		} else {
+			pr_info("snoc_qosgen configured successfully\n");
+		}
 	}
 
 	do {
