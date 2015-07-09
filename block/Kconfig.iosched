@@ -56,7 +56,7 @@ config IOSCHED_CFQ
 
 config IOSCHED_FIOPS
 	tristate "IOPS based I/O scheduler"
-	default y
+	default n
 	---help---
 	  This is an IOPS based I/O scheduler. It will try to distribute
 	  IOPS equally among all processes in the system. It's mainly for
