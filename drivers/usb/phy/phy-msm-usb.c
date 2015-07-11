@@ -257,6 +257,9 @@ static int msm_hsusb_ldo_enable(struct msm_otg *motg,
 		break;
 
 	case USB_PHY_REG_OFF:
+		if (motg->phy.flags & PHY_RM_PULLDOWN)
+			return 0;
+
 		ret = regulator_disable(hsusb_1p8);
 		if (ret) {
 			dev_err(motg->phy.dev, "%s: unable to disable the hsusb 1p8\n",
@@ -303,6 +306,8 @@ static int msm_hsusb_ldo_enable(struct msm_otg *motg,
 		break;
 
 	case USB_PHY_REG_LPM_OFF:
+		if (motg->phy.flags & PHY_RM_PULLDOWN)
+			return 0;
 		ret = regulator_set_optimum_mode(hsusb_1p8,
 				USB_PHY_1P8_HPM_LOAD);
 		if (ret < 0) {
@@ -4483,8 +4488,8 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 			msm_hsusb_ldo_enable(motg, USB_PHY_REG_ON);
 			motg->phy.flags |= PHY_RM_PULLDOWN;
 		} else {
-			msm_hsusb_ldo_enable(motg, USB_PHY_REG_OFF);
 			motg->phy.flags &= ~PHY_RM_PULLDOWN;
+			msm_hsusb_ldo_enable(motg, USB_PHY_REG_OFF);
 		}
 
 		dev_dbg(motg->phy.dev, "RM Pulldown %d\n", val->intval);
