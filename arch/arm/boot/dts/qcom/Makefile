@@ -264,6 +264,9 @@ dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p2a.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p2c.dtb
 endif
 
+# Sparrowhawk or Osprey refresh
+dtb-$(CONFIG_ARCH_MSM8916) += msm8929-sparrowhawk-p0.dtb
+
 ifeq ($(CONFIG_MMI_DEVICE_DTBS),y)
 # Add 1k of padding to the DTBs to allow for environment variables
 # to be runtime added by the bootloader (i.e. /chosen properties)
