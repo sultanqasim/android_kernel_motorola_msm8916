@@ -578,6 +578,12 @@
 			1100000 1100000 1100000>;
 		qcom,cpr-enable;
 	};
+	qcom,csiphy@1b0ac00 {
+	    qcom,revision-v3;
+	};
+	qcom,csiphy@1b0b000 {
+	    qcom,revision-v3;
+	};
 };
 
 &tsens {
