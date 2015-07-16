@@ -149,6 +149,11 @@ static int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 			csiphybase + csiphy_dev->ctrl_reg->
 			csiphy_reg.mipi_csiphy_interrupt_clear0_addr);
 	} else {
+		if ((csiphy_dev->hw_version == CSIPHY_VERSION_V31) &&
+			csiphy_dev->is_3_1_rev3) {
+			msm_camera_io_w(0x01, csiphybase +
+				MIPI_CSIPHY_GLBL_PWG_CFG0_OFFSET);
+		}
 		val = 0x1;
 		msm_camera_io_w((lane_mask << 1) | val,
 				csiphybase +
@@ -524,6 +529,10 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 			csi_lane_mask >>= 1;
 			i++;
 		}
+		if ((csiphy_dev->hw_version == CSIPHY_VERSION_V31) &&
+			csiphy_dev->is_3_1_rev3)
+			msm_camera_io_w(0x00, csiphy_dev->base +
+				MIPI_CSIPHY_GLBL_PWG_CFG0_OFFSET);
 	}
 
 	if (--csiphy_dev->ref_count) {
@@ -613,6 +622,10 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 			csi_lane_mask >>= 1;
 			i++;
 		}
+		if ((csiphy_dev->hw_version == CSIPHY_VERSION_V31) &&
+			csiphy_dev->is_3_1_rev3)
+			msm_camera_io_w(0x00, csiphy_dev->base +
+				MIPI_CSIPHY_GLBL_PWG_CFG0_OFFSET);
 	}
 
 	if (--csiphy_dev->ref_count) {
@@ -870,6 +883,10 @@ static int csiphy_probe(struct platform_device *pdev)
 		pr_err("%s: msm_csiphy_get_clk_info() failed", __func__);
 		return -EFAULT;
 	}
+
+	new_csiphy_dev->is_3_1_rev3 = of_property_read_bool(
+		pdev->dev.of_node,
+		"qcom,revision-v3");
 
 	new_csiphy_dev->mem = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "csiphy");
