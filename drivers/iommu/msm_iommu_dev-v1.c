@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -489,8 +489,17 @@ static int msm_iommu_ctx_parse_dt(struct platform_device *pdev,
 
 	get_secure_ctx(pdev->dev.of_node, drvdata, ctx_drvdata);
 
-	if (ctx_drvdata->secure_context) {
+	if (drvdata->sec_id != -1) {
 		irq = platform_get_irq(pdev, 1);
+
+		/*
+		 * This is for supporting old DTs where it was assumed
+		 * that interrupt 0 is only required as their CB is
+		 * non-secure.
+		 */
+		if (irq < 0)
+			irq = platform_get_irq(pdev, 0);
+
 		if (irq > 0) {
 			ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
 					msm_iommu_secure_fault_handler_v2,
@@ -539,6 +548,10 @@ static int msm_iommu_ctx_parse_dt(struct platform_device *pdev,
 	if (of_property_read_string(pdev->dev.of_node, "label",
 					&ctx_drvdata->name))
 		ctx_drvdata->name = dev_name(&pdev->dev);
+
+	ctx_drvdata->report_error_on_fault =
+		of_property_read_bool(pdev->dev.of_node,
+				"qcom,report-error-on-fault");
 
 	if (!of_get_property(pdev->dev.of_node, "qcom,iommu-ctx-sids", &nsid)) {
 		ret = -EINVAL;

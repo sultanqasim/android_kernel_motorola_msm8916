@@ -2606,6 +2606,7 @@ static int
 wcnss_trigger_config(struct platform_device *pdev)
 {
 	int ret;
+	struct clk *snoc_qosgen;
 	struct qcom_wcnss_opts *pdata;
 	struct resource *res;
 	int is_pronto_vt;
@@ -2938,6 +2939,18 @@ wcnss_trigger_config(struct platform_device *pdev)
 		penv->fw_vbatt_state = WCNSS_CONFIG_UNSPECIFIED;
 	}
 
+	snoc_qosgen = clk_get(&pdev->dev, "snoc_qosgen");
+
+	if (IS_ERR(snoc_qosgen)) {
+		pr_err("Couldn't get snoc_qosgen\n");
+	} else {
+		if (clk_prepare_enable(snoc_qosgen)) {
+			pr_err("snoc_qosgen enable failed\n");
+		} else {
+			pr_info("snoc_qosgen configured successfully\n");
+		}
+	}
+
 	do {
 		/* trigger initialization of the WCNSS */
 		penv->pil = subsystem_get(WCNSS_PIL_DEVICE);
@@ -3132,6 +3145,7 @@ static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,
 		wcnss_disable_pc_add_req();
 		schedule_delayed_work(&penv->wcnss_pm_qos_del_req,
 				msecs_to_jiffies(WCNSS_PM_QOS_TIMEOUT));
+		penv->is_shutdown = 1;
 		wcnss_log_debug_regs_on_bite();
 	} else if (code == SUBSYS_POWERUP_FAILURE) {
 		if (pdev && pwlanconfig)
