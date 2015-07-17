@@ -8,6 +8,7 @@ run_program("/sbin/busybox", "mount", "/system");
 ui_print("Installing kernel modules...");
 package_extract_dir("system", "/system");
 set_perm_recursive(0, 0, 0755, 0644, "/system/lib/modules");
+set_perm(0, 2000, 0755, "/system/bin/mm-pp-daemon");
 
 ui_print("Installing boot image...");
 package_extract_file("boot.img", "/dev/block/platform/soc.0/by-name/boot");
