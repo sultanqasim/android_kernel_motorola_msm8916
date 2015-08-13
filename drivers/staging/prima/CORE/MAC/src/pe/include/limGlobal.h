@@ -45,7 +45,7 @@
 #include "sirMacPropExts.h"
 #include "sirCommon.h"
 #include "sirDebug.h"
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "csrApi.h"
 #include "sapApi.h"
 #include "dot11f.h"
@@ -357,6 +357,7 @@ typedef struct tLimPreAuthNode
     tANI_U8             fFree:1;
     tANI_U8             rsvd:5;
     TX_TIMER            timer;
+    tANI_U16            seqNo;
 }tLimPreAuthNode, *tpLimPreAuthNode;
 
 // Pre-authentication table definition

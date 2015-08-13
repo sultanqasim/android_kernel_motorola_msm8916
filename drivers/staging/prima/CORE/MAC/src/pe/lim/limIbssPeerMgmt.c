@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -40,7 +40,7 @@
 #include "palTypes.h"
 #include "aniGlobal.h"
 #include "sirCommon.h"
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "limUtils.h"
 #include "limAssocUtils.h"
 #include "limStaHashApi.h"
@@ -1460,7 +1460,7 @@ limIbssCoalesce(
     tSirMacAddr         currentBssId;
     tLimIbssPeerNode    *pPeerNode;
     tpDphHashNode       pStaDs;
-    tUpdateBeaconParams beaconParams; 
+    tUpdateBeaconParams beaconParams;
 
     vos_mem_set((tANI_U8 *)&beaconParams, sizeof(tUpdateBeaconParams), 0);
 
@@ -1533,8 +1533,12 @@ limIbssCoalesce(
          * pMac->lim.gLimIbssStaLimit
          */
         if ((pMac->lim.gLimNumIbssPeers+1) >= pMac->lim.gLimIbssStaLimit)
-        {
-            PELOGE(limLog(pMac, LOGE, FL("**** MAX STA LIMIT HAS REACHED ****"));)
+        {   /*Print every 100th time */
+            if (pMac->lim.gLimIbssRetryCnt % 100 == 0)
+            {
+               limLog(pMac, LOG1, FL("**** MAX STA LIMIT HAS REACHED ****"));
+            }
+            pMac->lim.gLimIbssRetryCnt++;
             return eSIR_LIM_MAX_STA_REACHED_ERROR;
         }
         PELOGW(limLog(pMac, LOGW, FL("IBSS Peer node does not exist, adding it***"));)

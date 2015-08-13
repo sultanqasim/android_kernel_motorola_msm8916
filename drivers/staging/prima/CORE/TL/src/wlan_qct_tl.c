@@ -141,6 +141,7 @@
 #include "vos_trace.h"
 #include "wlan_qct_tl_trace.h"
 #include "tlDebug.h"
+#include "cfgApi.h"
 #ifdef FEATURE_WLAN_WAPI
 /*Included to access WDI_RxBdType */
 #include "wlan_qct_wdi_bd.h"
@@ -1176,6 +1177,8 @@ WLANTL_RegisterSTAClient
   WLANTL_CbType*  pTLCb = NULL;
   WLANTL_STAClientType* pClientSTA = NULL;
   v_U8_t    ucTid = 0;/*Local variable to clear previous replay counters of STA on all TIDs*/
+  v_U32_t   istoggleArpEnb = 0;
+  tpAniSirGlobal pMac;
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
   /*------------------------------------------------------------------------
@@ -1259,10 +1262,17 @@ WLANTL_RegisterSTAClient
   pClientSTA->wSTADesc.ucSTAId  = pwSTADescType->ucSTAId;
   pClientSTA->ptkInstalled = 0;
 
+  pMac = vos_get_context(VOS_MODULE_ID_PE, pvosGCtx);
+  if ( NULL != pMac )
+  {
+    wlan_cfgGetInt(pMac, WNI_CFG_TOGGLE_ARP_BDRATES, &istoggleArpEnb);
+  }
+  pClientSTA->arpRate = (v_U8_t)istoggleArpEnb;
+
   TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
-             "WLAN TL:Registering STA Client ID: %d with UC %d and BC %d", 
-             pwSTADescType->ucSTAId, 
-              pwSTADescType->ucUcastSig, pwSTADescType->ucBcastSig));
+   "WLAN TL:Registering STA Client ID: %d with UC %d and BC %d toggleArp :%hhu",
+    pwSTADescType->ucSTAId, pwSTADescType->ucUcastSig,
+    pwSTADescType->ucBcastSig, pClientSTA->arpRate));
 
   pClientSTA->wSTADesc.wSTAType = pwSTADescType->wSTAType;
 
@@ -7592,7 +7602,7 @@ WLANTL_STATxAuth
    WLANTL_STAClientType *pStaClient = NULL;
    v_U8_t                ucWDSEnabled = 0;
    v_U32_t               ucTxFlag   = 0;
-   v_U8_t                ucACMask, i; 
+   v_U8_t                ucACMask, i;
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
   /*------------------------------------------------------------------------
@@ -7923,8 +7933,17 @@ WLANTL_STATxAuth
 #endif /* FEATURE_WLAN_TDLS */
   if( tlMetaInfo.ucIsArp )
   {
-    /*Send ARP at lowest Phy rate and through WQ5 */
-    ucTxFlag |= HAL_USE_BD_RATE_MASK;
+    if (pStaClient->arpRate == 0)
+    {
+        ucTxFlag |= HAL_USE_BD_RATE_1_MASK;
+    }
+    else if (pStaClient->arpRate == 1 || pStaClient->arpRate == 3)
+    {
+        pStaClient->arpRate ^= 0x2;
+        ucTxFlag |= HAL_USE_BD_RATE_1_MASK<<(pStaClient->arpRate-1);
+    }
+    TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO,
+           "arp pkt sending on BD rate: %hhu", pStaClient->arpRate));
   }
 
   vosStatus = (VOS_STATUS)WDA_DS_BuildTxPacketInfo( pvosGCtx, 
@@ -9270,7 +9289,7 @@ WLANTL_TxProcessMsg
     break;
 
   case WLANTL_TX_FW_DEBUG:
-    vos_fwDumpReq(274, 0, 0, 0, 0);
+    vos_fwDumpReq(274, 0, 0, 0, 0, 1); //Async event
     break;
 
   default:
@@ -9871,21 +9890,8 @@ if ((0 == w8023Header.usLenType) && (pClientSTA->wSTADesc.ucIsEseSta))
         pw80211Header->wFrmCtrl.toDS          = 0;
         pw80211Header->wFrmCtrl.fromDS        = 0;
 
-        /*
-         * If the frame is a multicast frame, then, the Address1
-         * should be the destination address filled in the packet. Which is
-         * the multicast address. Otherwise, set it to BSSID
-         */
-        if (0 == tlMetaInfo->ucBcast && 1 == tlMetaInfo->ucMcast)
-        {
-           vos_copy_macaddr( (v_MACADDR_t*)&pw80211Header->vA1,
+        vos_copy_macaddr( (v_MACADDR_t*)&pw80211Header->vA1,
                              (v_MACADDR_t*)&w8023Header.vDA);
-        }
-        else
-        {
-           vos_copy_macaddr( (v_MACADDR_t*)&pw80211Header->vA1,
-                 &pClientSTA->wSTADesc.vSTAMACAddress);
-        }
         vos_mem_copy( pw80211Header->vA3,
               &pClientSTA->wSTADesc.vBSSIDforIBSS ,
               VOS_MAC_ADDR_SIZE);
@@ -10644,7 +10650,7 @@ WLAN_TLAPGetNextTxIds
 {
   WLANTL_CbType*  pTLCb;
   v_U8_t          ucACFilter = 1;
-  v_U8_t          ucNextSTA = 0; // Motorola IKJB42MAIN-4103, are002, initialization
+  v_U8_t          ucNextSTA ; 
   v_BOOL_t        isServed = TRUE;  //current round has find a packet or not
   v_U8_t          ucACLoopNum = WLANTL_AC_HIGH_PRIO + 1; //number of loop to go
   v_U8_t          uFlowMask; // TX FlowMask from WDA
@@ -11459,6 +11465,7 @@ WLANTL_CleanSTA
    ptlSTAClient->ucCurrentAC     = WLANTL_AC_HIGH_PRIO;
    ptlSTAClient->ucCurrentWeight = 0;
    ptlSTAClient->ucServicedAC    = WLANTL_AC_BK;
+   ptlSTAClient->ucPktPending = 0;
 
    vos_mem_zero( ptlSTAClient->aucACMask, sizeof(ptlSTAClient->aucACMask));
    vos_mem_zero( &ptlSTAClient->wUAPSDInfo, sizeof(ptlSTAClient->wUAPSDInfo));

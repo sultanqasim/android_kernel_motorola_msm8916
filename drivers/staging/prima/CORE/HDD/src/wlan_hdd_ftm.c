@@ -89,7 +89,9 @@
 #define FTM_CHAIN_SEL_R0_ON         1
 #define FTM_CHAIN_SEL_T0_ON         2
 #define FTM_CHAIN_SEL_R0_T0_ON      3
-#define FTM_CHAIN_SEL_MAX           3
+#define FTM_CHAIN_SEL_ANTENNA_0     7
+#define FTM_CHAIN_SEL_ANTENNA_1     8
+#define FTM_CHAIN_SEL_MAX           8
 
 #define WCNSS_TXFIR_OFFSET          0x00018000
 
@@ -1214,6 +1216,14 @@ static VOS_STATUS wlan_ftm_priv_enable_chain(hdd_adapter_t *pAdapter,v_U16_t cha
 
         case FTM_CHAIN_SEL_T0_ON:
             chainSelect = PHY_CHAIN_SEL_T0_ON;
+            break;
+
+        case FTM_CHAIN_SEL_ANTENNA_0:
+            chainSelect = PHY_CHAIN_SEL_ANT_0;
+            break;
+
+        case FTM_CHAIN_SEL_ANTENNA_1:
+            chainSelect = PHY_CHAIN_SEL_ANT_1;
             break;
     }
 
@@ -3230,6 +3240,7 @@ void wlan_hdd_process_ftm_cmd
     pVosContextType pVosContext = (pVosContextType)(pHddCtx->pvosContext);
     int hostState;
     tPttMsgbuffer *tempRspBuffer = NULL;
+    static int count;
 
     ENTER();
 
@@ -3260,6 +3271,19 @@ void wlan_hdd_process_ftm_cmd
 
         hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Invalid Module Type =%d",__func__,pRequestBuf->module_type);
 
+        pHddCtx->ftm.pResponseBuf->ftm_err_code = WLAN_FTM_FAILURE;
+        wlan_ftm_send_response(pHddCtx);
+        return ;
+    }
+
+    if (VOS_FTM_MODE != hdd_get_conparam())
+    {
+        count++;
+        if (count == 1 || !(count % 10))
+        {
+            hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Driver not loaded in FTM"
+                " mode, current mode: %d ",__func__, hdd_get_conparam());
+        }
         pHddCtx->ftm.pResponseBuf->ftm_err_code = WLAN_FTM_FAILURE;
         wlan_ftm_send_response(pHddCtx);
         return ;

@@ -423,6 +423,7 @@ typedef struct sAniSirLim
     /// Definition for storing IBSS peers BSS description
     tLimIbssPeerNode      *gLimIbssPeerList;
     tANI_U32               gLimNumIbssPeers;
+    tANI_U32               gLimIbssRetryCnt;
 
     // ibss info - params for which ibss to join while coalescing
     tAniSirLimIbss      ibssInfo;
@@ -1075,6 +1076,8 @@ typedef struct sAniSirGlobal
     v_BOOL_t isCoexScoIndSet;
     v_U8_t miracast_mode;
     v_U8_t fBtcEnableIndTimerVal;
+    tANI_BOOLEAN miracastVendorConfig;
+    v_BOOL_t fActiveScanOnDFSChannels;
 } tAniSirGlobal;
 
 #ifdef FEATURE_WLAN_TDLS

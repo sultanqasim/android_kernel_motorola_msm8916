@@ -2586,6 +2586,88 @@ eHalStatus csrScanFilterResults(tpAniSirGlobal pMac)
     return status;
 }
 
+/**
+ * csrScanFilterDFSResults
+ *
+ *FUNCTION:
+ * This function filter BSSIDs on DFS channels from the scan results.
+ *
+ *LOGIC:
+ * Get scan result from scan list and Check Scan result channel number
+ * with 11d channel list if channel number is found in 11d channel list
+ * and if fEnableDFSChnlScan is zero and if channel is DFS, then
+ * remove scan result entry from scan list
+ *
+ *ASSUMPTIONS:
+ *
+ *NOTE:
+ *
+ * @param  pMac        Pointer to Global MAC structure
+ *
+ * @return Status
+ */
+
+eHalStatus csrScanFilterDFSResults(tpAniSirGlobal pMac)
+{
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+    tListElem *pEntry,*pTempEntry;
+    tCsrScanResult *pBssDesc;
+
+    pEntry = csrLLPeekHead( &pMac->scan.scanResultList, LL_ACCESS_LOCK );
+    while( pEntry )
+    {
+        pBssDesc = GET_BASE_ADDR( pEntry, tCsrScanResult, Link );
+        pTempEntry = csrLLNext( &pMac->scan.scanResultList, pEntry,
+                                                            LL_ACCESS_LOCK );
+        if((pMac->scan.fEnableDFSChnlScan == DFS_CHNL_SCAN_DISABLED) &&
+                  CSR_IS_CHANNEL_DFS(pBssDesc->Result.BssDescriptor.channelId))
+        {
+            smsLog( pMac, LOG1, FL("%d is a DFS ch filtered from scan list"),
+                    pBssDesc->Result.BssDescriptor.channelId);
+            /* Remove Scan result which does not have 11d channel */
+            if( csrLLRemoveEntry( &pMac->scan.scanResultList, pEntry,
+                                                              LL_ACCESS_LOCK ))
+            {
+                csrFreeScanResultEntry( pMac, pBssDesc );
+            }
+        }
+        else
+        {
+            smsLog( pMac, LOG1, FL("%d is a Valid channel"),
+                    pBssDesc->Result.BssDescriptor.channelId);
+        }
+        pEntry = pTempEntry;
+    }
+
+    pEntry = csrLLPeekHead( &pMac->scan.tempScanResults, LL_ACCESS_LOCK );
+    while( pEntry )
+    {
+        pBssDesc = GET_BASE_ADDR( pEntry, tCsrScanResult, Link );
+        pTempEntry = csrLLNext( &pMac->scan.tempScanResults, pEntry,
+                                                            LL_ACCESS_LOCK );
+
+        if((pMac->scan.fEnableDFSChnlScan == DFS_CHNL_SCAN_DISABLED) &&
+                  CSR_IS_CHANNEL_DFS(pBssDesc->Result.BssDescriptor.channelId))
+        {
+           smsLog( pMac, LOG1, FL("%d is a DFS ch filtered from scan list"),
+                    pBssDesc->Result.BssDescriptor.channelId);
+            /* Remove Scan result which does not have 11d channel */
+            if( csrLLRemoveEntry( &pMac->scan.tempScanResults, pEntry,
+                        LL_ACCESS_LOCK ))
+            {
+                csrFreeScanResultEntry( pMac, pBssDesc );
+            }
+        }
+        else
+        {
+            smsLog( pMac, LOG1, FL("%d is a Valid channel"),
+                    pBssDesc->Result.BssDescriptor.channelId);
+        }
+        pEntry = pTempEntry;
+    }
+    return status;
+}
+
 
 eHalStatus csrScanCopyResultList(tpAniSirGlobal pMac, tScanResultHandle hIn, tScanResultHandle *phResult)
 {
@@ -3402,7 +3484,6 @@ void csrApplyPower2Current( tpAniSirGlobal pMac )
 void csrApplyChannelPowerCountryInfo( tpAniSirGlobal pMac, tCsrChannel *pChannelList, tANI_U8 *countryCode, tANI_BOOLEAN updateRiva)
 {
     int i, j, count, countryIndex = -1;
-    eNVChannelEnabledType channelEnabledType;
     tANI_U8 numChannels = 0;
     tANI_U8 tempNumChannels = 0;
     tANI_U8 channelIgnore = FALSE;
@@ -3420,39 +3501,26 @@ void csrApplyChannelPowerCountryInfo( tpAniSirGlobal pMac, tCsrChannel *pChannel
             }
         }
         tempNumChannels = CSR_MIN(pChannelList->numChannels, WNI_CFG_VALID_CHANNEL_LIST_LEN);
-        /* If user doesn't want to scan the DFS channels lets trim them from 
-        the valid channel list*/
+
         for(i=0; i < tempNumChannels; i++)
         {
             channelIgnore = FALSE;
-            if( FALSE == pMac->scan.fEnableDFSChnlScan )
+            if( countryIndex != -1 )
             {
-                channelEnabledType =
-                    vos_nv_getChannelEnabledState(pChannelList->channelList[i]);
-            }
-            else
-            {
-                channelEnabledType = NV_CHANNEL_ENABLE;
-            }
-            if( NV_CHANNEL_ENABLE == channelEnabledType )
-            {
-                if( countryIndex != -1 )
+                for(j=0; j < countryIgnoreList[countryIndex].channelCount; j++)
                 {
-                    for(j=0; j < countryIgnoreList[countryIndex].channelCount; j++)
+                    if( pChannelList->channelList[i] ==
+                            countryIgnoreList[countryIndex].channelList[j] )
                     {
-                        if( pChannelList->channelList[i] ==
-                                countryIgnoreList[countryIndex].channelList[j] )
-                        {
-                            channelIgnore = TRUE;
-                            break;
-                        }
+                        channelIgnore = TRUE;
+                        break;
                     }
                 }
-                if( FALSE == channelIgnore )
-                {
-                   ChannelList.channelList[numChannels] = pChannelList->channelList[i];
-                   numChannels++;
-                }
+            }
+            if( FALSE == channelIgnore )
+            {
+                ChannelList.channelList[numChannels] = pChannelList->channelList[i];
+                numChannels++;
             }
         }
         ChannelList.numChannels = numChannels;
@@ -3479,6 +3547,30 @@ void csrApplyChannelPowerCountryInfo( tpAniSirGlobal pMac, tCsrChannel *pChannel
     csrSetCfgCountryCode(pMac, countryCode);
 }
 
+void csrUpdateFCCChannelList(tpAniSirGlobal pMac)
+{
+    tCsrChannel ChannelList;
+    tANI_U8 chnlIndx = 0;
+    int i;
+    chnlIndx = pMac->scan.base20MHzChannels.numChannels;
+
+    for ( i = 0; i < pMac->scan.base20MHzChannels.numChannels; i++ )
+    {
+        if (pMac->scan.fcc_constraint &&
+                    ((pMac->scan.base20MHzChannels.channelList[i] == 12) ||
+                    (pMac->scan.base20MHzChannels.channelList[i] == 13)))
+        {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                          FL("removing channel %d"),
+                          pMac->scan.base20MHzChannels.channelList[i]);
+            continue;
+        }
+        ChannelList.channelList[i] = pMac->scan.base20MHzChannels.channelList[i];
+        chnlIndx++;
+    }
+    csrSetCfgValidChannelList(pMac, ChannelList.channelList, chnlIndx);
+
+}
 
 void csrResetCountryInformation( tpAniSirGlobal pMac, tANI_BOOLEAN fForce, tANI_BOOLEAN updateRiva )
 {
@@ -5397,6 +5489,28 @@ eHalStatus csrScanAgeResults(tpAniSirGlobal pMac, tSmeGetScanChnRsp *pScanChnInf
     return (status);
 }
 
+eHalStatus csrIbssAgeBss(tpAniSirGlobal pMac)
+{
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+    tListElem *pEntry, *tmpEntry;
+    tCsrScanResult *pResult;
+
+    csrLLLock(&pMac->scan.scanResultList);
+    pEntry = csrLLPeekHead( &pMac->scan.scanResultList, LL_ACCESS_NOLOCK );
+    while( pEntry )
+    {
+       tmpEntry = csrLLNext(&pMac->scan.scanResultList,
+                                             pEntry, LL_ACCESS_NOLOCK);
+       pResult = GET_BASE_ADDR( pEntry, tCsrScanResult, Link );
+
+       smsLog(pMac, LOGW, FL(" age out due Forced IBSS leave"));
+       csrScanAgeOutBss(pMac, pResult);
+       pEntry = tmpEntry;
+    }
+    csrLLUnlock(&pMac->scan.scanResultList);
+
+    return (status);
+}
 
 eHalStatus csrSendMBScanReq( tpAniSirGlobal pMac, tANI_U16 sessionId, 
                     tCsrScanRequest *pScanReq, tScanReqParam *pScanReqParam )
@@ -6103,6 +6217,16 @@ eHalStatus csrScanCopyRequest(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq, tCs
                           /* Skip CH 144 if firmware support not present */
                           if (pSrcReq->ChannelInfo.ChannelList[index] == 144 && !ch144_support)
                               continue;
+                          /* Skip channel 12 and 13 when FCC constraint is true */
+                          if ((pMac->scan.fcc_constraint) &&
+                                 ((pSrcReq->ChannelInfo.ChannelList[index] ==12) ||
+                                 (pSrcReq->ChannelInfo.ChannelList[index] ==13)))
+                          {
+                              VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                                  FL("Ignoring channel : %d "),
+                                  pSrcReq->ChannelInfo.ChannelList[index]);
+                              continue;
+                          }
 
                           NVchannel_state = vos_nv_getChannelEnabledState(
                                   pSrcReq->ChannelInfo.ChannelList[index]);
@@ -6165,7 +6289,9 @@ eHalStatus csrScanCopyRequest(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq, tCs
                              */
                             if ( ( csrRoamIsValidChannel(pMac, pSrcReq->ChannelInfo.ChannelList[index]) ) )
                             {
-                                if( (pSrcReq->skipDfsChnlInP2pSearch && 
+                                if( ((pSrcReq->skipDfsChnlInP2pSearch ||
+                                     (pMac->scan.fEnableDFSChnlScan ==
+                                     DFS_CHNL_SCAN_DISABLED)) &&
                                     (NV_CHANNEL_DFS == vos_nv_getChannelEnabledState(pSrcReq->ChannelInfo.ChannelList[index])) )
 #ifdef FEATURE_WLAN_LFR
                                      /* 
@@ -7741,10 +7867,12 @@ eHalStatus csrGetCountryCode(tpAniSirGlobal pMac, tANI_U8 *pBuf, tANI_U8 *pbLen)
 
 void csrSetCfgScanControlList( tpAniSirGlobal pMac, tANI_U8 *countryCode, tCsrChannel *pChannelList  )
 {   
-    tANI_U8 i, j;
+    tANI_U8 i, j, k;
     tANI_BOOLEAN found=FALSE;  
     tANI_U8 *pControlList = NULL;
     tANI_U32 len = WNI_CFG_SCAN_CONTROL_LIST_LEN;
+    tANI_U8 cfgActiveDFSChannels = 0;
+    tANI_U8 *cfgActiveDFSChannelLIst = NULL;
 
     if ( (pControlList = vos_mem_malloc(WNI_CFG_SCAN_CONTROL_LIST_LEN)) != NULL )
     {
@@ -7766,10 +7894,38 @@ void csrSetCfgScanControlList( tpAniSirGlobal pMac, tANI_U8 *countryCode, tCsrCh
                 {
                     pControlList[j+1] = csrGetScanType(pMac, pControlList[j]);
                     found = FALSE;  // reset the flag
-                }
-                       
-            }            
 
+                    // When DFS mode is 2, mark static channels as active
+                    if (pMac->scan.fEnableDFSChnlScan ==
+                                   DFS_CHNL_SCAN_ENABLED_ACTIVE)
+                    {
+                        cfgActiveDFSChannels =
+                          pMac->roam.neighborRoamInfo.cfgParams.
+                                               channelInfo.numOfChannels;
+                        cfgActiveDFSChannelLIst =
+                          pMac->roam.neighborRoamInfo.cfgParams.
+                                               channelInfo.ChannelList;
+                        if (cfgActiveDFSChannelLIst)
+                        {
+                           for (k=0; k < cfgActiveDFSChannels; k++)
+                           {
+                               if(CSR_IS_CHANNEL_DFS(cfgActiveDFSChannelLIst[k])
+                                   && (pControlList[j] ==
+                                                  cfgActiveDFSChannelLIst[k]))
+                               {
+                                   pControlList[j+1] = eSIR_ACTIVE_SCAN;
+                                   smsLog(pMac, LOG1, FL("Marked DFS ch %d"
+                                          " as active"),
+                                          cfgActiveDFSChannelLIst[k]);
+                               }
+                           }
+                        }
+                    }
+                }
+            }
+
+            smsLog(pMac, LOG1, FL("fEnableDFSChnlScan %d"),
+                                       pMac->scan.fEnableDFSChnlScan);
             VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                       "%s: dump scan control list",__func__);
             VOS_TRACE_HEX_DUMP(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
@@ -7780,7 +7936,6 @@ void csrSetCfgScanControlList( tpAniSirGlobal pMac, tANI_U8 *countryCode, tCsrCh
         vos_mem_free(pControlList);
     }//AllocateMemory
 }
-
 
 //if bgPeriod is 0, background scan is disabled. It is in millisecond units
 eHalStatus csrSetCfgBackgroundScanPeriod(tpAniSirGlobal pMac, tANI_U32 bgPeriod)

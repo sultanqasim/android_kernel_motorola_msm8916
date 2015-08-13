@@ -267,13 +267,16 @@
 #define QWLAN_HAL_CFG_BURST_MODE_BE_TXOP_VALUE               209
 #define QWLAN_HAL_CFG_ENABLE_DYNAMIC_RA_START_RATE           210
 #define QWLAN_HAL_CFG_BTC_FAST_WLAN_CONN_PREF                211
+#define QWLAN_HAL_CFG_ENABLE_RTSCTS_HTVHT                    212
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN      213
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN        214
+#define QWLAN_HAL_CFG_LINK_FAIL_TX_CNT                       215
 
-
-#define QWLAN_HAL_CFG_MAX_PARAMS                             212
+#define QWLAN_HAL_CFG_MAX_PARAMS                             216
 
 
 /* Total number of Integer CFGs. This is used while allocating the memory for TLV */
-#define QWLAN_HAL_CFG_INTEGER_PARAM                     212
+#define QWLAN_HAL_CFG_INTEGER_PARAM                     216
 
 /*-------------------------------------------------------------------------
   Configuration Parameter min, max, defaults
@@ -1047,5 +1050,29 @@
 #define QWLAN_HAL_CFG_BTC_FAST_WLAN_CONN_PREF_MIN 0
 #define QWLAN_HAL_CFG_BTC_FAST_WLAN_CONN_PREF_MAX 1
 
+/* QWLAN_HAL_CFG_ENABLE_RTSCTS_HTVHT */
+/* Bit mask value to enable RTS/CTS for different modes
+ * for 2.4 GHz, HT20 - 0x0001, for 2.4 GHz, HT40 - 0x0002
+ * for 2.4 GHz, VHT20 - 0x0004, for 2.4 GHz, VHT40 - 0x0008
+ * for 5 GHz, HT20 - 0x0100, for 5 GHz, HT40 - 0x0200
+ * for 5 GHz, VHT20 - 0x0400, for 5 GHz, VHT40 - 0x0800
+ * for 5 GHz, VHT80 - 0x1000
+ */
+#define QWLAN_HAL_CFG_ENABLE_RTSCTS_HTVHT_MIN 0x0000
+#define QWLAN_HAL_CFG_ENABLE_RTSCTS_HTVHT_MAX 0x1f0f
+#define QWLAN_HAL_CFG_ENABLE_RTSCTS_HTVHT_DEF 0x0000
+
+/* QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN */
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN_MIN     0
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN_MAX     250000
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN_DEF     40000
+/* QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN */
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN_MIN       0
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN_MAX       250000
+#define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN_DEF       40000
+/* QWLAN_HAL_CFG_LINK_FAIL_TX_CNT */
+#define QWLAN_HAL_CFG_LINK_FAIL_TX_CNT_MIN    50
+#define QWLAN_HAL_CFG_LINK_FAIL_TX_CNT_MAX    1000
+#define QWLAN_HAL_CFG_LINK_FAIL_TX_CNT_DEF    200
 
 #endif //__WLAN_HAL_CFG_H__

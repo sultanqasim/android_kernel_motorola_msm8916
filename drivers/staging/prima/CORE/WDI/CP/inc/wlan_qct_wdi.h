@@ -11173,6 +11173,22 @@ WDI_SpoofMacAddrInfoType *pWdiReq,
   void*                          pUserData
 );
 
+/**
+ @brief WDI_SetRtsCtsHTVhtInd
+        Set RTS/CTS indication for diff modes.
+
+ @param rtsCtsVal: Bit mask value to enable RTS/CTS for different modes
+
+ @return Result of the function call
+*/
+
+WDI_Status
+WDI_SetRtsCtsHTVhtInd
+(
+  wpt_uint32 rtsCtsVal
+);
+
+
 #ifdef __cplusplus
  }
 #endif 

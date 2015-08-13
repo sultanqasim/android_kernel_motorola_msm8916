@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,7 +36,7 @@
  *
  */
 
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "aniGlobal.h"
 #include "cfgApi.h"
 
@@ -603,6 +603,10 @@ limProcessProbeReqFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession 
             else
             {
                 {
+                    if ((VOS_P2P_GO_MODE == psessionEntry->pePersona) &&
+                                                        pMac->miracastVendorConfig)
+                        return;
+
                     // Broadcast SSID in the Probe Request.
                     // Reply with SSID we're configured with.
                     //Turn off the SSID length to 0 if hidden SSID feature is present

@@ -3599,6 +3599,13 @@ typedef struct sSirSmeDelStaSelfRsp
     tSirMacAddr     selfMacAddr;
 }tSirSmeDelStaSelfRsp, *tpSirSmeDelStaSelfRsp;
 
+typedef enum DFSChanScanType
+{
+    DFS_CHNL_SCAN_DISABLED,
+    DFS_CHNL_SCAN_ENABLED_NORMAL,
+    DFS_CHNL_SCAN_ENABLED_ACTIVE
+}eDFSChanScanType;
+
 /* Coex Indication defines - 
    should match WLAN_COEX_IND_DATA_SIZE 
    should match WLAN_COEX_IND_TYPE_DISABLE_HB_MONITOR 
@@ -3951,14 +3958,6 @@ typedef struct sSirRcvPktFilterCfg
   tSirRcvPktFilterFieldParams     paramsData[SIR_MAX_NUM_TESTS_PER_FILTER];
 }tSirRcvPktFilterCfgType, *tpSirRcvPktFilterCfgType;
 
-// IKJB42MAIN-1244, Motorola, a19091 - BEGIN
-typedef struct sSirInvokeV6Filter
-{
-    int (*configureFilterFn)(void *pAdapter, v_U8_t set, v_U8_t userSet);
-    void *pHddAdapter;
-    v_U8_t set;
-}tSirInvokeV6Filter;
-// IKJB42MAIN-1244, Motorola, a19091 - END
 //
 // Filter Packet Match Count Parameters
 //

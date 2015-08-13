@@ -42,7 +42,7 @@
 #include "wniApi.h"
 #include "sirCommon.h"
 
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "pmmApi.h"
 #include "cfgApi.h"
 
@@ -2489,7 +2489,7 @@ limAddSta(
     {
         /* peer STA get the LDPC capability from pStaDs, which populated from 
          * HT/VHT capability*/
-        if(pMac->lim.disableLDPCWithTxbfAP)
+        if(pAddStaParams->vhtTxBFCapable && pMac->lim.disableLDPCWithTxbfAP)
         {
             pAddStaParams->htLdpcCapable = 0;
             pAddStaParams->vhtLdpcCapable = 0;
@@ -3802,7 +3802,7 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
             }
 
             pAddBssParams->staContext.maxAmpduSize= pAssocRsp->HTCaps.maxRxAMPDUFactor;
-            if( pMac->lim.disableLDPCWithTxbfAP )
+            if( pAddBssParams->staContext.vhtTxBFCapable && pMac->lim.disableLDPCWithTxbfAP )
             {
                 pAddBssParams->staContext.htLdpcCapable = 0;
                 pAddBssParams->staContext.vhtLdpcCapable = 0;
@@ -4245,7 +4245,7 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
             }
 
             pAddBssParams->staContext.maxAmpduSize= pBeaconStruct->HTCaps.maxRxAMPDUFactor;
-            if( pMac->lim.disableLDPCWithTxbfAP )
+            if( pAddBssParams->staContext.vhtTxBFCapable && pMac->lim.disableLDPCWithTxbfAP )
             {
                 pAddBssParams->staContext.htLdpcCapable = 0;
                 pAddBssParams->staContext.vhtLdpcCapable = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,7 +36,7 @@
  *
  */
 #include "palTypes.h"
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "aniGlobal.h"
 #include "sirApi.h"
 #include "sirParams.h"
@@ -266,9 +266,12 @@ limSuspendLink(tpAniSirGlobal pMac, tSirLinkTrafficCheck trafficCheck,  SUSPEND_
       return;
    }
 
-   if( pMac->lim.gpLimSuspendCallback )
+   if( pMac->lim.gpLimSuspendCallback ||
+       pMac->lim.gLimSystemInScanLearnMode )
    {
-      limLog( pMac, LOGE, "%s:%d: gLimSuspendLink callback is not NULL...something is wrong", __func__, __LINE__ );
+      limLog( pMac, LOGE, FL("Something is wrong, SuspendLinkCbk:%p "
+              "IsSystemInScanLearnMode:%d"), pMac->lim.gpLimSuspendCallback,
+               pMac->lim.gLimSystemInScanLearnMode );
       callback( pMac, eHAL_STATUS_FAILURE, data ); 
       return;
    }
@@ -660,6 +663,12 @@ void limCovertChannelScanType(tpAniSirGlobal pMac,tANI_U8 channelNum, tANI_BOOLE
     if (len > WNI_CFG_SCAN_CONTROL_LIST_LEN)
     {
         limLog(pMac, LOGE, FL("Invalid scan control list length:%d"), len);
+        return ;
+    }
+    if (pMac->fActiveScanOnDFSChannels)
+    {
+        limLog(pMac, LOG1, FL("DFS feature triggered,"
+                              "block scan type conversion"));
         return ;
     }
     for (i=0; (i+1) < len; i+=2)
@@ -1506,18 +1515,18 @@ void limSetOemDataReqMode(tpAniSirGlobal pMac, eHalStatus status, tANI_U32* data
     if(status != eHAL_STATUS_SUCCESS)
     {
         limLog(pMac, LOGE, FL("OEM_DATA: failed in suspend link"));
-        goto error;
+        /* If failed to suspend the link, there is no need
+         * to resume link. Return failure.
+         */
+        limSetOemDataReqModeFailed(pMac, status, data);
     }
     else
     {
         PELOGE(limLog(pMac, LOGE, FL("OEM_DATA: Calling limSendHalOemDataReq"));)
         limSendHalOemDataReq(pMac);
-        return;
     }
 
-error:
-    limResumeLink(pMac, limSetOemDataReqModeFailed, NULL);
-    return ;
+    return;
 } /*** end limSendHalOemDataReq() ***/
 
 #endif //FEATURE_OEM_DATA_SUPPORT
@@ -2278,6 +2287,12 @@ limProcessMlmJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
           //suspend link
           limLog(pMac, LOG1, FL("Suspend link as LimSession on sessionid %d"
           "is off channel"),sessionId);
+          if (limIsLinkSuspended(pMac))
+          {
+            limLog(pMac, LOGE, FL("Link is already suspended for some other"
+                   " reason. Return failure on sessionId:%d"), sessionId);
+            goto error;
+          }
           limSuspendLink(pMac, eSIR_DONT_CHECK_LINK_TRAFFIC_BEFORE_SCAN, 
                    limProcessMlmPostJoinSuspendLink, (tANI_U32*)psessionEntry );
         }
@@ -2299,31 +2314,26 @@ limProcessMlmJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     else
     {
         /**
-              * Should not have received JOIN req in states other than
-              * Idle state or on AP.
-              * Return join confirm with invalid parameters code.
-              */
-        PELOGE(limLog(pMac, LOGE,
-               FL("Unexpected Join request for role %d state %d"),
-               psessionEntry->limSystemRole,
-               psessionEntry->limMlmState);)
-        limPrintMlmState(pMac, LOGE, psessionEntry->limMlmState);
-        
+         * Should not have received JOIN req in states other than
+         * Idle state or on AP.
+         * Return join confirm with invalid parameters code.
+         */
         limLog(pMac, LOGE,
                FL("SessionId:%d Unexpected Join request for role %d state %d "),
                psessionEntry->peSessionId,psessionEntry->limSystemRole,
                psessionEntry->limMlmState);
+        limPrintMlmState(pMac, LOGE, psessionEntry->limMlmState);
     }
 
 error: 
+    vos_mem_free(pMsgBuf);
+    if (psessionEntry != NULL)
+        psessionEntry->pLimMlmJoinReq = NULL;
 
-        
-        mlmJoinCnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
-        mlmJoinCnf.sessionId = sessionId;
-        mlmJoinCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
-        limPostSmeMessage(pMac, LIM_MLM_JOIN_CNF, (tANI_U32 *) &mlmJoinCnf);
-
-
+    mlmJoinCnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
+    mlmJoinCnf.sessionId = sessionId;
+    mlmJoinCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+    limPostSmeMessage(pMac, LIM_MLM_JOIN_CNF, (tANI_U32 *) &mlmJoinCnf);
 } /*** limProcessMlmJoinReq() ***/
 
 

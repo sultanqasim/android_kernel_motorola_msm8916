@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,7 +43,7 @@
 
 #include "palTypes.h"
 #include "sirTypes.h"
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "aniCompiler.h"
 
 
@@ -425,6 +425,7 @@
 #define SIR_MAC_ANI_WORKAROUND_EID_MIN     0
 #define SIR_MAC_ANI_WORKAROUND_EID_MAX     255
 
+#define SIR_MAC_MAX_ADD_IE_LENGTH   500
 /// Maximum length of each IE
 #define SIR_MAC_MAX_IE_LENGTH       255
 

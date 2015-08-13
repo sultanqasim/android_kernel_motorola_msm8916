@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -40,7 +40,7 @@
  *
  */
 #include "palTypes.h"
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "wniApi.h"
 #include "sirCommon.h"
 #include "sirDebug.h"
@@ -1063,6 +1063,7 @@ tSirRetStatus peOpen(tpAniSirGlobal pMac, tMacOpenParameters *pMacOpenParam)
     }
     pMac->lim.deauthMsgCnt = 0;
     pMac->lim.retryPacketCnt = 0;
+    pMac->lim.gLimIbssRetryCnt = 0;
 
     /*
      * peOpen is successful by now, so it is right time to initialize
