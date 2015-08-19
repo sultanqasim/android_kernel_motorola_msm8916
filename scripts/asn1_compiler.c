@@ -1353,6 +1353,9 @@ static void render_out_of_line_list(FILE *out)
 			render_opcode(out, "ASN1_OP_END_SET_OF%s,\n", act);
 			render_opcode(out, "_jump_target(%u),\n", entry);
 			break;
+		default:
+			/* shouldn't go here */
+			break;
 		}
 		if (e->action)
 			render_opcode(out, "_action(ACT_%s),\n",
