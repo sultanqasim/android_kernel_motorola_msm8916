@@ -6,12 +6,9 @@ How to build:
 export ARCH=arm
 export SUBARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-
-export VARIANT=gsm
 make mrproper
 make msm8916-squid_defconfig
 ./build_cwm_zip.sh
-
-Note: export VARIANT=cdma to build for the CDMA variant
 
 You will now have a TWRP flashable zip at:
 arch/arm/boot/squid_kernel.zip

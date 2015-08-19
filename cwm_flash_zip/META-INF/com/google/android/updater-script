@@ -2,15 +2,27 @@ ui_print("Squid Kernel for Moto E LTE (surnia)");
 
 assert(getprop("ro.product.device") == "surnia" || getprop("ro.product.device") == "surnia_umts" || getprop("ro.product.device") == "surnia_udstv" || getprop("ro.product.device") == "surnia_uds" || abort("This package is for device: surnia,surnia_umts,surnia_udstv,surnia_uds; this device is " + getprop("ro.product.device") + "."););
 
-ui_print("Mounting /system folder...");
-run_program("/sbin/busybox", "mount", "/system");
+ui_print("Extracting flashing tools...");
+package_extract_dir("tools", "/tmp");
+set_perm(0, 0, 0777, "/tmp/mkbootimg");
+set_perm(0, 0, 0777, "/tmp/unpackbootimg");
+set_perm(0, 0, 0777, "/tmp/flash_kernel.sh");
+
+ui_print("Building and installing boot image...");
+run_program("/tmp/flash_kernel.sh");
+
+ui_print("Cleaning up flashing tools...");
+delete("/tmp/boot.img");
+delete("/tmp/mkbootimg");
+delete("/tmp/unpackbootimg");
+delete("/tmp/flash_kernel.sh");
 
 ui_print("Installing kernel modules...");
+mount("ext4", "EMMC", "/dev/block/bootdevice/by-name/system", "/system");
 package_extract_dir("system", "/system");
 set_perm_recursive(0, 0, 0755, 0644, "/system/lib/modules");
-
-ui_print("Installing boot image...");
-package_extract_file("boot.img", "/dev/block/platform/soc.0/by-name/boot");
+symlink("/system/lib/modules/pronto/pronto_wlan.ko", "/system/lib/modules/wlan.ko");
+unmount("/system");
 
 ui_print("Kernel installation completed!");
 show_progress(0.100000, 0);
