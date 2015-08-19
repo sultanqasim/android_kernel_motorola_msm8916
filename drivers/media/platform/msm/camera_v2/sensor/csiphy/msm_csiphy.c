@@ -16,6 +16,7 @@
 #include <linux/of.h>
 #include <linux/module.h>
 #include <linux/irqreturn.h>
+#include <soc/qcom/socinfo.h>
 #include "msm_csiphy.h"
 #include "msm_sd.h"
 #include "msm_camera_io_util.h"
@@ -26,6 +27,7 @@
 #include "include/msm_csiphy_3_2_hwreg.h"
 
 #define DBG_CSIPHY 0
+#define SOC_REVISION_3 0x30000
 
 #define V4L2_IDENT_CSIPHY                        50003
 #define CSIPHY_VERSION_V22                        0x01
@@ -42,6 +44,7 @@
 
 static struct msm_cam_clk_info csiphy_clk_info[CSIPHY_NUM_CLK_MAX];
 static struct v4l2_file_operations msm_csiphy_v4l2_subdev_fops;
+uint32_t is_3_1_rev3 = 0;
 
 static int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 	struct msm_camera_csiphy_params *csiphy_params)
@@ -150,7 +153,7 @@ static int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 			csiphy_reg.mipi_csiphy_interrupt_clear0_addr);
 	} else {
 		if ((csiphy_dev->hw_version == CSIPHY_VERSION_V31) &&
-			csiphy_dev->is_3_1_rev3) {
+			is_3_1_rev3) {
 			msm_camera_io_w(0x01, csiphybase +
 				MIPI_CSIPHY_GLBL_PWG_CFG0_OFFSET);
 		}
@@ -530,7 +533,7 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 			i++;
 		}
 		if ((csiphy_dev->hw_version == CSIPHY_VERSION_V31) &&
-			csiphy_dev->is_3_1_rev3)
+			is_3_1_rev3)
 			msm_camera_io_w(0x00, csiphy_dev->base +
 				MIPI_CSIPHY_GLBL_PWG_CFG0_OFFSET);
 	}
@@ -623,7 +626,7 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 			i++;
 		}
 		if ((csiphy_dev->hw_version == CSIPHY_VERSION_V31) &&
-			csiphy_dev->is_3_1_rev3)
+			is_3_1_rev3)
 			msm_camera_io_w(0x00, csiphy_dev->base +
 				MIPI_CSIPHY_GLBL_PWG_CFG0_OFFSET);
 	}
@@ -884,10 +887,6 @@ static int csiphy_probe(struct platform_device *pdev)
 		return -EFAULT;
 	}
 
-	new_csiphy_dev->is_3_1_rev3 = of_property_read_bool(
-		pdev->dev.of_node,
-		"qcom,revision-v3");
-
 	new_csiphy_dev->mem = platform_get_resource_byname(pdev,
 					IORESOURCE_MEM, "csiphy");
 	if (!new_csiphy_dev->mem) {
@@ -1009,6 +1008,9 @@ static struct platform_driver csiphy_driver = {
 
 static int __init msm_csiphy_init_module(void)
 {
+	if (early_machine_is_msm8939())
+		if (socinfo_get_version() == SOC_REVISION_3)
+			is_3_1_rev3 = 1;
 	return platform_driver_register(&csiphy_driver);
 }
 

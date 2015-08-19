@@ -3002,7 +3002,7 @@ static int i2c_msm_qup_post_xfer(struct i2c_msm_ctrl *ctrl, int err)
 	 */
 	disable_irq(ctrl->rsrcs.irq);
 
-	/* flush dma data and reset the qup core in timeout error.
+	/* flush bam data and reset the qup core in timeout error.
 	 * for other error case, its handled by the ISR
 	 */
 	if (ctrl->xfer.err == I2C_MSM_ERR_TIMEOUT) {
