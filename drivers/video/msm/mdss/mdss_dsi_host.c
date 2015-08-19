@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -108,6 +108,7 @@ void mdss_dsi_ctrl_init(struct device *ctrl_dev,
 	mutex_init(&ctrl->mutex);
 	mutex_init(&ctrl->cmd_mutex);
 	mutex_init(&ctrl->clk_lane_mutex);
+	mutex_init(&ctrl->cmdlist_mutex);
 	mdss_dsi_buf_alloc(ctrl_dev, &ctrl->tx_buf, SZ_4K);
 	mdss_dsi_buf_alloc(ctrl_dev, &ctrl->rx_buf, SZ_4K);
 	mdss_dsi_buf_alloc(ctrl_dev, &ctrl->status_buf, SZ_4K);
@@ -355,7 +356,6 @@ void mdss_dsi_host_init(struct mdss_panel_data *pdata)
 		dsi_ctrl |= BIT(5);
 	if (pinfo->data_lane0)
 		dsi_ctrl |= BIT(4);
-
 
 	data = 0;
 	if (pinfo->te_sel)
@@ -1049,7 +1049,7 @@ static void mdss_dsi_mode_setup(struct mdss_panel_data *pdata)
 	u32 hbp, hfp, vbp, vfp, hspw, vspw, width, height;
 	u32 ystride, bpp, data, dst_bpp;
 	u32 dummy_xres = 0, dummy_yres = 0;
-	u32 hsync_period, vsync_period;
+	u32 hsync_period, vsync_period, reg = 0;
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -1111,6 +1111,13 @@ static void mdss_dsi_mode_setup(struct mdss_panel_data *pdata)
 
 		ystride = width * bpp + 1;
 
+		/* Enable frame transfer in burst mode */
+		if (ctrl_pdata->hw_rev >= MDSS_DSI_HW_REV_103) {
+			reg = MIPI_INP(ctrl_pdata->ctrl_base + 0x1b8);
+			reg = reg | BIT(16);
+			MIPI_OUTP((ctrl_pdata->ctrl_base + 0x1b8), reg);
+			ctrl_pdata->burst_mode_enabled = 1;
+		}
 		/* DSI_COMMAND_MODE_MDP_STREAM_CTRL */
 		data = (ystride << 16) | (mipi->vc << 8) | DTYPE_DCS_LWRITE;
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x60, data);
@@ -1449,6 +1456,14 @@ do_send:
 	while (!end) {
 		pr_debug("%s:  rlen=%d pkt_size=%d rx_byte=%d\n",
 				__func__, rlen, pkt_size, rx_byte);
+		/*
+		 * Skip max_pkt_size dcs cmd if
+		 * its already been configured
+		 * for the requested pkt_size
+		 */
+		if (pkt_size == ctrl->cur_max_pkt_size)
+			goto skip_max_pkt_size;
+
 		max_pktsize[0] = pkt_size;
 		mdss_dsi_buf_init(tp);
 		ret = mdss_dsi_cmd_dma_add(tp, &pkt_size_cmd);
@@ -1472,9 +1487,11 @@ do_send:
 			rp->read_cnt = 0;
 			goto end;
 		}
+		ctrl->cur_max_pkt_size = pkt_size;
 		pr_debug("%s: max_pkt_size=%d sent\n",
 					__func__, pkt_size);
 
+skip_max_pkt_size:
 		mdss_dsi_buf_init(tp);
 		ret = mdss_dsi_cmd_dma_add(tp, cmds);
 		if (!ret) {
@@ -2009,24 +2026,36 @@ int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 	struct mdss_rect *roi = NULL;
 	int ret = -EINVAL;
 	int rc = 0;
+	bool cmd_mutex_acquired = false;
 
 	if (mdss_get_sd_client_cnt())
 		return -EPERM;
 
 	if (from_mdp) {	/* from mdp kickoff */
-		mutex_lock(&ctrl->cmd_mutex);
+		if (!ctrl->burst_mode_enabled) {
+			mutex_lock(&ctrl->cmd_mutex);
+			cmd_mutex_acquired = true;
+		}
 		pinfo = &ctrl->panel_data.panel_info;
 		if (pinfo->partial_update_enabled)
 			roi = &pinfo->roi;
 	}
 
 	req = mdss_dsi_cmdlist_get(ctrl);
+	if (req && from_mdp && ctrl->burst_mode_enabled) {
+		mutex_lock(&ctrl->cmd_mutex);
+		cmd_mutex_acquired = true;
+	}
 
 	MDSS_XLOG(ctrl->ndx, from_mdp, ctrl->mdp_busy, current->pid,
 							XLOG_FUNC_ENTRY);
 
-	/* make sure dsi_cmd_mdp is idle */
-	mdss_dsi_cmd_mdp_busy(ctrl);
+	if (!ctrl->burst_mode_enabled || from_mdp) {
+		/* make sure dsi_cmd_mdp is idle when
+		 * burst mode is not enabled
+		*/
+		mdss_dsi_cmd_mdp_busy(ctrl);
+	}
 
 	pr_debug("%s: ctrl=%d from_mdp=%d pid=%d\n", __func__,
 				ctrl->ndx, from_mdp, current->pid);
@@ -2117,8 +2146,8 @@ need_lock:
 		 */
 		if (!roi || (roi->w != 0 || roi->h != 0))
 			mdss_dsi_cmd_mdp_start(ctrl);
-
-		mutex_unlock(&ctrl->cmd_mutex);
+		if (cmd_mutex_acquired)
+			mutex_unlock(&ctrl->cmd_mutex);
 	} else {	/* from dcs send */
 		if (ctrl->cmd_clk_ln_recovery_en &&
 				ctrl->panel_mode == DSI_CMD_MODE &&

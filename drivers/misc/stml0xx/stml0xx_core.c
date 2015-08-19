@@ -412,6 +412,24 @@ static struct stml0xx_platform_data *stml0xx_of_init(struct spi_device *spi)
 			     &pdata->ct406_pulse_count);
 	of_property_read_u32(np, "ct406_prox_gain",
 			     &pdata->ct406_prox_gain);
+	pdata->ct406_als_lux1_c0_mult = 0x294;
+	pdata->ct406_als_lux1_c1_mult = 0x55A;
+	pdata->ct406_als_lux1_div = 0x64;
+	pdata->ct406_als_lux2_c0_mult = 0xDA;
+	pdata->ct406_als_lux2_c1_mult = 0x186;
+	pdata->ct406_als_lux2_div = 0x64;
+	of_property_read_u32(np, "ct406_als_lux1_c0_mult",
+			     &pdata->ct406_als_lux1_c0_mult);
+	of_property_read_u32(np, "ct406_als_lux1_c1_mult",
+			     &pdata->ct406_als_lux1_c1_mult);
+	of_property_read_u32(np, "ct406_als_lux1_div",
+			     &pdata->ct406_als_lux1_div);
+	of_property_read_u32(np, "ct406_als_lux2_c0_mult",
+			     &pdata->ct406_als_lux2_c0_mult);
+	of_property_read_u32(np, "ct406_als_lux2_c1_mult",
+			     &pdata->ct406_als_lux2_c1_mult);
+	of_property_read_u32(np, "ct406_als_lux2_div",
+			     &pdata->ct406_als_lux2_div);
 
 	pdata->dsp_iface_enable = 0;
 	of_property_read_u32(np, "dsp_iface_enable",
@@ -1064,7 +1082,7 @@ static int stml0xx_remove(struct spi_device *spi)
 static int stml0xx_resume(struct device *dev)
 {
 	static struct timespec ts;
-	static struct stml0xx_work_struct *stm_ws;
+	static struct stml0xx_delayed_work_struct *stm_ws;
 	struct stml0xx_data *ps_stml0xx = spi_get_drvdata(to_spi_device(dev));
 
 	get_monotonic_boottime(&ts);
@@ -1076,17 +1094,17 @@ static int stml0xx_resume(struct device *dev)
 
 	if (ps_stml0xx->pending_wake_work) {
 		stm_ws = kmalloc(
-			sizeof(struct stml0xx_work_struct),
+			sizeof(struct stml0xx_delayed_work_struct),
 			GFP_ATOMIC);
 		if (!stm_ws) {
 			dev_err(dev, "stml0xx_resume: unable to allocate work struct");
 			return 0;
 		}
-		INIT_WORK((struct work_struct *)stm_ws,
+		INIT_DELAYED_WORK((struct delayed_work *)stm_ws,
 			stml0xx_irq_wake_work_func);
 		stm_ws->ts_ns = ts_to_ns(ts);
-		queue_work(ps_stml0xx->irq_work_queue,
-			(struct work_struct *)stm_ws);
+		queue_delayed_work(ps_stml0xx->irq_work_queue,
+			(struct delayed_work *)stm_ws, 0);
 		ps_stml0xx->pending_wake_work = false;
 	}
 

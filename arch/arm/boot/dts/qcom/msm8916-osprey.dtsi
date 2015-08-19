@@ -78,6 +78,20 @@
 	};
 };
 
+&spi_0 {
+	stml0xx: stml0xx@0 {
+		ct406_detect_threshold = <0x0096>;
+		ct406_undetect_threshold = <0x0073>;
+		ct406_pulse_count = <0x03>;
+		ct406_als_lux1_c0_mult = <0x386>;
+		ct406_als_lux1_c1_mult = <0x693>;
+		ct406_als_lux1_div = <0x80>;
+		ct406_als_lux2_c0_mult = <0x11F>;
+		ct406_als_lux2_c1_mult = <0x1DE>;
+		ct406_als_lux2_div = <0x80>;
+	};
+};
+
 &spi_5 {
 	/delete-node/ nmi326@0;
 };
@@ -147,7 +161,7 @@
 		fairchild,ext-temp-volt-mv = <4000>;
 		fairchild,ext-temp-soc = <65>;
 		fairchild,oreg-voltage-mv = <4350>;
-		fairchild,low-voltage-uv = <3200000>;
+		fairchild,low-voltage-uv = <3000000>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&fan5404x_int_default>;

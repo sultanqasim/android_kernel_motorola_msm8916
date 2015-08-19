@@ -2753,8 +2753,10 @@ static int wm_adsp_capture_block(struct wm_adsp *adsp, int *avail)
 	/* Don't empty the buffer as it kills the firmware */
 	write_index--;
 
-	if (read_index < 0)
+	if (read_index < 0) {
+		*avail = 0;
 		return 0;	/* stream has not yet started */
+	}
 
 	*avail = write_index - read_index;
 	if (*avail < 0)
@@ -2804,6 +2806,9 @@ static int wm_adsp_capture_block2(struct wm_adsp *adsp, int *avail)
 	read_index = sign_extend32(next_read_index, 23);
 	write_index = sign_extend32(next_write_index, 23);
 
+	/* Don't empty the buffer as it kills the firmware */
+	write_index--;
+
 	if (read_index < 0) {
 		*avail = 0;
 		return 0;
@@ -2845,21 +2850,26 @@ int wm_adsp_stream_alloc(struct wm_adsp *adsp,
 		adsp->capt_buf_size = WM_ADSP_CAPTURE_BUFFER_SIZE;
 		adsp->capt_buf.buf = vmalloc(adsp->capt_buf_size);
 
-		if (!adsp->capt_buf.buf)
-			return -ENOMEM;
+		if (!adsp->capt_buf.buf) {
+			ret = -ENOMEM;
+			goto err_capt_buf;
+		}
+
+		adsp->capt_buf.head = 0;
+		adsp->capt_buf.tail = 0;
 	}
 	if (!adsp->capt_buf2.buf) {
 		adsp->capt_buf_size = WM_ADSP_CAPTURE_BUFFER_SIZE;
 		adsp->capt_buf2.buf = vmalloc(adsp->capt_buf_size);
 
-		if (!adsp->capt_buf2.buf)
-			return -ENOMEM;
-	}
+		if (!adsp->capt_buf2.buf) {
+			ret = -ENOMEM;
+			goto err_capt_buf;
+		}
 
-	adsp->capt_buf.head = 0;
-	adsp->capt_buf.tail = 0;
-	adsp->capt_buf2.head = 0;
-	adsp->capt_buf2.tail = 0;
+		adsp->capt_buf2.head = 0;
+		adsp->capt_buf2.tail = 0;
+	}
 
 
 	if (!adsp->raw_capt_buf) {
@@ -2878,7 +2888,7 @@ int wm_adsp_stream_alloc(struct wm_adsp *adsp,
 
 		if (!adsp->raw_capt_buf2) {
 			ret = -ENOMEM;
-			goto err_capt_buf;
+			goto err_raw_capt_buf;
 		}
 	}
 
@@ -2918,8 +2928,14 @@ int wm_adsp_stream_alloc(struct wm_adsp *adsp,
 
 err_raw_capt_buf:
 	kfree(adsp->raw_capt_buf);
+	kfree(adsp->raw_capt_buf2);
+	adsp->raw_capt_buf = NULL;
+	adsp->raw_capt_buf2 = NULL;
 err_capt_buf:
 	vfree(adsp->capt_buf.buf);
+	vfree(adsp->capt_buf2.buf);
+	adsp->capt_buf.buf = NULL;
+	adsp->capt_buf2.buf = NULL;
 
 	return ret;
 }
@@ -3061,12 +3077,12 @@ static int wm_adsp_stream_capture(struct wm_adsp *adsp)
 				return ret;
 
 			amount_read += ret;
-		} while (ret > 0);
+		} while (ret > 0 && avail >= WM_ADSP_MAX_READ_SIZE);
 
 		total_read += amount_read;
-	} while (amount_read > 0 && avail > WM_ADSP_MAX_READ_SIZE);
+	} while (amount_read > 0 && avail >= WM_ADSP_MAX_READ_SIZE);
 
-	if (avail > WM_ADSP_MAX_READ_SIZE)
+	if (avail >= WM_ADSP_MAX_READ_SIZE)
 		adsp->buffer_drain_pending = true;
 
 	return total_read * WM_ADSP_DATA_WORD_SIZE;
@@ -3089,12 +3105,12 @@ static int wm_adsp_stream_capture2(struct wm_adsp *adsp)
 				return ret;
 
 			amount_read += ret;
-		} while (ret > 0);
+		} while (ret > 0 && avail >= WM_ADSP_MAX_READ_SIZE);
 
 		total_read += amount_read;
-	} while (amount_read > 0 && avail > WM_ADSP_MAX_READ_SIZE);
+	} while (amount_read > 0 && avail >= WM_ADSP_MAX_READ_SIZE);
 
-	if (avail > WM_ADSP_MAX_READ_SIZE)
+	if (avail >= WM_ADSP_MAX_READ_SIZE)
 		adsp->buffer2_drain_pending = true;
 
 	return total_read * WM_ADSP_DATA_WORD_SIZE;

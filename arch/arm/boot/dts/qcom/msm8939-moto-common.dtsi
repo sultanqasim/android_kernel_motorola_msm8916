@@ -152,6 +152,10 @@
 		pinctrl-0 = <&kungpow_default>;
 	};
 
+	android_usb: android_usb@086000c8 {
+		mmi,pm-qos-latency-factory = <2 2 2>;
+        };
+
 	qcom,cci@1b0c000 {
 		vddio-supply = <&pm8916_l10>;
 	};
@@ -662,6 +666,7 @@
 	pinctrl-1 = <&sdc1_clk_off &sdc1_cmd_off &sdc1_data_off>;
 
 	qcom,nonremovable;
+	qcom,emmc;
 
 	status = "ok";
 };
@@ -689,6 +694,8 @@
 			2 &msm_gpio 25 0>;
 	interrupt-names = "hc_irq", "pwr_irq", "status_irq";
 	cd-gpios = <&msm_gpio 25 0x0>;
+
+	qcom,sd;
 
 	status = "ok";
 };
@@ -853,6 +860,8 @@
                 qcom,ext-temp-soc = <65>;
                 qcom,low-voltage-uv = <3200000>;
                 qcom,max-voltage-uv = <4350000>;
+		qcom,stepchg-voltage-mv = <4100>;
+		qcom,stepchg-taper-ma = <1800>;
         };
 
 	max17050: max17050-battery@36 {
@@ -997,12 +1006,12 @@
 		ct406_recalibrate_threshold = <0x0064>;
 		ct406_pulse_count = <0x02>;
 		ct406_prox_gain = <0x02>;
-		ct406_als_lux1_c0_mult = <0x294>;
-		ct406_als_lux1_c1_mult = <0x55A>;
-		ct406_als_lux1_div = <0x64>;
-		ct406_als_lux2_c0_mult = <0xDA>;
-		ct406_als_lux2_c1_mult = <0x186>;
-		ct406_als_lux2_div = <0x64>;
+		ct406_als_lux1_c0_mult = <0x386>;
+		ct406_als_lux1_c1_mult = <0x693>;
+		ct406_als_lux1_div = <0x80>;
+		ct406_als_lux2_c0_mult = <0x11F>;
+		ct406_als_lux2_c1_mult = <0x1DE>;
+		ct406_als_lux2_div = <0x80>;
 		dsp_iface_enable = <1>;
 		headset_detect_enable = <0>;
 		headset_hw_version = <0>;
@@ -1089,16 +1098,17 @@
 		adsps {
 			#address-cells = <1>;
 			#size-cells = <0>;
-			adsp@1100 {
+			adsp@1200 {
 				reg = <0x1200>;
 				firmware {
 					frontend {
 						wlf,wmfw-file = "aov-frontend";
 						wlf,bin-file = "aov-vrgain";
+						wlf,compr-caps = <1 1 4 1 16000>;
 					};
 				};
 			};
-			adsp@1200 {
+			adsp@1300 {
 				reg = <0x1300>;
 				firmware {
 					aov {
