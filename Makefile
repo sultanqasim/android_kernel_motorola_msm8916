@@ -1460,13 +1460,9 @@ clean := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.clean obj
 
 endif	# skip-makefile
 
-# boot image builder
+# dt image builder
 ifeq "$(TOP)" "./"
-ifeq ($(VARIANT),)
-$(info VARIANT not specified. Not loading bootimage building rules.)
-else
 include bootimage.mk
-endif
 endif
 
 PHONY += FORCE
