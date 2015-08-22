@@ -360,8 +360,6 @@ struct mdss_mdp_pp_tear_check {
 	u32 refx100;
 };
 
-struct mdss_livedisplay_ctx;
-
 struct mdss_panel_info {
 	u32 xres;
 	u32 yres;
@@ -443,8 +441,6 @@ struct mdss_panel_info {
 	enum cabc_mode cabc_mode;
 	bool hbm_feature_enabled;
 	bool hbm_state;
-
-        struct mdss_livedisplay_ctx *livedisplay;
 };
 
 struct mdss_panel_data {
