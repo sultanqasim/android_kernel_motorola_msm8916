@@ -826,6 +826,9 @@ sme_process_cmd:
                     status = pmcPrepareCommand( pMac, pmcCommand, pv, size, &pPmcCmd );
                     if( HAL_STATUS_SUCCESS( status ) && pPmcCmd )
                     {
+                        /* Set the time out to 30 sec */
+                        pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
+                                          CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE;
                         //Force this command to wake up the chip
                         csrLLInsertHead( &pMac->sme.smeCmdActiveList, &pPmcCmd->Link, LL_ACCESS_NOLOCK );
                         csrLLUnlock( &pMac->sme.smeCmdActiveList );
@@ -852,6 +855,19 @@ sme_process_cmd:
                 {
                     // we can reuse the pCommand
 
+                    /* For roam command set timeout to 30 * 2 sec.
+                     * There are cases where we try to connect to different
+                     * APs with same SSID one by one until sucessfully conneted
+                     * and thus roam command might take more time if connection
+                     * is rejected by too many APs.
+                     */
+                    if ((eSmeCommandRoam == pCommand->command) &&
+                        (eCsrHddIssued == pCommand->u.roamCmd.roamReason))
+                        pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
+                                         CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE * 2;
+                    else
+                        pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
+                                             CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE;
                     // Insert the command onto the ActiveList...
                     csrLLInsertHead( &pMac->sme.smeCmdActiveList, &pCommand->Link, LL_ACCESS_NOLOCK );
 
@@ -10997,6 +11013,23 @@ eHalStatus sme_StopBatchScanInd
 
 #endif
 
+void activeListCmdTimeoutHandle(void *userData)
+{
+    /* Return if no cmd pending in active list as
+     * in this case we should not be here.
+     */
+    if ((NULL == userData) ||
+        (0 == csrLLCount(&((tpAniSirGlobal) userData)->sme.smeCmdActiveList)))
+        return;
+    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+        "%s: Active List command timeout Cmd List Count %d", __func__,
+        csrLLCount(&((tpAniSirGlobal) userData)->sme.smeCmdActiveList) );
+    smeGetCommandQStatus((tHalHandle) userData);
+
+    if (!(vos_isLoadUnloadInProgress() ||
+        vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL)))
+       VOS_BUG(0);
+}
 
 #ifdef FEATURE_WLAN_CH_AVOID
 /* ---------------------------------------------------------------------------
@@ -11033,16 +11066,6 @@ eHalStatus sme_AddChAvoidCallback
     return(status);
 }
 #endif /* FEATURE_WLAN_CH_AVOID */
-
-void activeListCmdTimeoutHandle(void *userData)
-{
-    if (NULL == userData)
-        return;
-    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-        "%s: Active List command timeout Cmd List Count %d", __func__,
-    csrLLCount(&((tpAniSirGlobal) userData)->sme.smeCmdActiveList) );
-    smeGetCommandQStatus((tHalHandle) userData);
-}
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 
@@ -11940,19 +11963,19 @@ eHalStatus sme_RegisterBtCoexTDLSCallback
 }
 
 /* ---------------------------------------------------------------------------
+    \fn smeNeighborMiddleOfRoaming
 
-    \fn smeNeighborRoamIsHandoffInProgress
-
-    \brief  This function is a wrapper to call csrNeighborRoamIsHandoffInProgress
+    \brief This function is a wrapper to call csrNeighborMiddleOfRoaming
 
     \param hHal - The handle returned by macOpen.
 
-    \return eANI_BOOLEAN_TRUE if reassoc in progress, eANI_BOOLEAN_FALSE otherwise
-
+    \return eANI_BOOLEAN_TRUE if reassoc in progress,
+            eANI_BOOLEAN_FALSE otherwise
 ---------------------------------------------------------------------------*/
-tANI_BOOLEAN smeNeighborRoamIsHandoffInProgress(tHalHandle hHal)
+
+tANI_BOOLEAN smeNeighborMiddleOfRoaming(tHalHandle hHal)
 {
-    return (csrNeighborRoamIsHandoffInProgress(PMAC_STRUCT(hHal)));
+    return (csrNeighborMiddleOfRoaming(PMAC_STRUCT(hHal)));
 }
 
 void sme_SetDefDot11Mode(tHalHandle hHal)
