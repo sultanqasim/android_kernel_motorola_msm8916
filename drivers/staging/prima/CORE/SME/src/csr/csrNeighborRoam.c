@@ -1343,21 +1343,31 @@ eHalStatus csrNeighborRoamPrepareScanProfileFilter(tpAniSirGlobal pMac, tCsrScan
 
     pScanFilter->BSSType = pCurProfile->BSSType;
 
-    /* We are intrested only in the scan results on channels that we scanned  */
-    pScanFilter->ChannelInfo.numOfChannels = pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels;
-    pScanFilter->ChannelInfo.ChannelList = vos_mem_malloc(pScanFilter->ChannelInfo.numOfChannels * sizeof(tANI_U8));
-    if (NULL == pScanFilter->ChannelInfo.ChannelList)
+    if (pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels)
     {
-        smsLog(pMac, LOGE, FL("Scan Filter Channel list mem alloc failed"));
-        vos_mem_free(pScanFilter->SSIDs.SSIDList);
-        pScanFilter->SSIDs.SSIDList = NULL;
-        return eHAL_STATUS_FAILED_ALLOC;
+       /* We are intrested only in the scan results on channels that we scanned  */
+       pScanFilter->ChannelInfo.numOfChannels =
+        pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels;
+       pScanFilter->ChannelInfo.ChannelList =
+        vos_mem_malloc(pScanFilter->ChannelInfo.numOfChannels * sizeof(tANI_U8));
+       if (NULL == pScanFilter->ChannelInfo.ChannelList)
+       {
+          smsLog(pMac, LOGE, FL("Scan Filter Channel list mem alloc failed"));
+          vos_mem_free(pScanFilter->SSIDs.SSIDList);
+          pScanFilter->SSIDs.SSIDList = NULL;
+          return eHAL_STATUS_FAILED_ALLOC;
+       }
+       for (i = 0; i < pScanFilter->ChannelInfo.numOfChannels; i++)
+       {
+          pScanFilter->ChannelInfo.ChannelList[i] =
+            pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList[i];
+       }
     }
-    for (i = 0; i < pScanFilter->ChannelInfo.numOfChannels; i++)
+    else
     {
-        pScanFilter->ChannelInfo.ChannelList[i] = pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList[i];
+       pScanFilter->ChannelInfo.numOfChannels = 0;
+       pScanFilter->ChannelInfo.ChannelList = NULL;
     }
-
 #ifdef WLAN_FEATURE_VOWIFI_11R
     if (pNeighborRoamInfo->is11rAssoc)
     {
@@ -2746,8 +2756,17 @@ eHalStatus csrNeighborRoamScanForInitialForced5GRoaming(tpAniSirGlobal pMac, tAN
     if (eHAL_STATUS_SUCCESS != status)
     {
         smsLog(pMac, LOGE, FL("Forced intial roam to 5Gh request failed: Status = %d"), status);
+        return status;
     }
 
+    //keep firmware shut-up for any roaming related scan during
+    //this tenure.
+    status = csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_STOP,
+                                REASON_INITIAL_FORCED_ROAM_TO_5G);
+    if (eHAL_STATUS_SUCCESS != status)
+    {
+        smsLog(pMac, LOGE, FL("csrRoamOffloadScan stop scan cmd got failed status = %d"), status);
+    }
     return status;
 }
 #endif
@@ -3046,16 +3065,6 @@ void csrForcedInitialRoamTo5GHTimerCallback(void *context)
     //keep track this scan & roam is due to Forced initial roam to 5GHz
     pNeighborRoamInfo->isForcedInitialRoamTo5GH = 1;
 
-    //keep firmware shut-up for any roaming related scan during
-    //this tenure.
-    status = csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_STOP,
-                                REASON_INITIAL_FORCED_ROAM_TO_5G);
-    if (eHAL_STATUS_SUCCESS != status)
-    {
-        smsLog(pMac, LOGE, FL("csrRoamOffloadScan stop scan cmd got failed status = %d"), status);
-        return;
-    }
-
     // MUKUL TODO: whatever we are doing should we need to move
     // it after offload scan response comes from firmware ???
     status = csrNeighborRoamTransitToCFGChanScan(pMac);
@@ -3063,8 +3072,6 @@ void csrForcedInitialRoamTo5GHTimerCallback(void *context)
     {
         smsLog(pMac, LOGE,
                FL("csrNeighborRoamTransitToCFGChanScan failed status=%d"), status);
-         //restart scan offload to firmware
-         csrNeighborRoamStartLfrScan(pMac, REASON_INITIAL_FORCED_ROAM_TO_5G);
     }
 }
 
