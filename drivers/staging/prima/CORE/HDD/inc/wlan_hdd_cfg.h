@@ -1993,7 +1993,7 @@ static __inline tANI_U32 defHddRateToDefCfgRate( tANI_U32 defRateIndex )
 #define CFG_VHT_AMPDU_LEN_EXP_NAME          "gVhtMaxAmpduLenExp"
 #define CFG_VHT_AMPDU_LEN_EXP_MIN           ( 0 )
 #define CFG_VHT_AMPDU_LEN_EXP_MAX           ( 7 )
-#define CFG_VHT_AMPDU_LEN_EXP_DEFAULT       ( 3 )
+#define CFG_VHT_AMPDU_LEN_EXP_DEFAULT       ( 7 )
 
 #endif
 
@@ -2203,6 +2203,16 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_BTC_FAST_WLAN_CONN_PREF_MIN         ( 0 )
 #define CFG_BTC_FAST_WLAN_CONN_PREF_MAX         ( 1 )
 
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN             "gBtcStaticOppWlanIdleWlanLen"
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN_DEFAULT     ( 40000 )
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN_MIN         ( 0 )
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_WLAN_LEN_MAX         ( 250000 )
+
+
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN             "gBtcStaticOppWlanIdleBtLen"
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN_DEFAULT     ( 40000 )
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN_MIN         ( 0 )
+#define CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN_MAX         ( 250000 )
 /*
  * Connection related log Enable/Disable.
  * 0x1 - Enable mgmt pkt logs (no probe req/rsp).
@@ -2953,6 +2963,8 @@ typedef struct
    v_BOOL_t                    toggleArpBDRates;
    v_U32_t                     linkFailTimeout;
    v_U32_t                     linkFailTxCnt;
+   v_U32_t                     btcStaticOppWlanIdleWlanLen;
+   v_U32_t                     btcStaticOppWlanIdleBtLen;
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation
