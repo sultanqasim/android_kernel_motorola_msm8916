@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -95,6 +95,7 @@ static tANI_U8* __limTraceGetTimerString( tANI_U16 timerId )
         CASE_RETURN_STRING(eLIM_PERIODIC_JOIN_PROBE_REQ_TIMER);
         CASE_RETURN_STRING(eLIM_INSERT_SINGLESHOT_NOA_TIMER);
         CASE_RETURN_STRING(eLIM_CONVERT_ACTIVE_CHANNEL_TO_PASSIVE);
+        CASE_RETURN_STRING(eLIM_AUTH_RETRY_TIMER);
         default:
             return( "UNKNOWN" );
             break;
@@ -277,6 +278,9 @@ void macTraceMsgTx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data)
         case SIR_CFG_MODULE_ID:
             macTrace(pMac, TRACE_CODE_TX_CFG_MSG, session, data);
             break;
+        default:
+            macTrace(pMac, moduleId, session, data);
+            break;
     }
 }
 
@@ -299,6 +303,9 @@ void macTraceMsgTxNew(tpAniSirGlobal pMac, tANI_U8 module, tANI_U8 session, tANI
             break;
         case SIR_CFG_MODULE_ID:
             macTraceNew(pMac, module, TRACE_CODE_TX_CFG_MSG, session, data);
+            break;
+        default:
+            macTrace(pMac, moduleId, session, data);
             break;
         }
 }
@@ -326,6 +333,9 @@ void macTraceMsgRx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data)
             break;
         case SIR_CFG_MODULE_ID:
             macTrace(pMac, TRACE_CODE_RX_CFG_MSG, session, data);
+            break;
+        default:
+            macTrace(pMac, moduleId, session, data);
             break;
         }
 }
@@ -355,6 +365,9 @@ void macTraceMsgRxNew(tpAniSirGlobal pMac, tANI_U8 module, tANI_U8 session, tANI
             break;
         case SIR_CFG_MODULE_ID:
             macTraceNew(pMac, module, TRACE_CODE_RX_CFG_MSG, session, data);
+            break;
+        default:
+            macTrace(pMac, moduleId, session, data);
             break;
         }
 }

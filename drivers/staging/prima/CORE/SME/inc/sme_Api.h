@@ -646,16 +646,6 @@ eHalStatus sme_ScanFlushResult(tHalHandle hHal, tANI_U8 sessionId);
  */
 eHalStatus sme_FilterScanResults(tHalHandle hHal, tANI_U8 sessionId);
 
-/*
- * ---------------------------------------------------------------------------
- *  \fn sme_FilterScanDFSResults
- *  \brief a wrapper function to request CSR to filter BSSIDs on DFS channels
- *         from the scan results.
- *  \return eHalStatus
- *---------------------------------------------------------------------------
- */
-eHalStatus sme_FilterScanDFSResults(tHalHandle hHal);
-
 eHalStatus sme_ScanFlushP2PResult(tHalHandle hHal, tANI_U8 sessionId);
 
 /* ---------------------------------------------------------------------------
@@ -3249,60 +3239,6 @@ VOS_STATUS sme_StartTdlsLinkTeardownReq(tHalHandle hHal, tANI_U8 sessionId, tSir
 #endif /* FEATURE_WLAN_TDLS */
 eHalStatus sme_UpdateDfsSetting(tHalHandle hHal, tANI_U8 fUpdateEnableDFSChnlScan);
 
-/* ---------------------------------------------------------------------------
-    \fn sme_UpdateDFSRoamMode
-    \brief  Update DFS roam scan mode
-            This function is called to configure allowDFSChannelRoam
-            dynamically
-    \param  hHal - HAL handle for device
-    \param  allowDFSChannelRoam - DFS roaming scan mode
-            mode 0 disable roam scan on DFS channels
-            mode 1 enables roam scan (passive/active) on DFS channels
-    \return eHAL_STATUS_SUCCESS - SME update DFS roaming scan config
-            successfully.
-            Other status means SME failed to update DFS roaming scan config.
-    \sa
-    -------------------------------------------------------------------------*/
-eHalStatus sme_UpdateDFSRoamMode(tHalHandle hHal, tANI_U8 allowDFSChannelRoam);
-
-/* ---------------------------------------------------------------------------
-    \fn sme_UpdateDFSScanMode
-    \brief  Update DFS scan mode
-            This function is called to configure fEnableDFSChnlScan.
-    \param  hHal - HAL handle for device
-    \param  dfsScanMode - DFS scan mode
-            mode 0 disable scan on DFS channels
-            mode 1 enables passive scan on DFS channels
-            mode 2 enables active scan on DFS channels for static list
-    \return eHAL_STATUS_SUCCESS - SME update DFS roaming scan config
-            successfully.
-            Other status means SME failed to update DFS scan config.
-    \sa
-    -------------------------------------------------------------------------*/
-eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal, tANI_U8 dfsScanMode);
-
-/*--------------------------------------------------------------------------
-  \brief sme_GetDFSScanMode() - get DFS scan mode
-  \param hHal - The handle returned by macOpen.
-  \return DFS scan mode
-            mode 0 disable scan on DFS channels
-            mode 1 enables passive scan on DFS channels
-            mode 2 enables active scan on DFS channels for static list
-  \sa
-  --------------------------------------------------------------------------*/
-v_U8_t sme_GetDFSScanMode(tHalHandle hHal);
-
-/* ---------------------------------------------------------------------------
-    \fn sme_HandleDFSChanScan
-    \brief  Gets Valid channel list and updates scan control list according to
-             dfsScanMode
-    \param  hHal - HAL handle for device
-    \return eHAL_STATUS_FAILURE when failed to get valid channel list
-            Otherwise eHAL_STATUS_SUCCESS -
-    \sa
-    -------------------------------------------------------------------------*/
-eHalStatus sme_HandleDFSChanScan(tHalHandle hHal);
-
 /*
  * SME API to enable/disable WLAN driver initiated SSR
  */
@@ -3439,7 +3375,8 @@ eHalStatus sme_SendRateUpdateInd(tHalHandle hHal, tSirRateUpdateInd *rateUpdateP
 */
 eHalStatus smeIssueFastRoamNeighborAPEvent (tHalHandle hHal,
                                             tANI_U8 *bssid,
-                                            tSmeFastRoamTrigger fastRoamTrig);
+                                            tSmeFastRoamTrigger fastRoamTrig,
+                                            tANI_U8 channel);
 
 eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId,
                                       tANI_U8 *pBSSId,
@@ -3542,7 +3479,8 @@ VOS_STATUS sme_SendTdlsChanSwitchReq(tHalHandle hHal,
                                      tANI_S32 tdlsOffCh,
                                      tANI_S32 tdlsOffChBwOffset,
                                      tANI_U8 tdlsSwMode);
-
+eHalStatus sme_GetFwStats(tHalHandle hHal, tANI_U32 stats, void *data,
+                                                void *callback);
 void sme_SetMiracastMode (tHalHandle hHal,tANI_U8 mode);
 
 void sme_resetCoexEevent(tHalHandle hHal);
@@ -3551,6 +3489,14 @@ tANI_U32 sme_GetChannelBondingMode5G(tHalHandle hHal);
 tANI_U32 sme_GetChannelBondingMode24G(tHalHandle hHal);
 
 void sme_disable_dfs_channel(tHalHandle hHal, bool disable_dfs);
+
+/* HDD Callback function */
+typedef void(*pEncryptMsgRSPCb)(void *pUserData, void *infoParam);
+
+eHalStatus sme_Encryptmsgsend (tHalHandle hHal,
+                               u8 *pCmd,
+                               int length,
+                               pEncryptMsgRSPCb encCB);
 
 /* ---------------------------------------------------------------------------
      \fn sme_RegisterBtCoexTDLSCallback
@@ -3579,15 +3525,21 @@ eHalStatus sme_RegisterBtCoexTDLSCallback
 ---------------------------------------------------------------------------*/
 tANI_BOOLEAN smeNeighborMiddleOfRoaming(tHalHandle hHal);
 
-void sme_SetDefDot11Mode(tHalHandle hHal);
+/* --------------------------------------------------------------------------
+
+    \fn sme_IsCoexScoIndicationSet
+    \brief To check if the BTC module in fwr has sent the SCO
+           indication to host or not
+
+    \param hHal - The handle returned by macOpen.
+    \return TRUE - Sco call in progress FALSE- No SCO call in progress
+
+  --------------------------------------------------------------------------*/
+tANI_BOOLEAN sme_IsCoexScoIndicationSet(tHalHandle hHal);
+
 eHalStatus sme_SetMiracastVendorConfig(tHalHandle hHal,
                                tANI_U32 iniNumBuffAdvert,
                                       tANI_U32 set_value);
 
-eHalStatus sme_SetRtsCtsHtVht(tHalHandle hHal, tANI_U32 set_value);
-
-tANI_BOOLEAN sme_handleSetFccChannel(tHalHandle hHal,
-                                      tANI_U8 fcc_constraint);
-
-
+void sme_SetDefDot11Mode(tHalHandle hHal);
 #endif //#if !defined( __SME_API_H )
