@@ -670,7 +670,6 @@ typedef struct tagCsrConfig
     tANI_U8 isCoalesingInIBSSAllowed;
     tANI_U8 allowDFSChannelRoam;
     tANI_BOOLEAN initialScanSkipDFSCh;
-    tANI_BOOLEAN ignorePeerErpInfo;
     tANI_BOOLEAN sendDeauthBeforeCon;
 }tCsrConfig;
 
@@ -799,7 +798,6 @@ typedef struct tagCsrScanStruct
 
     csrScanCompleteCallback callback11dScanDone;
     eCsrBand  scanBandPreference;  //This defines the band perference for scan
-    bool fcc_constraint;
 }tCsrScanStruct;
 
 #ifdef FEATURE_WLAN_TDLS_INTERNAL
@@ -930,7 +928,7 @@ typedef struct tagCsrRoamSession
     /* This contains the additional IE in (unicast)
      *  probe request at the time of join
      */
-    tANI_U8 addIEScan[SIR_MAC_MAX_ADD_IE_LENGTH+2];
+    tANI_U8 addIEScan[SIR_MAC_MAX_IE_LENGTH+2];
     tANI_U32 nAddIEAssocLength;      //the byte count for pAddIeAssocIE
     tANI_U8 *pAddIEAssoc; //this contains the additional IE in (re) assoc request
 
@@ -1159,7 +1157,6 @@ void csrScanResumeIMPS( tpAniSirGlobal pMac );
 
 eHalStatus csrInitGetChannels(tpAniSirGlobal pMac);
 eHalStatus csrScanFilterResults(tpAniSirGlobal pMac);
-eHalStatus csrScanFilterDFSResults(tpAniSirGlobal pMac);
 
 eHalStatus csrSetModifyProfileFields(tpAniSirGlobal pMac, tANI_U32 sessionId,
                                      tCsrRoamModifyProfileFields *pModifyProfileFields);

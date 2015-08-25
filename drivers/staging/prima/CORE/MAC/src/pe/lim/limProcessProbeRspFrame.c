@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -38,7 +38,7 @@
  */
 
 #include "wniApi.h"
-#include "wniCfg.h"
+#include "wniCfgSta.h"
 #include "aniGlobal.h"
 #include "schApi.h"
 #include "utilsApi.h"
@@ -142,10 +142,10 @@ limProcessProbeRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession 
     pHdr = WDA_GET_RX_MAC_HEADER(pRxPacketInfo);
 
 
-   PELOG2(limLog(pMac, LOG2,
+   limLog(pMac, LOG2,
              FL("Received Probe Response frame with length=%d from "),
              WDA_GET_RX_MPDU_LEN(pRxPacketInfo));
-    limPrintMacAddr(pMac, pHdr->sa, LOG2);)
+    limPrintMacAddr(pMac, pHdr->sa, LOG2);
 
    if (!pMac->fScanOffload)
    {

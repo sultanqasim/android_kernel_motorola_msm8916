@@ -38,7 +38,7 @@
  */
 
 #include "palTypes.h"
-#include "wniCfg.h"
+#include "wniCfgSta.h"
 
 #include "cfgApi.h"
 #include "pmmApi.h"
@@ -131,8 +131,7 @@ ap_beacon_process(
                 if (((!(pBcnStruct->erpPresent)) && 
                       !(pBcnStruct->HTInfo.present))|| 
                     //if erp not present then  11B AP overlapping
-                    (!pMac->roam.configParam.ignorePeerErpInfo &&
-                      pBcnStruct->erpPresent &&
+                    (pBcnStruct->erpPresent &&
                     (pBcnStruct->erpIEInfo.useProtection ||
                     pBcnStruct->erpIEInfo.nonErpPresent)))
                 {
@@ -159,8 +158,7 @@ ap_beacon_process(
               if (((!(pBcnStruct->erpPresent)) && 
                     !(pBcnStruct->HTInfo.present))|| 
                   //if erp not present then  11B AP overlapping
-                  (!pMac->roam.configParam.ignorePeerErpInfo &&
-                    pBcnStruct->erpPresent &&
+                  (pBcnStruct->erpPresent &&
                   (pBcnStruct->erpIEInfo.useProtection ||
                   pBcnStruct->erpIEInfo.nonErpPresent)))
               {

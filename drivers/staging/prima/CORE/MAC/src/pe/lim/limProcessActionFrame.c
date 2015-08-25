@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -42,7 +42,7 @@
 #include "wniApi.h"
 #include "sirApi.h"
 #include "aniGlobal.h"
-#include "wniCfg.h"
+#include "wniCfgSta.h"
 #include "schApi.h"
 #include "utilsApi.h"
 #include "limTypes.h"
@@ -758,15 +758,15 @@ __limProcessDelTsReq(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession pse
             PELOGW(limLog(pMac, LOGW, FL("Ignoring delts request: wme not enabled/capable"));)
             return;
         }
-        PELOG2(limLog(pMac, LOG2, FL("WME Delts received"));)
+        limLog(pMac, LOG1, FL("WME Delts received"));
     }
     else if ((psessionEntry->limQosEnabled) && pSta->lleEnabled)
         {
-        PELOG2(limLog(pMac, LOG2, FL("11e QoS Delts received"));)
+        limLog(pMac, LOG1, FL("11e QoS Delts received"));
         }
     else if ((psessionEntry->limWsmEnabled) && pSta->wsmEnabled)
         {
-        PELOG2(limLog(pMac, LOG2, FL("WSM Delts received"));)
+        limLog(pMac, LOG1, FL("WSM Delts received"));
         }
     else
     {

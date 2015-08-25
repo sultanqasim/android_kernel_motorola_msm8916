@@ -111,7 +111,8 @@
 #define DHCP_OPTION53_STATUS_OFFSET    ( 0x11C )
 /* WLAN_DHCP_DEBUG */
 
-#define TID3 0x60
+
+
 
 
 /*--------------------------------------------------------------------------- 
