@@ -1083,7 +1083,7 @@ void WLANTL_AssocFailed(v_U8_t staId)
        " %s fails to start forwarding (staId %d)", __func__, staId);
   }
 }
-
+  
   /*===========================================================================
 
   FUNCTION  WLANTL_Finish_ULA
@@ -1097,18 +1097,18 @@ void WLANTL_AssocFailed(v_U8_t staId)
   DEPENDENCIES
 
      TL must have been initialized before this gets called.
-
+  
   PARAMETERS
 
    callbackRoutine:   HDD Callback function.
    callbackContext : HDD userdata context.
-
+  
    RETURN VALUE
 
    VOS_STATUS_SUCCESS/VOS_STATUS_FAILURE
-
+   
   SIDE EFFECTS
-
+   
 ============================================================================*/
 
 VOS_STATUS WLANTL_Finish_ULA( void (*callbackRoutine) (void *callbackContext),
@@ -11446,6 +11446,7 @@ WLANTL_CleanSTA
    ptlSTAClient->ucCurrentAC     = WLANTL_AC_HIGH_PRIO;
    ptlSTAClient->ucCurrentWeight = 0;
    ptlSTAClient->ucServicedAC    = WLANTL_AC_BK;
+   ptlSTAClient->ucPktPending = 0;
 
    vos_mem_zero( ptlSTAClient->aucACMask, sizeof(ptlSTAClient->aucACMask));
    vos_mem_zero( &ptlSTAClient->wUAPSDInfo, sizeof(ptlSTAClient->wUAPSDInfo));

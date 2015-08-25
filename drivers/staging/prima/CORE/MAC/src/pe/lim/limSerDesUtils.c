@@ -1076,7 +1076,7 @@ limJoinReqSerDes(tpAniSirGlobal pMac, tpSirSmeJoinReq pJoinReq, tANI_U8 *pBuf)
     if (pJoinReq->addIEScan.length)
     {
         // Check for IE length (that includes length of type & length)
-        if (pJoinReq->addIEScan.length > SIR_MAC_MAX_IE_LENGTH + 2)
+        if (pJoinReq->addIEScan.length > SIR_MAC_MAX_ADD_IE_LENGTH + 2)
         {
             limLog(pMac, LOGE,
                    FL("Invalid addIE Scan length %d in SME_JOIN_REQ"),
@@ -1303,11 +1303,11 @@ limJoinReqSerDes(tpAniSirGlobal pMac, tpSirSmeJoinReq pJoinReq, tANI_U8 *pBuf)
     pBuf += pJoinReq->supportedChannels.numChnl;
     len-= pJoinReq->supportedChannels.numChnl;
 
-    limLog(pMac, LOG1,
+    PELOG2(limLog(pMac, LOG2,
             FL("spectrumInd ON: minPower %d, maxPower %d , numChnls %d"),
             pJoinReq->powerCap.minTxPower,
             pJoinReq->powerCap.maxTxPower,
-            pJoinReq->supportedChannels.numChnl);
+            pJoinReq->supportedChannels.numChnl);)
 
     // Extract uapsdPerAcBitmask
     pJoinReq->uapsdPerAcBitmask = *pBuf++;

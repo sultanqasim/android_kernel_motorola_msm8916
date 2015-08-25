@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -33,8 +33,6 @@
 
 \brief       Linux HDD TDLS include file
 ==========================================================================*/
-
-#ifdef FEATURE_WLAN_TDLS
 
 #define MAX_NUM_TDLS_PEER           3
 
@@ -292,8 +290,7 @@ void wlan_hdd_tdls_check_bmps(hdd_adapter_t *pAdapter);
 
 u8 wlan_hdd_tdls_is_peer_progress(hdd_adapter_t *pAdapter, u8 *mac);
 
-hddTdlsPeer_t *wlan_hdd_tdls_is_progress(hdd_context_t *pHddCtx, u8* mac,
-                                         u8 skip_self, tANI_BOOLEAN mutexLock);
+hddTdlsPeer_t *wlan_hdd_tdls_is_progress(hdd_context_t *pHddCtx, u8* mac, u8 skip_self);
 
 void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
                             eTDLSSupportMode tdls_mode,
@@ -334,9 +331,6 @@ int wlan_hdd_tdls_extctrl_deconfig_peer(hdd_adapter_t *pAdapter, u8 *peer);
 int wlan_hdd_tdls_extctrl_config_peer(hdd_adapter_t *pAdapter,
                                       u8 *peer,
                                       cfg80211_exttdls_callback callback);
-void hdd_tdls_notify_mode_change(hdd_adapter_t *pAdapter,
-                                 hdd_context_t *pHddCtx);
-void wlan_hdd_tdls_disable_offchan_and_teardown_links(hdd_context_t *pHddCtx);
 /*EXT TDLS*/
 int wlan_hdd_tdls_get_status(hdd_adapter_t *pAdapter,
                              tANI_U8* mac,
@@ -354,16 +348,4 @@ int hdd_set_tdls_scan_type(hdd_adapter_t *pAdapter,
 hddTdlsPeer_t *wlan_hdd_tdls_get_first_connected_peer(hdd_adapter_t *pAdapter);
 
 int wlan_hdd_validate_tdls_context(hdd_context_t *pHddCtx, tdlsCtx_t *pTdlsCtx);
-
-#else
-static inline void hdd_tdls_notify_mode_change(hdd_adapter_t *pAdapter,
-                                               hdd_context_t *pHddCtx)
-{
-}
-static inline void
-wlan_hdd_tdls_disable_offchan_and_teardown_links(hdd_context_t *pHddCtx)
-{
-}
-#endif
-
 #endif // __HDD_TDSL_H

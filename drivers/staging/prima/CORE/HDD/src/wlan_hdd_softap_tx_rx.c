@@ -49,7 +49,6 @@
 #include <linux/etherdevice.h>
 //#include <vos_list.h>
 #include <vos_types.h>
-#include <vos_sched.h>
 #include <aniGlobal.h>
 #include <halTypes.h>
 #include <net/ieee80211_radiotap.h>
@@ -299,7 +298,6 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
    //Extract the destination address from ethernet frame
    v_MACADDR_t *pDestMacAddress = (v_MACADDR_t*)skb->data;
    int os_status = NETDEV_TX_OK; 
-   struct sk_buff *skb1;
 
    pDestMacAddress = (v_MACADDR_t*)skb->data;
    
@@ -470,20 +468,10 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
          spin_lock_bh(&pAdapter->aStaInfo[STAId].wmm_tx_queue[ac].lock);
          status = hdd_list_remove_back( &pAdapter->aStaInfo[STAId].wmm_tx_queue[ac], &anchor);
          spin_unlock_bh(&pAdapter->aStaInfo[STAId].wmm_tx_queue[ac].lock);
-         /* Free the skb only if we are able to remove it from the list.
-          * If we are not able to retrieve it from the list it means that
-          * the skb was pulled by TX Thread and is use so we should not free
-          * it here
-          */
-         if (VOS_IS_STATUS_SUCCESS(status))
-         {
-            pktNode = list_entry(anchor, skb_list_node_t, anchor);
-            skb1 = pktNode->skb;
-            kfree_skb(skb1);
-         }
          ++pAdapter->stats.tx_dropped;
          ++pAdapter->hdd_stats.hddTxRxStats.txXmitDropped;
          ++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
+         kfree_skb(skb);
          goto xmit_done;
       }
    }
@@ -519,7 +507,6 @@ VOS_STATUS hdd_softap_sta_2_sta_xmit(struct sk_buff *skb,
    hdd_adapter_t *pAdapter = (hdd_adapter_t *)netdev_priv(dev);
    v_U8_t ac;
    vos_list_node_t *anchor = NULL;
-   struct sk_buff *skb1;
 
    ++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
 
@@ -609,20 +596,10 @@ VOS_STATUS hdd_softap_sta_2_sta_xmit(struct sk_buff *skb,
          spin_lock_bh(&pAdapter->aStaInfo[STAId].wmm_tx_queue[ac].lock);
          status = hdd_list_remove_back( &pAdapter->aStaInfo[STAId].wmm_tx_queue[ac], &anchor);
          spin_unlock_bh(&pAdapter->aStaInfo[STAId].wmm_tx_queue[ac].lock);
-         /* Free the skb only if we are able to remove it from the list.
-          * If we are not able to retrieve it from the list it means that
-          * the skb was pulled by TX Thread and is use so we should not free
-          * it here
-          */
-         if (VOS_IS_STATUS_SUCCESS(status))
-         {
-            pktNode = list_entry(anchor, skb_list_node_t, anchor);
-            skb1 = pktNode->skb;
-            kfree_skb(skb1);
-         }
          ++pAdapter->stats.tx_dropped;
          ++pAdapter->hdd_stats.hddTxRxStats.txXmitDropped;
          ++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
+         kfree_skb(skb);
          status = VOS_STATUS_E_FAILURE;
          goto xmit_end;
       }
@@ -636,14 +613,14 @@ xmit_end:
 }
 
 /**============================================================================
-  @brief __hdd_softap_tx_timeout() - Function called by OS if there is any
+  @brief hdd_softap_tx_timeout() - Function called by OS if there is any
   timeout during transmission. Since HDD simply enqueues packet
   and returns control to OS right away, this would never be invoked
 
   @param dev : [in] pointer to Libra network device
   @return    : None
   ===========================================================================*/
-void __hdd_softap_tx_timeout(struct net_device *dev)
+void hdd_softap_tx_timeout(struct net_device *dev)
 {
    hdd_adapter_t *pAdapter =  WLAN_HDD_GET_PRIV_PTR(dev);
    struct netdev_queue *txq;
@@ -714,37 +691,21 @@ void __hdd_softap_tx_timeout(struct net_device *dev)
 
 } 
 
-void hdd_softap_tx_timeout(struct net_device *dev)
-{
-   vos_ssr_protect(__func__);
-   __hdd_softap_tx_timeout(dev);
-   vos_ssr_unprotect(__func__);
-   return;
-}
 
 /**============================================================================
-  @brief __hdd_softap_stats() - Function registered with the Linux OS for
+  @brief hdd_softap_stats() - Function registered with the Linux OS for 
   device TX/RX statistic
 
   @param dev      : [in] pointer to Libra network device
   
   @return         : pointer to net_device_stats structure
   ===========================================================================*/
-struct net_device_stats* __hdd_softap_stats(struct net_device *dev)
+struct net_device_stats* hdd_softap_stats(struct net_device *dev)
 {
    hdd_adapter_t* priv = netdev_priv(dev);
    return &priv->stats;
 }
 
-struct net_device_stats* hdd_softap_stats(struct net_device *dev)
-{
-   struct net_device_stats *priv_stats;
-   vos_ssr_protect(__func__);
-   priv_stats = __hdd_softap_stats(dev);
-   vos_ssr_unprotect(__func__);
-
-   return priv_stats;
-}
 
 /**============================================================================
   @brief hdd_softap_init_tx_rx() - Init function to initialize Tx/RX

@@ -3375,8 +3375,7 @@ eHalStatus sme_SendRateUpdateInd(tHalHandle hHal, tSirRateUpdateInd *rateUpdateP
 */
 eHalStatus smeIssueFastRoamNeighborAPEvent (tHalHandle hHal,
                                             tANI_U8 *bssid,
-                                            tSmeFastRoamTrigger fastRoamTrig,
-                                            tANI_U8 channel);
+                                            tSmeFastRoamTrigger fastRoamTrig);
 
 eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId,
                                       tANI_U8 *pBSSId,
@@ -3479,8 +3478,7 @@ VOS_STATUS sme_SendTdlsChanSwitchReq(tHalHandle hHal,
                                      tANI_S32 tdlsOffCh,
                                      tANI_S32 tdlsOffChBwOffset,
                                      tANI_U8 tdlsSwMode);
-eHalStatus sme_GetFwStats(tHalHandle hHal, tANI_U32 stats, void *data,
-                                                void *callback);
+
 void sme_SetMiracastMode (tHalHandle hHal,tANI_U8 mode);
 
 void sme_resetCoexEevent(tHalHandle hHal);
@@ -3489,14 +3487,6 @@ tANI_U32 sme_GetChannelBondingMode5G(tHalHandle hHal);
 tANI_U32 sme_GetChannelBondingMode24G(tHalHandle hHal);
 
 void sme_disable_dfs_channel(tHalHandle hHal, bool disable_dfs);
-
-/* HDD Callback function */
-typedef void(*pEncryptMsgRSPCb)(void *pUserData, void *infoParam);
-
-eHalStatus sme_Encryptmsgsend (tHalHandle hHal,
-                               u8 *pCmd,
-                               int length,
-                               pEncryptMsgRSPCb encCB);
 
 /* ---------------------------------------------------------------------------
      \fn sme_RegisterBtCoexTDLSCallback
@@ -3514,16 +3504,16 @@ eHalStatus sme_RegisterBtCoexTDLSCallback
 );
 
 /* ---------------------------------------------------------------------------
-    \fn smeNeighborMiddleOfRoaming
+    \fn smeNeighborRoamIsHandoffInProgress
 
-    \brief This function is a wrapper to call csrNeighborMiddleOfRoaming
+    \brief This function is a wrapper to call csrNeighborRoamIsHandoffInProgress
 
     \param hHal - The handle returned by macOpen.
 
     \return eANI_BOOLEAN_TRUE if reassoc in progress,
             eANI_BOOLEAN_FALSE otherwise
 ---------------------------------------------------------------------------*/
-tANI_BOOLEAN smeNeighborMiddleOfRoaming(tHalHandle hHal);
+tANI_BOOLEAN smeNeighborRoamIsHandoffInProgress(tHalHandle hHal);
 
 /* --------------------------------------------------------------------------
 
@@ -3536,10 +3526,6 @@ tANI_BOOLEAN smeNeighborMiddleOfRoaming(tHalHandle hHal);
 
   --------------------------------------------------------------------------*/
 tANI_BOOLEAN sme_IsCoexScoIndicationSet(tHalHandle hHal);
-
-eHalStatus sme_SetMiracastVendorConfig(tHalHandle hHal,
-                               tANI_U32 iniNumBuffAdvert,
-                                      tANI_U32 set_value);
 
 void sme_SetDefDot11Mode(tHalHandle hHal);
 #endif //#if !defined( __SME_API_H )

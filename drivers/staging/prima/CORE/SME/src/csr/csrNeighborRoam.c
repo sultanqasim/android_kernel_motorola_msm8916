@@ -249,10 +249,9 @@ void csrNeighborRoamFreeRoamableBSSList(tpAniSirGlobal pMac, tDblLinkList *pList
     return;
 }
 
-static eHalStatus csrNeighborRoamTriggerHandoff(tpAniSirGlobal pMac,
+static void csrNeighborRoamTriggerHandoff(tpAniSirGlobal pMac, 
                                           tpCsrNeighborRoamControlInfo pNeighborRoamInfo)
 {
-    eHalStatus status = eHAL_STATUS_SUCCESS;
 #ifdef WLAN_FEATURE_VOWIFI_11R
     if ((pNeighborRoamInfo->is11rAssoc)
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
@@ -263,7 +262,7 @@ static eHalStatus csrNeighborRoamTriggerHandoff(tpAniSirGlobal pMac,
         if ((eCSR_NEIGHBOR_ROAM_STATE_REPORT_SCAN == pNeighborRoamInfo->neighborRoamState) ||
             (eSME_ROAM_TRIGGER_FAST_ROAM == pNeighborRoamInfo->cfgRoamEn))
         {
-            status = csrNeighborRoamIssuePreauthReq(pMac);
+            csrNeighborRoamIssuePreauthReq(pMac);
             pNeighborRoamInfo->cfgRoamEn = eSME_ROAM_TRIGGER_NONE;
             vos_mem_set(&pNeighborRoamInfo->cfgRoambssId[0],
                         sizeof(pNeighborRoamInfo->cfgRoambssId),
@@ -290,7 +289,7 @@ static eHalStatus csrNeighborRoamTriggerHandoff(tpAniSirGlobal pMac,
         {
             if (eCSR_NEIGHBOR_ROAM_STATE_REPORT_SCAN == pNeighborRoamInfo->neighborRoamState)
             {
-                status = csrNeighborRoamIssuePreauthReq(pMac);
+                csrNeighborRoamIssuePreauthReq(pMac);
             }
             else
             {
@@ -311,7 +310,7 @@ static eHalStatus csrNeighborRoamTriggerHandoff(tpAniSirGlobal pMac,
 #endif
                 )
                 {
-                    status = csrNeighborRoamIssuePreauthReq(pMac);
+                    csrNeighborRoamIssuePreauthReq(pMac);
                     pNeighborRoamInfo->cfgRoamEn = eSME_ROAM_TRIGGER_NONE;
                     vos_mem_set(&pNeighborRoamInfo->cfgRoambssId[0],
                                 sizeof(pNeighborRoamInfo->cfgRoambssId),
@@ -341,7 +340,6 @@ static eHalStatus csrNeighborRoamTriggerHandoff(tpAniSirGlobal pMac,
                            pNeighborRoamInfo->neighborRoamState));
                 }
             }
-    return status;
 }
 
 VOS_STATUS csrNeighborRoamUpdateFastRoamingEnabled(tpAniSirGlobal pMac, const v_BOOL_t fastRoamEnabled)
@@ -661,7 +659,6 @@ static void csrNeighborRoamResetPreauthControlInfo(tpAniSirGlobal pMac)
 #endif
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
     pNeighborRoamInfo->uOsRequestedHandoff = 0;
-    pNeighborRoamInfo->isForcedInitialRoamTo5GH = 0;
     vos_mem_zero(&pNeighborRoamInfo->handoffReqInfo, sizeof(tCsrHandoffRequest));
 #endif
 
@@ -771,7 +768,6 @@ void csrNeighborRoamResetConnectedStateControlInfo(tpAniSirGlobal pMac)
 #endif
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
     pNeighborRoamInfo->uOsRequestedHandoff = 0;
-    pNeighborRoamInfo->isForcedInitialRoamTo5GH = 0;
     vos_mem_zero(&pNeighborRoamInfo->handoffReqInfo, sizeof(tCsrHandoffRequest));
 #endif
 }
@@ -781,6 +777,8 @@ void csrNeighborRoamResetReportScanStateControlInfo(tpAniSirGlobal pMac)
     tpCsrNeighborRoamControlInfo pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
     pNeighborRoamInfo->csrSessionId            =   CSR_SESSION_ID_INVALID;
     vos_mem_set(pNeighborRoamInfo->currAPbssid, sizeof(tCsrBssid), 0);
+    pNeighborRoamInfo->neighborScanTimerInfo.pMac = pMac;
+    pNeighborRoamInfo->neighborScanTimerInfo.sessionId = CSR_SESSION_ID_INVALID;
 #ifdef FEATURE_WLAN_ESE
     pNeighborRoamInfo->isESEAssoc = eANI_BOOLEAN_FALSE;
     pNeighborRoamInfo->isVOAdmitted = eANI_BOOLEAN_FALSE;
@@ -1217,13 +1215,6 @@ eHalStatus csrNeighborRoamPreauthRspHandler(tpAniSirGlobal pMac, tSirRetStatus l
              pNeighborRoamInfo->uOsRequestedHandoff = 0;
              csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_START, REASON_PREAUTH_FAILED_FOR_ALL);
           }
-          else if(pNeighborRoamInfo->isForcedInitialRoamTo5GH)
-          {
-             pNeighborRoamInfo->isForcedInitialRoamTo5GH = 0;
-             smsLog(pMac, LOGE, FL("Forced 5G roaming preauth got failed"
-                    "send RSO START cmd to fwr."));
-             csrRoamOffloadScan(pMac,ROAM_SCAN_OFFLOAD_START,REASON_CONNECT);
-          }
           else
           {
              csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_RESTART, REASON_PREAUTH_FAILED_FOR_ALL);
@@ -1531,7 +1522,7 @@ static tANI_BOOLEAN csrNeighborRoamProcessScanResults(tpAniSirGlobal pMac,
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
        && !csrRoamIsRoamOffloadScanEnabled(pMac)
 #endif
-       && ((eSME_ROAM_TRIGGER_SCAN != pNeighborRoamInfo->cfgRoamEn) &&
+       && ((eSME_ROAM_TRIGGER_SCAN != pNeighborRoamInfo->cfgRoamEn) ||
            (eSME_ROAM_TRIGGER_FAST_ROAM != pNeighborRoamInfo->cfgRoamEn)))
        {
                /*
@@ -2107,14 +2098,7 @@ static eHalStatus csrNeighborRoamProcessScanComplete (tpAniSirGlobal pMac)
                 }
 #endif
 
-                hstatus = csrNeighborRoamTriggerHandoff(pMac,pNeighborRoamInfo);
-                if(eHAL_STATUS_SUCCESS != hstatus)
-                {
-                    smsLog(pMac, LOGE,
-                           FL("csrNeighborRoamTriggerHandoff fail status = %d"),
-                           hstatus);
-                    return eHAL_STATUS_FAILURE;
-                }
+                csrNeighborRoamTriggerHandoff(pMac, pNeighborRoamInfo);
                 return eHAL_STATUS_SUCCESS;
             }
 
@@ -2160,13 +2144,6 @@ static eHalStatus csrNeighborRoamProcessScanComplete (tpAniSirGlobal pMac)
                             "tempVal = %u, roamNow = %d uOsRequestedHandoff = %d",
                             tempVal, roamNow, pNeighborRoamInfo->uOsRequestedHandoff);
                 }
-                else if (pNeighborRoamInfo->isForcedInitialRoamTo5GH)
-                {
-                    VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                              "No 5G candidate found tempVal=%u, roamNow=%d",
-                               tempVal, roamNow);
-                    return eHAL_STATUS_FAILURE;
-                }
                 else
                 {
                     if (pNeighborRoamInfo->uOsRequestedHandoff)
@@ -2175,7 +2152,11 @@ static eHalStatus csrNeighborRoamProcessScanComplete (tpAniSirGlobal pMac)
                             REASON_NO_CAND_FOUND_OR_NOT_ROAMING_NOW);
                         pNeighborRoamInfo->uOsRequestedHandoff = 0;
                     }
-
+                    else if (pNeighborRoamInfo->isForcedInitialRoamTo5GH)
+                    {
+                        smsLog(pMac, LOGE, FL("Forced roam to 5G No candidate found, starting fw offload scan again, status = %d"), hstatus);
+                        csrNeighborRoamStartLfrScan(pMac, REASON_INITIAL_FORCED_ROAM_TO_5G);
+                    }
                     else
                     {
                         /* There is no candidate or We are not roaming Now.
@@ -2383,31 +2364,31 @@ static eHalStatus csrNeighborRoamForceRoamTo5GhScanCb(tHalHandle halHandle,
 
     pMac->roam.neighborRoamInfo.scanRspPending = eANI_BOOLEAN_FALSE;
 
-    if (eCSR_NEIGHBOR_ROAM_STATE_CFG_CHAN_LIST_SCAN != pNeighborRoamInfo->neighborRoamState)
+    /* This can happen when we receive a UP event from TL in any of the scan states. Silently ignore it */
+    if (eCSR_NEIGHBOR_ROAM_STATE_CONNECTED == pNeighborRoamInfo->neighborRoamState)
     {
-        smsLog(pMac, LOGE, FL("Received in neighborRoamState %d . Ignore it"),
-                pNeighborRoamInfo->neighborRoamState);
+        smsLog(pMac, LOGE, FL("Received in CONNECTED state. Must be because a UP event from TL after issuing scan request. Ignore it"));
         hstatus = eHAL_STATUS_FAILURE;
         goto end;
     }
 
-    //keep track of forced 5G scan & roam is due to Forced initial roam to 5GHz
-    pNeighborRoamInfo->isForcedInitialRoamTo5GH = 1;
+    if (eCSR_NEIGHBOR_ROAM_STATE_INIT == pNeighborRoamInfo->neighborRoamState)
+    {
+        smsLog(pMac, LOGE, FL("Received in INIT state. Must have disconnected. Ignore it"));
+        hstatus = eHAL_STATUS_FAILURE;
+        goto end;
+    }
 
     NEIGHBOR_ROAM_DEBUG(pMac, LOGW, "%s: process scan results", __func__);
     hstatus = csrNeighborRoamProcessScanComplete(pMac);
 
+    //Clear off the isForcedInitialRoamTo5GH
+    pNeighborRoamInfo->isForcedInitialRoamTo5GH = 0;
+
     if (eHAL_STATUS_SUCCESS != hstatus)
     {
-        smsLog(pMac, LOGE, FL("Force Roam To 5GhScanCb failed with status %d"),
-        hstatus);
-        pNeighborRoamInfo->isForcedInitialRoamTo5GH = 0;
-        /*
-         * Send RSO start because in case 5G roaming host have
-         * not enabled at initial connection
-         */
-        csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_START, REASON_CONNECT);
-        CSR_NEIGHBOR_ROAM_STATE_TRANSITION(eCSR_NEIGHBOR_ROAM_STATE_CONNECTED);
+        smsLog(pMac, LOGE, FL("Force Roam To 5GhScanCb failed with status %d"), hstatus);
+        goto end;
     }
 
     if (NULL != pContext)
@@ -2417,6 +2398,8 @@ static eHalStatus csrNeighborRoamForceRoamTo5GhScanCb(tHalHandle halHandle,
 end:
     if (NULL != pContext)
         vos_mem_free(pContext);
+    if (hstatus != eHAL_STATUS_SUCCESS)
+          csrNeighborRoamStartLfrScan(pMac, REASON_INITIAL_FORCED_ROAM_TO_5G);
     return hstatus;
 }
 #endif
@@ -2762,6 +2745,7 @@ eHalStatus csrNeighborRoamScanForInitialForced5GRoaming(tpAniSirGlobal pMac, tAN
     {
         smsLog(pMac, LOGE, FL("Forced intial roam to 5Gh request failed: Status = %d"), status);
     }
+
     return status;
 }
 #endif
@@ -2850,14 +2834,10 @@ eHalStatus csrNeighborRoamPerformContiguousBgScan(tpAniSirGlobal pMac, tANI_U32 
 ---------------------------------------------------------------------------*/
 void csrNeighborRoamNeighborScanTimerCallback(void *pv)
 {
-    tpAniSirGlobal pMac = PMAC_STRUCT( pv );
-    tpCsrNeighborRoamControlInfo  pNeighborRoamInfo;
-    if(!pMac)
-    {
-        VOS_TRACE (VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, FL("pMac is Null"));
-        return;
-    }
-    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
+    tCsrTimerInfo *pInfo = (tCsrTimerInfo *)pv;
+    tpAniSirGlobal pMac = pInfo->pMac;
+    tANI_U32         sessionId = pInfo->sessionId;
+    tpCsrNeighborRoamControlInfo    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
 
     // check if bg scan is on going, no need to send down the new params if true
     if(eANI_BOOLEAN_TRUE == pNeighborRoamInfo->scanRspPending)
@@ -2867,6 +2847,8 @@ void csrNeighborRoamNeighborScanTimerCallback(void *pv)
        return;
     }
 
+    VOS_ASSERT(sessionId == pNeighborRoamInfo->csrSessionId);
+
     switch (pNeighborRoamInfo->neighborRoamState)
     {
 #ifdef WLAN_FEATURE_VOWIFI_11R
@@ -2874,7 +2856,7 @@ void csrNeighborRoamNeighborScanTimerCallback(void *pv)
             switch(pNeighborRoamInfo->prevNeighborRoamState)
             {
                 case eCSR_NEIGHBOR_ROAM_STATE_REPORT_QUERY:
-                    csrNeighborRoamPerformBgScan(pMac, pNeighborRoamInfo->csrSessionId);
+                    csrNeighborRoamPerformBgScan(pMac, sessionId);
                     break;
                 default:
                     smsLog(pMac, LOGE, FL("Neighbor scan callback received in"
@@ -2888,7 +2870,7 @@ void csrNeighborRoamNeighborScanTimerCallback(void *pv)
             break;
 #endif /* WLAN_FEATURE_VOWIFI_11R */
         case eCSR_NEIGHBOR_ROAM_STATE_CFG_CHAN_LIST_SCAN:     
-            csrNeighborRoamPerformBgScan(pMac, pNeighborRoamInfo->csrSessionId );
+            csrNeighborRoamPerformBgScan(pMac, sessionId);
             break;
         default:
             break;
@@ -2898,15 +2880,10 @@ void csrNeighborRoamNeighborScanTimerCallback(void *pv)
 
 void csrNeighborRoamEmptyScanRefreshTimerCallback(void *context)
 {
-    tpAniSirGlobal pMac = PMAC_STRUCT( context );
+    tCsrTimerInfo *pInfo = (tCsrTimerInfo *)context;
+    tpAniSirGlobal pMac = pInfo->pMac;
     VOS_STATUS     vosStatus = VOS_STATUS_SUCCESS;
-    tpCsrNeighborRoamControlInfo  pNeighborRoamInfo;
-    if(!pMac)
-    {
-        VOS_TRACE (VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, FL("pMac is Null"));
-        return;
-    }
-    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
+    tpCsrNeighborRoamControlInfo    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
 
     /* Reset all the variables just as no scan had happened before */
     csrNeighborRoamResetConnectedStateControlInfo(pMac);
@@ -2955,17 +2932,11 @@ void csrNeighborRoamEmptyScanRefreshTimerCallback(void *context)
 ---------------------------------------------------------------------------*/
 void csrNeighborRoamResultsRefreshTimerCallback(void *context)
 {
-    tpAniSirGlobal pMac = PMAC_STRUCT( context );
+    tCsrTimerInfo *pInfo = (tCsrTimerInfo *)context;
+    tpAniSirGlobal pMac = pInfo->pMac;
     VOS_STATUS     vosStatus = VOS_STATUS_SUCCESS;
-    tpCsrNeighborRoamControlInfo  pNeighborRoamInfo;
-
-    if(!pMac)
-    {
-        VOS_TRACE (VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, FL("pMac is Null"));
-        return;
-    }
-    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
-
+    tpCsrNeighborRoamControlInfo    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
+     
     NEIGHBOR_ROAM_DEBUG(pMac, LOG2, FL("Deregistering DOWN event reassoc callback with TL. RSSI = %d"), pNeighborRoamInfo->cfgParams.neighborReassocThreshold * (-1));
 
     /* Deregister reassoc callback. Ignore return status */
@@ -3026,15 +2997,10 @@ void csrNeighborRoamResultsRefreshTimerCallback(void *context)
 
 void csrForcedInitialRoamTo5GHTimerCallback(void *context)
 {
-    tpAniSirGlobal pMac = PMAC_STRUCT( context );
+    tCsrTimerInfo  *pInfo = (tCsrTimerInfo *)context;
+    tpAniSirGlobal pMac = pInfo->pMac;
     eHalStatus status = eHAL_STATUS_SUCCESS;
-    tpCsrNeighborRoamControlInfo  pNeighborRoamInfo;
-    if(!pMac)
-    {
-        VOS_TRACE (VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, FL("pMac is Null"));
-        return;
-    }
-    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
+    tpCsrNeighborRoamControlInfo    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
 
     NEIGHBOR_ROAM_DEBUG(pMac, LOGE, FL("forcedInitialRoamTo5GHTimer timer expired"));
 
@@ -3057,25 +3023,29 @@ void csrForcedInitialRoamTo5GHTimerCallback(void *context)
         return;
     }
 
-    pNeighborRoamInfo->scanRequestTimeStamp = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
-    /*
-     * We are about to start a fresh scan cycle for all valid channles for 5Ghz
-     * purge non-P2P results from the past for 5Ghz band
-     */
-    csrScanFlushSelectiveResultForBand(pMac, VOS_FALSE, SIR_BAND_5_GHZ);
-    status = csrNeighborRoamScanForInitialForced5GRoaming(
-                 pMac, pNeighborRoamInfo->csrSessionId);
-    if(status != eHAL_STATUS_SUCCESS)
+    //keep track this scan & roam is due to Forced initial roam to 5GHz
+    pNeighborRoamInfo->isForcedInitialRoamTo5GH = 1;
+
+    //keep firmware shut-up for any roaming related scan during
+    //this tenure.
+    status = csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_STOP,
+                                REASON_INITIAL_FORCED_ROAM_TO_5G);
+    if (eHAL_STATUS_SUCCESS != status)
     {
-        smsLog(pMac, LOGE,
-               FL("csrNeighborRoamScanForInitialForced5GRoaming failed status=%d"), status);
-        //Send RSO start because in case 5G roaming host have not enabled at initial connection
-        csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_START, REASON_CONNECT);
+        smsLog(pMac, LOGE, FL("csrRoamOffloadScan stop scan cmd got failed status = %d"), status);
         return;
     }
 
-    /* Transition to CFG_CHAN_LIST_SCAN */
-    CSR_NEIGHBOR_ROAM_STATE_TRANSITION(eCSR_NEIGHBOR_ROAM_STATE_CFG_CHAN_LIST_SCAN);
+    // MUKUL TODO: whatever we are doing should we need to move
+    // it after offload scan response comes from firmware ???
+    status = csrNeighborRoamTransitToCFGChanScan(pMac);
+    if (eHAL_STATUS_SUCCESS != status)
+    {
+        smsLog(pMac, LOGE,
+               FL("csrNeighborRoamTransitToCFGChanScan failed status=%d"), status);
+         //restart scan offload to firmware
+         csrNeighborRoamStartLfrScan(pMac, REASON_INITIAL_FORCED_ROAM_TO_5G);
+    }
 }
 
 #if defined WLAN_FEATURE_VOWIFI_11R && defined WLAN_FEATURE_VOWIFI
@@ -3813,8 +3783,24 @@ VOS_STATUS csrNeighborRoamTransitToCFGChanScan(tpAniSirGlobal pMac)
             vos_mem_copy(currChannelListInfo->ChannelList,
                   scanChannelList, outputNumOfChannels * sizeof(tANI_U8));
         } 
+        else if(pNeighborRoamInfo->isForcedInitialRoamTo5GH)
+        {
+            NEIGHBOR_ROAM_DEBUG(pMac, LOG1, "Forced roam to 5G cfg chain list");
 
+            pNeighborRoamInfo->scanRequestTimeStamp = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
+            /* We are about to start a fresh scan cycle for all valid channles for 5Ghz
+                    * purge non-P2P results from the past for 5Ghz band */
+            csrScanFlushSelectiveResultForBand(pMac, VOS_FALSE, SIR_BAND_5_GHZ);
 
+            status = csrNeighborRoamScanForInitialForced5GRoaming(pMac, sessionId);
+            if(status != eHAL_STATUS_SUCCESS)
+                return VOS_STATUS_E_FAILURE;
+
+            /* Transition to CFG_CHAN_LIST_SCAN */
+            CSR_NEIGHBOR_ROAM_STATE_TRANSITION(eCSR_NEIGHBOR_ROAM_STATE_CFG_CHAN_LIST_SCAN);
+
+            return VOS_STATUS_SUCCESS;
+        }
 #ifdef FEATURE_WLAN_LFR
         else if ((pNeighborRoamInfo->uScanMode == DEFAULT_SCAN) &&
                  (abs(pNeighborRoamInfo->lookupDOWNRssi) >
@@ -4548,6 +4534,8 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac, tANI_U8 sessionId
             vos_mem_copy(pNeighborRoamInfo->currAPbssid, 
                         pMac->roam.roamSession[sessionId].connectedProfile.bssid, sizeof(tCsrBssid));
             pNeighborRoamInfo->currAPoperationChannel = pMac->roam.roamSession[sessionId].connectedProfile.operationChannel;
+            pNeighborRoamInfo->neighborScanTimerInfo.pMac = pMac;
+            pNeighborRoamInfo->neighborScanTimerInfo.sessionId = sessionId;
             pNeighborRoamInfo->currentNeighborLookupThreshold =
                 pNeighborRoamInfo->cfgParams.neighborLookupThreshold;
 #ifdef FEATURE_WLAN_LFR
@@ -4614,21 +4602,6 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac, tANI_U8 sessionId
                  if(csrRoamIsStaMode(pMac, sessionId))
                  {
                      pNeighborRoamInfo->uOsRequestedHandoff = 0;
-                     pNeighborRoamInfo->isForcedInitialRoamTo5GH = 0;
-                     if(pNeighborRoamInfo->cfgParams.neighborInitialForcedRoamTo5GhEnable &&
-                       (GetRFBand(pNeighborRoamInfo->currAPoperationChannel) ==
-                        SIR_BAND_2_4_GHZ))
-                     {
-                         /*
-                          * Keep 5G and Fwr roaming mutually exclusive so do not
-                          * send RSO start Note we have to send RSO start in all
-                          * errro case.
-                          */
-                         smsLog(pMac, LOG1,
-                                FL("Do not send RSO start"
-                                   "because 5G force roaming is enabled"));
-                         break;
-                     }
                      csrRoamOffloadScan(pMac, ROAM_SCAN_OFFLOAD_START, REASON_CONNECT);
                  }
               } else {
@@ -4786,8 +4759,10 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
 #endif
     pNeighborRoamInfo->scanRspPending = eANI_BOOLEAN_FALSE;
 
+    pNeighborRoamInfo->neighborScanTimerInfo.pMac = pMac;
+    pNeighborRoamInfo->neighborScanTimerInfo.sessionId = CSR_SESSION_ID_INVALID;
     status = vos_timer_init(&pNeighborRoamInfo->neighborScanTimer, VOS_TIMER_TYPE_SW,
-                    csrNeighborRoamNeighborScanTimerCallback, (void *)pMac);
+                    csrNeighborRoamNeighborScanTimerCallback, (void *)&pNeighborRoamInfo->neighborScanTimerInfo);
 
     if (eHAL_STATUS_SUCCESS != status)
     {
@@ -4798,7 +4773,7 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
     }
 
     status = vos_timer_init(&pNeighborRoamInfo->neighborResultsRefreshTimer, VOS_TIMER_TYPE_SW,
-                    csrNeighborRoamResultsRefreshTimerCallback, (void *)pMac);
+                    csrNeighborRoamResultsRefreshTimerCallback, (void *)&pNeighborRoamInfo->neighborScanTimerInfo);
 
     if (eHAL_STATUS_SUCCESS != status)
     {
@@ -4811,7 +4786,7 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
 
     status = vos_timer_init(&pNeighborRoamInfo->emptyScanRefreshTimer, VOS_TIMER_TYPE_SW,
                 csrNeighborRoamEmptyScanRefreshTimerCallback,
-                (void *)pMac);
+                (void *)&pNeighborRoamInfo->neighborScanTimerInfo);
 
     if (eHAL_STATUS_SUCCESS != status)
     {
@@ -4824,7 +4799,7 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
     }
 
     status = vos_timer_init(&pNeighborRoamInfo->forcedInitialRoamTo5GHTimer, VOS_TIMER_TYPE_SW,
-                csrForcedInitialRoamTo5GHTimerCallback, (void *)pMac);
+                csrForcedInitialRoamTo5GHTimerCallback, (void *)&pNeighborRoamInfo->neighborScanTimerInfo);
 
     if (eHAL_STATUS_SUCCESS != status)
     {
@@ -4905,6 +4880,8 @@ void csrNeighborRoamClose(tpAniSirGlobal pMac)
    
     pNeighborRoamInfo->cfgParams.channelInfo.ChannelList = NULL;
     
+    pNeighborRoamInfo->neighborScanTimerInfo.pMac = NULL;
+    pNeighborRoamInfo->neighborScanTimerInfo.sessionId = CSR_SESSION_ID_INVALID;
     vos_timer_destroy(&pNeighborRoamInfo->neighborScanTimer);
     vos_timer_destroy(&pNeighborRoamInfo->neighborResultsRefreshTimer);
     vos_timer_destroy(&pNeighborRoamInfo->emptyScanRefreshTimer);

@@ -948,23 +948,6 @@ limProcessMlmReassocCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         psessionEntry->pLimReAssocReq = NULL;
     }
 
-    /* Upon Reassoc success or failure, freeup the cached
-     * preauth request, to ensure that channel switch is now
-     * allowed following any change in HT params.
-     */
-    if (pMac->ft.ftPEContext.pFTPreAuthReq)
-    {
-        limLog(pMac, LOG1, "%s: Freeing pFTPreAuthReq= %p", __func__,
-               pMac->ft.ftPEContext.pFTPreAuthReq);
-        if (pMac->ft.ftPEContext.pFTPreAuthReq->pbssDescription)
-        {
-            vos_mem_free(pMac->ft.ftPEContext.pFTPreAuthReq->pbssDescription);
-            pMac->ft.ftPEContext.pFTPreAuthReq->pbssDescription = NULL;
-        }
-        vos_mem_free(pMac->ft.ftPEContext.pFTPreAuthReq);
-        pMac->ft.ftPEContext.pFTPreAuthReq = NULL;
-    }
-
     PELOGE(limLog(pMac, LOG1, FL("Rcv MLM_REASSOC_CNF with result code %d"), pLimMlmReassocCnf->resultCode);)
     if (pLimMlmReassocCnf->resultCode == eSIR_SME_SUCCESS) {
         // Successful Reassociation
@@ -2554,7 +2537,7 @@ limProcessApMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ)
     mlmStartCnf.sessionId = pAddBssParams->sessionId;
     if( eHAL_STATUS_SUCCESS == pAddBssParams->status )
     {
-        limLog(pMac, LOG1, FL("WDA_ADD_BSS_RSP returned with eHAL_STATUS_SUCCESS"));
+        PELOG2(limLog(pMac, LOG2, FL("WDA_ADD_BSS_RSP returned with eHAL_STATUS_SUCCESS"));)
         if (limSetLinkState(pMac, eSIR_LINK_AP_STATE,psessionEntry->bssId,
               psessionEntry->selfMacAddr, NULL, NULL) != eSIR_SUCCESS )
             goto end;
@@ -3476,43 +3459,48 @@ void limProcessMlmSetStaKeyRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ )
 }
 void limProcessMlmSetBssKeyRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ )
 {
+    tANI_U8 respReqd = 1;
     tLimMlmSetKeysCnf mlmSetKeysCnf;
     tANI_U16          resultCode;
     tANI_U8           sessionId = 0;
     tpPESession  psessionEntry;
-    tpLimMlmSetKeysReq lpLimMlmSetKeysReq;
-
     SET_LIM_PROCESS_DEFD_MESGS(pMac, true);
     vos_mem_set((void *)&mlmSetKeysCnf, sizeof( tLimMlmSetKeysCnf ), 0);
-    if ( NULL == limMsgQ->bodyptr )
+   //BTAMP
+    if( NULL == limMsgQ->bodyptr )
     {
         PELOGE(limLog(pMac, LOGE,FL("limMsgQ bodyptr is null"));)
         return;
     }
     sessionId = ((tpSetBssKeyParams) limMsgQ->bodyptr)->sessionId;
-    if ((psessionEntry = peFindSessionBySessionId(pMac, sessionId))== NULL)
+    if((psessionEntry = peFindSessionBySessionId(pMac, sessionId))== NULL)
     {
-        limLog(pMac, LOGE,FL("session does not exist for sessionId %d"),
-                                                                 sessionId);
+        PELOGE(limLog(pMac, LOGE,FL("session does not exist for given sessionId"));)
         vos_mem_zero(limMsgQ->bodyptr, sizeof(tSetBssKeyParams));
         vos_mem_free( limMsgQ->bodyptr );
         limMsgQ->bodyptr = NULL;
         return;
     }
-    if ( eLIM_MLM_WT_SET_BSS_KEY_STATE == psessionEntry->limMlmState )
+    if( eLIM_MLM_WT_SET_BSS_KEY_STATE == psessionEntry->limMlmState )
         resultCode = (tANI_U16) (((tpSetBssKeyParams) limMsgQ->bodyptr)->status);
     else
-        /* BCAST key also uses tpSetStaKeyParams. Done this way for readabilty */
-        resultCode = (tANI_U16) (((tpSetStaKeyParams) limMsgQ->bodyptr)->status);
+        resultCode = (tANI_U16) (((tpSetStaKeyParams) limMsgQ->bodyptr)->status); //BCAST key also uses tpSetStaKeyParams. Done this way for readabilty.
 
+    //
+    // TODO & FIXME_GEN4
+    // Need to inspect tSirMsgQ.reserved for a valid Dialog token!
+    //
+  // Validate SME/LIM state - Read the above "ASSUMPTIONS"
+  //if( eLIM_SME_LINK_EST_STATE == pMac->lim.gLimSmeState )
+  //{
+    // Validate MLME state
     if( eLIM_MLM_WT_SET_BSS_KEY_STATE != psessionEntry->limMlmState &&
         eLIM_MLM_WT_SET_STA_BCASTKEY_STATE != psessionEntry->limMlmState )
     {
-        /* Mesg received from HAL in Invalid state! */
-        limLog( pMac, LOGW,
-                 FL( "Received unexpected [Mesg Id - %d] in state %d" ),
-                 limMsgQ->type, psessionEntry->limMlmState );
-        mlmSetKeysCnf.resultCode = eSIR_SME_INVALID_STATE;
+        // Mesg received from HAL in Invalid state!
+        limLog( pMac, LOGW, FL( "Received unexpected [Mesg Id - %d] in state %d" ), limMsgQ->type, psessionEntry->limMlmState );
+        // There's not much that MLME can do at this stage...
+        respReqd = 0;
     }
     else
       mlmSetKeysCnf.resultCode = resultCode;
@@ -3523,24 +3511,26 @@ void limProcessMlmSetBssKeyRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ )
     // Restore MLME state
     psessionEntry->limMlmState = psessionEntry->limPrevMlmState;
 
-    MTRACE(macTrace(pMac, TRACE_CODE_MLM_STATE,
-           psessionEntry->peSessionId, psessionEntry->limMlmState));
-    lpLimMlmSetKeysReq = (tpLimMlmSetKeysReq) pMac->lim.gpLimMlmSetKeysReq;
-    mlmSetKeysCnf.sessionId = sessionId;
-
-    /* Prepare and Send LIM_MLM_SETKEYS_CNF */
-    if( NULL != lpLimMlmSetKeysReq )
+    MTRACE(macTrace(pMac, TRACE_CODE_MLM_STATE, psessionEntry->peSessionId, psessionEntry->limMlmState));
+    if( respReqd )
     {
-        vos_mem_copy((tANI_U8 *) &mlmSetKeysCnf.peerMacAddr,
-                     (tANI_U8 *) lpLimMlmSetKeysReq->peerMacAddr,
-                      sizeof(tSirMacAddr));
-        /* Free the buffer cached for the global pMac->lim.gpLimMlmSetKeysReq */
-        vos_mem_zero(pMac->lim.gpLimMlmSetKeysReq,
-                        sizeof(tLimMlmSetKeysReq));
-        vos_mem_free(pMac->lim.gpLimMlmSetKeysReq);
-        pMac->lim.gpLimMlmSetKeysReq = NULL;
+        tpLimMlmSetKeysReq lpLimMlmSetKeysReq = (tpLimMlmSetKeysReq) pMac->lim.gpLimMlmSetKeysReq;
+        mlmSetKeysCnf.sessionId = sessionId;
+
+        // Prepare and Send LIM_MLM_SETKEYS_CNF
+        if( NULL != lpLimMlmSetKeysReq )
+        {
+            vos_mem_copy((tANI_U8 *) &mlmSetKeysCnf.peerMacAddr,
+                         (tANI_U8 *) lpLimMlmSetKeysReq->peerMacAddr,
+                         sizeof(tSirMacAddr));
+            // Free the buffer cached for the global pMac->lim.gpLimMlmSetKeysReq
+            vos_mem_zero(pMac->lim.gpLimMlmSetKeysReq,
+                          sizeof(tLimMlmSetKeysReq));
+            vos_mem_free(pMac->lim.gpLimMlmSetKeysReq);
+            pMac->lim.gpLimMlmSetKeysReq = NULL;
+        }
+        limPostSmeMessage(pMac, LIM_MLM_SETKEYS_CNF, (tANI_U32 *) &mlmSetKeysCnf);
     }
-    limPostSmeMessage(pMac, LIM_MLM_SETKEYS_CNF, (tANI_U32 *) &mlmSetKeysCnf);
 }
 /**
  * limProcessMlmRemoveKeyRsp()

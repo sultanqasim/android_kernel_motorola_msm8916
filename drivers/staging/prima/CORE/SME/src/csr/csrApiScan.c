@@ -2056,35 +2056,6 @@ static void csrScanAddToOccupiedChannels(
         } 
     }
 }
-
-void csrAddChannelToOccupiedChannelList(tpAniSirGlobal pMac,
-                                     tANI_U8   channel)
-{
-    eHalStatus status;
-    tCsrChannel *pOccupiedChannels = &pMac->scan.occupiedChannels;
-    tANI_U8 numOccupiedChannels = pOccupiedChannels->numChannels;
-    tANI_U8 *pOccupiedChannelList = pOccupiedChannels->channelList;
-    if (!csrIsChannelPresentInList(pOccupiedChannelList,
-         numOccupiedChannels, channel))
-    {
-        status = csrAddToChannelListFront(pOccupiedChannelList,
-                                          numOccupiedChannels, channel);
-        if(HAL_STATUS_SUCCESS(status))
-        {
-            pOccupiedChannels->numChannels++;
-            smsLog(pMac, LOG2, FL("added channel %d to the list (count=%d)"),
-                channel, pOccupiedChannels->numChannels);
-            if (pOccupiedChannels->numChannels >
-                CSR_BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN)
-            {
-                pOccupiedChannels->numChannels =
-                    CSR_BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN;
-                smsLog(pMac, LOG2,
-                       FL("trim no of Channels for Occ channel list"));
-            }
-        }
-    }
-}
 #endif
 
 //Put the BSS into the scan result list
@@ -5426,28 +5397,6 @@ eHalStatus csrScanAgeResults(tpAniSirGlobal pMac, tSmeGetScanChnRsp *pScanChnInf
     return (status);
 }
 
-eHalStatus csrIbssAgeBss(tpAniSirGlobal pMac)
-{
-    eHalStatus status = eHAL_STATUS_SUCCESS;
-    tListElem *pEntry, *tmpEntry;
-    tCsrScanResult *pResult;
-
-    csrLLLock(&pMac->scan.scanResultList);
-    pEntry = csrLLPeekHead( &pMac->scan.scanResultList, LL_ACCESS_NOLOCK );
-    while( pEntry )
-    {
-       tmpEntry = csrLLNext(&pMac->scan.scanResultList,
-                                             pEntry, LL_ACCESS_NOLOCK);
-       pResult = GET_BASE_ADDR( pEntry, tCsrScanResult, Link );
-
-       smsLog(pMac, LOGW, FL(" age out due Forced IBSS leave"));
-       csrScanAgeOutBss(pMac, pResult);
-       pEntry = tmpEntry;
-    }
-    csrLLUnlock(&pMac->scan.scanResultList);
-
-    return (status);
-}
 
 eHalStatus csrSendMBScanReq( tpAniSirGlobal pMac, tANI_U16 sessionId, 
                     tCsrScanRequest *pScanReq, tScanReqParam *pScanReqParam )

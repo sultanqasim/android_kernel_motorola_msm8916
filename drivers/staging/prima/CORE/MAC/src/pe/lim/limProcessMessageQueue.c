@@ -358,8 +358,8 @@ static void limHandleUnknownA2IndexFrames(tpAniSirGlobal pMac, void *pRxPacketIn
 
         if (limIsGroupAddr(pMacHdr->addr2))
         {
-            limLog(pMac, LOG1, FL("Ignoring A2 Invalid Packet received for MC/BC:"));
-                    limPrintMacAddr(pMac, pMacHdr->addr2, LOG1);
+            PELOG2(limLog(pMac, LOG2, FL("Ignoring A2 Invalid Packet received for MC/BC:"));
+                    limPrintMacAddr(pMac, pMacHdr->addr2, LOG2);)
 
                 return;
         }
@@ -1086,7 +1086,7 @@ limProcessAbortScanInd(tpAniSirGlobal pMac, tANI_U8 SessionId)
      * SME should send WNI_CFG_BACKGROUND_SCAN_PERIOD indication 
      * to start the background scan again
      */
-    limLog(pMac, LOG1, FL("Processing AbortScan Ind"));
+    PELOG2(limLog(pMac, LOG2, FL("Processing AbortScan Ind"));)
 
     limAbortBackgroundScan(pMac);
 
@@ -1821,7 +1821,6 @@ limProcessMessages(tpAniSirGlobal pMac, tpSirMsgQ  limMsg)
         case SIR_LIM_DISASSOC_ACK_TIMEOUT:
         case SIR_LIM_DEAUTH_ACK_TIMEOUT:
         case SIR_LIM_CONVERT_ACTIVE_CHANNEL_TO_PASSIVE:
-        case SIR_LIM_AUTH_RETRY_TIMEOUT:
             // These timeout messages are handled by MLM sub module
 
             limProcessMlmReqMessages(pMac,

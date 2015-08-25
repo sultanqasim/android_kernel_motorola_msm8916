@@ -295,8 +295,6 @@ void csrRemoveScanForSSIDFromPendingList(tpAniSirGlobal pMac, tDblLinkList *pLis
 //The BSS is remove if the count reaches 0.
 eHalStatus csrScanAgeResults(tpAniSirGlobal pMac, tSmeGetScanChnRsp *pScanChnInfo);
 
-eHalStatus csrIbssAgeBss(tpAniSirGlobal pMac);
-
 //If fForce is TRUE we will save the new String that is learn't.
 //Typically it will be true in case of Join or user initiated ioctl
 tANI_BOOLEAN csrLearnCountryInformation( tpAniSirGlobal pMac, tSirBssDescription *pSirBssDesc,
@@ -475,15 +473,6 @@ eHalStatus csrScanBGScanAbort(tpAniSirGlobal);
   -------------------------------------------------------------------------------*/
 eHalStatus csrScanGetResult(tpAniSirGlobal, tCsrScanResultFilter *pFilter, tScanResultHandle *phResult);
 
-#ifdef FEATURE_WLAN_LFR
-/* ---------------------------------------------------------------------------
-    \fn csrAddChannelToOccupiedChannelList
-    \brief Add channel no given by fast reassoc cmd into occ chn list
-    \param channel - channel no passed by fast reassoc cmd
-    \return void
-  -------------------------------------------------------------------------------*/
-void csrAddChannelToOccupiedChannelList(tpAniSirGlobal pMac, tANI_U8 channel);
-#endif
 /* ---------------------------------------------------------------------------
     \fn csrScanFlushResult
     \brief Clear scan results.

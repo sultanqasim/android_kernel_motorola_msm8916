@@ -109,8 +109,6 @@
 #define WLAN_WAIT_TIME_POWER       800
 #define WLAN_WAIT_TIME_COUNTRY     1000
 #define WLAN_WAIT_TIME_CHANNEL_UPDATE   600
-#define FW_STATE_WAIT_TIME 500
-#define FW_STATE_RSP_LEN 100
 /* Amount of time to wait for sme close session callback.
    This value should be larger than the timeout used by WDI to wait for
    a response from WCNSS */
@@ -282,7 +280,6 @@ extern spinlock_t hdd_context_lock;
 #define POWER_CONTEXT_MAGIC 0x504F5752   //POWR
 #define SNR_CONTEXT_MAGIC   0x534E5200   //SNR
 #define BCN_MISS_RATE_CONTEXT_MAGIC 0x513F5753
-#define FW_STATS_CONTEXT_MAGIC  0x5022474E //FW STATS
 
 /*
  * Driver miracast parameters 0-Disabled
@@ -872,33 +869,6 @@ typedef enum
 
 #endif
 
-typedef enum
-{
-   FW_UBSP_STATS = 1,
-   FW_STATS_MAX,
-}hddFwStatsType;
-
-typedef struct
-{
-   struct completion completion;
-   tANI_U32 magic;
-   hdd_adapter_t *pAdapter;
-}fwStatsContext_t;
-
-typedef struct
-{
-   tANI_U32 ubsp_enter_cnt;
-   tANI_U32 ubsp_jump_ddr_cnt;
-}hddUbspFwStats;
-
-typedef struct
-{
-   hddFwStatsType type;
-   /*data*/
-   union{
-     hddUbspFwStats ubspStats;
-   }hddFwStatsData;
-}fwStatsResult_t;
 
 #define WLAN_HDD_ADAPTER_MAGIC 0x574c414e //ASCII "WLAN"
 
@@ -1102,13 +1072,6 @@ struct hdd_adapter_s
    sme_QosWmmUpType hddWmmDscpToUpMap[WLAN_HDD_MAX_DSCP+1];
    /* Lock for active sessions while processing deauth/Disassoc */
    spinlock_t lock_for_active_session;
-   fwStatsResult_t  fwStatsRsp;
-
-   /* Time stamp for last completed RoC request */
-   v_TIME_t lastRocTs;
-
-   /* work queue to defer the back to back p2p_listen */
-   struct delayed_work roc_work;
    /* Time stamp for start RoC request */
    v_TIME_t startRocTs;
 };
@@ -1386,8 +1349,6 @@ struct hdd_context_s
      * IP
      */
     struct notifier_block ipv4_notifier;
-    //Lock to avoid race condition during wmm operations
-    struct mutex   wmmLock;
 };
 
 
@@ -1438,7 +1399,7 @@ hdd_adapter_t * hdd_get_adapter_by_macaddr( hdd_context_t *pHddCtx, tSirMacAddr 
 hdd_adapter_t * hdd_get_mon_adapter( hdd_context_t *pHddCtx );
 VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter );
 hdd_adapter_t * hdd_get_adapter( hdd_context_t *pHddCtx, device_mode_t mode );
-void hdd_deinit_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter, tANI_U8 rtnl_held );
+void hdd_deinit_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter );
 VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
                              const v_BOOL_t bCloseSession );
 void hdd_set_station_ops( struct net_device *pWlanDev );
@@ -1552,6 +1513,6 @@ VOS_STATUS wlan_hdd_init_channels_for_cc(hdd_context_t *pHddCtx,  driver_load_ty
 #endif
 
 VOS_STATUS wlan_hdd_cancel_remain_on_channel(hdd_context_t *pHddCtx);
-hdd_remain_on_chan_ctx_t *hdd_get_remain_on_channel_ctx(hdd_context_t *pHddCtx);
 
+void hdd_nullify_netdev_ops(hdd_context_t *pHddCtx);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

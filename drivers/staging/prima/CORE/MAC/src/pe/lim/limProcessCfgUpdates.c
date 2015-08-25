@@ -649,7 +649,7 @@ limApplyConfiguration(tpAniSirGlobal pMac,tpPESession psessionEntry)
 {
     tANI_U32          val=0, phyMode;
 
-    limLog(pMac, LOG1, FL("Applying config"));
+    PELOG2(limLog(pMac, LOG2, FL("Applying config"));)
 
     limInitWdsInfoParams(pMac);
 

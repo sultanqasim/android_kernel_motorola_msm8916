@@ -1063,7 +1063,6 @@ tSirRetStatus peOpen(tpAniSirGlobal pMac, tMacOpenParameters *pMacOpenParam)
     }
     pMac->lim.deauthMsgCnt = 0;
     pMac->lim.retryPacketCnt = 0;
-    pMac->lim.gLimIbssRetryCnt = 0;
 
     /*
      * peOpen is successful by now, so it is right time to initialize
@@ -1245,7 +1244,6 @@ tANI_U8 limIsTimerAllowedInPowerSaveState(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
             case SIR_LIM_ASSOC_FAIL_TIMEOUT:
             case SIR_LIM_AUTH_FAIL_TIMEOUT:
             case SIR_LIM_ADDTS_RSP_TIMEOUT:
-            case SIR_LIM_AUTH_RETRY_TIMEOUT:
                 retStatus = TRUE;
                 break;
 

@@ -454,7 +454,7 @@ err_deep_sleep:
 
 }
 
-void __hdd_ipv6_notifier_work_queue(struct work_struct *work)
+void hdd_ipv6_notifier_work_queue(struct work_struct *work)
 {
     hdd_adapter_t* pAdapter =
              container_of(work, hdd_adapter_t, ipv6NotifierWorkQueue);
@@ -462,17 +462,12 @@ void __hdd_ipv6_notifier_work_queue(struct work_struct *work)
     int status;
 
     hddLog(LOG1, FL("Reconfiguring NS Offload"));
-    if (NULL == pAdapter)
-    {
-        hddLog(LOGE, FL("Adapter is invalid"));
-        return;
-    }
 
     pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     status = wlan_hdd_validate_context(pHddCtx);
     if (0 != status)
     {
-        hddLog(LOGE, FL("HDD context is invalid, status = %d"), status);
+        hddLog(LOGE, FL("HDD context is invalid"));
         return;
     }
 
@@ -509,12 +504,7 @@ void __hdd_ipv6_notifier_work_queue(struct work_struct *work)
 
 }
 
-void hdd_ipv6_notifier_work_queue(struct work_struct *work)
-{
-     vos_ssr_protect(__func__);
-     __hdd_ipv6_notifier_work_queue(work);
-     vos_ssr_unprotect(__func__);
-}
+
 int wlan_hdd_ipv6_changed(struct notifier_block *nb,
                             unsigned long data, void *arg)
 {
@@ -943,7 +933,7 @@ end:
 }
 #endif
 
-void __hdd_ipv4_notifier_work_queue(struct work_struct *work)
+void hdd_ipv4_notifier_work_queue(struct work_struct *work)
 {
     hdd_adapter_t* pAdapter =
              container_of(work, hdd_adapter_t, ipv4NotifierWorkQueue);
@@ -951,16 +941,11 @@ void __hdd_ipv4_notifier_work_queue(struct work_struct *work)
     int status;
 
     hddLog(LOG1, FL("Reconfiguring ARP Offload"));
-    if (NULL == pAdapter)
-    {
-        hddLog(LOGE, FL("Adapter is invalid"));
-        return;
-    }
     pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     status = wlan_hdd_validate_context(pHddCtx);
     if (0 != status)
     {
-        hddLog(LOGE, FL("HDD context is invalid, status = %d"), status);
+        hddLog(LOGE, FL("HDD context is invalid"));
         return;
     }
 
@@ -982,13 +967,6 @@ void __hdd_ipv4_notifier_work_queue(struct work_struct *work)
         // of IPv4 notifier again.
         hdd_conf_arp_offload(pAdapter, 2);
     }
-}
-
-void hdd_ipv4_notifier_work_queue(struct work_struct *work)
-{
-    vos_ssr_protect(__func__);
-    __hdd_ipv4_notifier_work_queue(work);
-    vos_ssr_unprotect(__func__);
 }
 
 int wlan_hdd_ipv4_changed(struct notifier_block *nb,

@@ -2202,7 +2202,7 @@ VOS_STATUS vos_wlanRestart(void)
 v_VOID_t vos_fwDumpReq(tANI_U32 cmd, tANI_U32 arg1, tANI_U32 arg2,
                         tANI_U32 arg3, tANI_U32 arg4, tANI_U8 async)
 {
-   WDA_HALDumpCmdReq(NULL, cmd, arg1, arg2, arg3, arg4, NULL, async);
+   WDA_HALDumpCmdReq(NULL, cmd, arg1, arg2, arg3, arg4, NULL, 0);
 }
 
 v_U64_t vos_get_monotonic_boottime(void)
@@ -2258,31 +2258,3 @@ v_BOOL_t vos_is_wlan_in_badState(VOS_MODULE_ID moduleId,
     }
     return pVosWDCtx->isFatalError;
 }
-
-/**
- * vos_isLoadUnloadInProgress()
- *
- * Return TRUE if load/unload is in progress.
- *
- */
-v_BOOL_t vos_isLoadUnloadInProgress(void)
-{
-    hdd_context_t *pHddCtx = NULL;
-    v_CONTEXT_t pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
-
-    if(!pVosContext)
-    {
-       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Global VOS context is Null", __func__);
-       return FALSE;
-    }
-
-    pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext );
-    if(!pHddCtx) {
-       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-                "%s: HDD context is Null", __func__);
-       return FALSE;
-    }
-
-    return ( 0 != pHddCtx->isLoadUnloadInProgress);
-}
-
