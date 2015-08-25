@@ -1952,8 +1952,6 @@ v_VOID_t hdd_wmm_classify_pkt ( hdd_adapter_t* pAdapter,
       }
       else
       {
-          v_BOOL_t toggleArpBDRates =
-                        (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->toggleArpBDRates;
           // default
 #ifdef HDD_WMM_DEBUG
           VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_WARN,
@@ -1963,11 +1961,6 @@ v_VOID_t hdd_wmm_classify_pkt ( hdd_adapter_t* pAdapter,
           //Give the highest priority to 802.1x packet
           if (pHdr->eth_II.h_proto == htons(HDD_ETHERTYPE_802_1_X))
               tos = 0xC0;
-          else if (TRUE == toggleArpBDRates &&
-                   pHdr->eth_II.h_proto == htons(HDD_ETHERTYPE_ARP))
-          {
-              tos = TID3;
-          }
           else
               tos = 0;
       }
@@ -2121,7 +2114,7 @@ v_U16_t hdd_wmm_select_queue(struct net_device * dev, struct sk_buff *skb)
    v_USHORT_t queueIndex;
    hdd_adapter_t *pAdapter =  WLAN_HDD_GET_PRIV_PTR(dev);
 
-   if (isWDresetInProgress()) {
+   if (vos_is_logp_in_progress(VOS_MODULE_ID_HDD, NULL)) {
        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
                   FL("called during WDReset"));
        skb->priority = SME_QOS_WMM_UP_BE;

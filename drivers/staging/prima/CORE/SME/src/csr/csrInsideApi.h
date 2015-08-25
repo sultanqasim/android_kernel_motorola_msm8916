@@ -386,7 +386,6 @@ eCsrCfgDot11Mode csrGetCfgDot11ModeFromCsrPhyMode(tCsrRoamProfile *pProfile, eCs
 tANI_U32 csrTranslateToWNICfgDot11Mode(tpAniSirGlobal pMac, eCsrCfgDot11Mode csrDot11Mode);
 void csrSaveChannelPowerForBand( tpAniSirGlobal pMac, tANI_BOOLEAN fPopulate5GBand );
 void csrApplyChannelPowerCountryInfo( tpAniSirGlobal pMac, tCsrChannel *pChannelList, tANI_U8 *countryCode, tANI_BOOLEAN updateRiva);
-void csrUpdateFCCChannelList(tpAniSirGlobal pMac);
 void csrApplyPower2Current( tpAniSirGlobal pMac );
 void csrAssignRssiForCategory(tpAniSirGlobal pMac, tANI_S8 bestApRssi, tANI_U8 catOffset);
 tANI_BOOLEAN csrIsMacAddressZero( tpAniSirGlobal pMac, tCsrBssid *pMacAddr );
@@ -476,6 +475,15 @@ eHalStatus csrScanBGScanAbort(tpAniSirGlobal);
   -------------------------------------------------------------------------------*/
 eHalStatus csrScanGetResult(tpAniSirGlobal, tCsrScanResultFilter *pFilter, tScanResultHandle *phResult);
 
+#ifdef FEATURE_WLAN_LFR
+/* ---------------------------------------------------------------------------
+    \fn csrAddChannelToOccupiedChannelList
+    \brief Add channel no given by fast reassoc cmd into occ chn list
+    \param channel - channel no passed by fast reassoc cmd
+    \return void
+  -------------------------------------------------------------------------------*/
+void csrAddChannelToOccupiedChannelList(tpAniSirGlobal pMac, tANI_U8 channel);
+#endif
 /* ---------------------------------------------------------------------------
     \fn csrScanFlushResult
     \brief Clear scan results.
@@ -489,14 +497,6 @@ eHalStatus csrScanFlushResult(tpAniSirGlobal);
  *-------------------------------------------------------------------------------
  */
 eHalStatus csrScanFilterResults(tpAniSirGlobal pMac);
-
-/* ---------------------------------------------------------------------------
- *  \fn csrScanFilterDFSResults
- *  \brief Filter BSSIDs on DFS channels from the scan results.
- *  \return eHalStatus
- *-------------------------------------------------------------------------------
- */
-eHalStatus csrScanFilterDFSResults(tpAniSirGlobal pMac);
 
 eHalStatus csrScanFlushSelectiveResult(tpAniSirGlobal, v_BOOL_t flushP2P);
 

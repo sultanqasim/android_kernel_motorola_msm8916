@@ -2861,15 +2861,15 @@ void WLANTL_PostResNeeded(v_PVOID_t pvosGCtx);
 
   DESCRIPTION
      This function is used by HDD to notify TL to finish Upper layer authentication
-     incase the last EAPOL packet is pending in the TL queue. 
-     To avoid the race condition between sme set key and the last EAPOL packet 
+     incase the last EAPOL packet is pending in the TL queue.
+     To avoid the race condition between sme set key and the last EAPOL packet
      the HDD module calls this function just before calling the sme_RoamSetKey.
-   
+
   DEPENDENCIES
 
     TL must have been initialized before this gets called.
 
-   
+
   PARAMETERS
 
    callbackRoutine:   HDD Callback function.
@@ -2878,9 +2878,9 @@ void WLANTL_PostResNeeded(v_PVOID_t pvosGCtx);
   RETURN VALUE
 
    VOS_STATUS_SUCCESS/VOS_STATUS_FAILURE
-   
+
   SIDE EFFECTS
-   
+
 ============================================================================*/
 
 VOS_STATUS WLANTL_Finish_ULA( void (*callbackRoutine) (void *callbackContext),

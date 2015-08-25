@@ -5745,7 +5745,7 @@ tANI_BOOLEAN csrMatchBSS( tHalHandle hHal, tSirBssDescription *pBssDesc, tCsrSca
             break;
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
-        if (pFilter->MDID.mdiePresent && csrRoamIs11rAssoc(pMac))
+        if (pFilter->MDID.mdiePresent)
         {
             if (pBssDesc->mdiePresent)
             {
@@ -6106,7 +6106,7 @@ void csrReleaseProfile(tpAniSirGlobal pMac, tCsrRoamProfile *pProfile)
 
         if (pProfile->nAddIEScanLength)
         {
-           memset(pProfile->addIEScan, 0 , SIR_MAC_MAX_ADD_IE_LENGTH+2);
+           memset(pProfile->addIEScan, 0 , SIR_MAC_MAX_IE_LENGTH+2);
            pProfile->nAddIEScanLength = 0;
         }
 
