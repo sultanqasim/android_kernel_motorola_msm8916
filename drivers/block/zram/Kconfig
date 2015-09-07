@@ -14,7 +14,6 @@ config ZRAM
 	  disks and maybe many more.
 
 	  See zram.txt for more information.
-	  Project home: <https://compcache.googlecode.com/>
 
 config ZRAM_LZ4_COMPRESS
 	bool "Enable LZ4 algorithm support"
@@ -23,11 +22,8 @@ config ZRAM_LZ4_COMPRESS
 	select LZ4_DECOMPRESS
 	default n
 	help
-	  This option enables LZ4 compression algorithm support, instead
-	  of the default LZO.  LZ4 may be faster on some architectures
-	  compared to LZO compression.
-
-	  See https://code.google.com/p/lz4/ for more information about LZ4.
+	  This option enables LZ4 compression algorithm support. Compression
+	  algorithm can be changed using `comp_algorithm' device attribute.
 
 config ZRAM_DEBUG
 	bool "Compressed RAM block device debug support"
