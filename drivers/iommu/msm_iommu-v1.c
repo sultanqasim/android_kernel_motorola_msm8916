@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -176,6 +176,14 @@ struct iommu_access_ops iommu_access_ops_v1 = {
 	.iommu_lock_release = _iommu_lock_release,
 };
 
+static BLOCKING_NOTIFIER_HEAD(msm_iommu_notifier_list);
+
+void msm_iommu_register_notify(struct notifier_block *nb)
+{
+	blocking_notifier_chain_register(&msm_iommu_notifier_list, nb);
+}
+EXPORT_SYMBOL(msm_iommu_register_notify);
+
 #ifdef CONFIG_MSM_IOMMU_VBIF_CHECK
 
 #define VBIF_XIN_HALT_CTRL0 0x200
@@ -347,34 +355,6 @@ static void __sync_tlb(struct msm_iommu_drvdata *iommu_drvdata, int ctx)
 				(val & CB_TLBSTATUS_SACTIVE) == 0, 5000000);
 	if (res)
 		check_tlb_sync_state(iommu_drvdata, ctx);
-}
-
-static int __flush_iotlb_va(struct iommu_domain *domain, unsigned int va)
-{
-	struct msm_iommu_priv *priv = domain->priv;
-	struct msm_iommu_drvdata *iommu_drvdata;
-	struct msm_iommu_ctx_drvdata *ctx_drvdata;
-	int ret = 0;
-
-	list_for_each_entry(ctx_drvdata, &priv->list_attached, attached_elm) {
-		BUG_ON(!ctx_drvdata->pdev || !ctx_drvdata->pdev->dev.parent);
-
-		iommu_drvdata = dev_get_drvdata(ctx_drvdata->pdev->dev.parent);
-		BUG_ON(!iommu_drvdata);
-
-
-		ret = __enable_clocks(iommu_drvdata);
-		if (ret)
-			goto fail;
-
-		SET_TLBIVA(iommu_drvdata->cb_base, ctx_drvdata->num,
-			   ctx_drvdata->asid | (va & CB_TLBIVA_VA));
-		mb();
-		__sync_tlb(iommu_drvdata, ctx_drvdata->num);
-		__disable_clocks(iommu_drvdata);
-	}
-fail:
-	return ret;
 }
 
 static int __flush_iotlb(struct iommu_domain *domain)
@@ -968,10 +948,6 @@ static int msm_iommu_map(struct iommu_domain *domain, unsigned long va,
 	if (ret)
 		goto fail;
 
-#ifdef CONFIG_MSM_IOMMU_TLBINVAL_ON_MAP
-	ret = __flush_iotlb_va(domain, va);
-#endif
-
 fail:
 	mutex_unlock(&msm_iommu_lock);
 	return ret;
@@ -993,7 +969,7 @@ static size_t msm_iommu_unmap(struct iommu_domain *domain, unsigned long va,
 	if (ret < 0)
 		goto fail;
 
-	ret = __flush_iotlb_va(domain, va);
+	ret = __flush_iotlb(domain);
 
 	msm_iommu_pagetable_free_tables(&priv->pt, va, len);
 fail:
@@ -1022,10 +998,6 @@ static int msm_iommu_map_range(struct iommu_domain *domain, unsigned int va,
 	ret = msm_iommu_pagetable_map_range(&priv->pt, va, sg, len, prot);
 	if (ret)
 		goto fail;
-
-#ifdef CONFIG_MSM_IOMMU_TLBINVAL_ON_MAP
-	__flush_iotlb(domain);
-#endif
 
 fail:
 	mutex_unlock(&msm_iommu_lock);
