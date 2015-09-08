@@ -1,21 +1,24 @@
-ui_print("Squid Kernel for Moto E LTE (surnia)");
+ui_print("Squid Kernel for Motorola MSM8916 Devices");
 
-assert(getprop("ro.product.device") == "surnia" || getprop("ro.product.device") == "surnia_umts" || getprop("ro.product.device") == "surnia_udstv" || getprop("ro.product.device") == "surnia_uds" || abort("This package is for device: surnia,surnia_umts,surnia_udstv,surnia_uds; this device is " + getprop("ro.product.device") + "."););
+assert(getprop("ro.product.device") == "surnia" || getprop("ro.product.device") == "osprey" || abort("This package is for device: surnia,osprey; this device is " + getprop("ro.product.device") + "."););
 
 ui_print("Extracting flashing tools...");
 package_extract_dir("tools", "/tmp");
 set_perm(0, 0, 0777, "/tmp/mkbootimg");
 set_perm(0, 0, 0777, "/tmp/unpackbootimg");
 set_perm(0, 0, 0777, "/tmp/flash_kernel.sh");
+set_progress(0.2);
 
 ui_print("Building and installing boot image...");
 run_program("/tmp/flash_kernel.sh");
+set_progress(0.6);
 
 ui_print("Cleaning up flashing tools...");
 delete("/tmp/boot.img");
 delete("/tmp/mkbootimg");
 delete("/tmp/unpackbootimg");
 delete("/tmp/flash_kernel.sh");
+set_progress(0.7);
 
 ui_print("Installing kernel modules...");
 mount("ext4", "EMMC", "/dev/block/bootdevice/by-name/system", "/system");
@@ -24,6 +27,7 @@ set_perm_recursive(0, 0, 0755, 0644, "/system/lib/modules");
 set_perm(0, 2000, 0755, "/system/bin/mm-pp-daemon");
 symlink("/system/lib/modules/pronto/pronto_wlan.ko", "/system/lib/modules/wlan.ko");
 unmount("/system");
+set_progress(0.9);
 
 ui_print("Kernel installation completed!");
-show_progress(0.100000, 0);
+set_progress(1.0);
