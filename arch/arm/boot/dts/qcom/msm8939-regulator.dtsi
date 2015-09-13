@@ -21,7 +21,7 @@
 		onnn,step-size = <6250>;
 		onnn,min-slew-ns = <416>;
 		onnn,max-slew-ns = <3333>;
-		regulator-min-microvolt = <1050000>;
+		regulator-min-microvolt = <1000000>;
 		regulator-max-microvolt = <1350000>;
 		onnn,min-setpoint = <600000>;
 		pintrl-names = "default";
@@ -35,7 +35,7 @@
 		compatible = "fairchild,fan53555-regulator";
 		reg = <0x60>;
 		fairchild,backup-vsel = <1>;
-		regulator-min-microvolt = <1050000>;
+		regulator-min-microvolt = <1000000>;
 		regulator-max-microvolt = <1350000>;
 		regulator-ramp-delay = <1250>;
 		pintrl-names = "default";
