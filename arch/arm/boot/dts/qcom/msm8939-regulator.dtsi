@@ -84,8 +84,8 @@
 		regulator-max-microvolt = <28>;
 
 		qcom,cpr-fuse-corners = <3>;
-		qcom,cpr-voltage-ceiling = <1050000 1150000 1350000>;
-		qcom,cpr-voltage-floor = <1050000 1050000 1137500>;
+		qcom,cpr-voltage-ceiling = <1050000 1150000 1300000>;
+		qcom,cpr-voltage-floor = <1000000 1000000 1100000>;
 		vdd-apc-supply = <&ncp6335d>;
 
 		qcom,vdd-mx-corner-map = <4 5 7>;
@@ -113,7 +113,7 @@
 		qcom,cpr-fuse-target-quot = <42 24 6>;
 		qcom,cpr-fuse-ro-sel = <54 54 54>;
 		qcom,cpr-quot-min-diff = <0>;
-		qcom,cpr-init-voltage-ref = <1050000 1150000 1350000>;
+		qcom,cpr-init-voltage-ref = <1030000 1100000 1280000>;
 		qcom,cpr-fuse-init-voltage =
 					<27 36 6 0>,
 					<27 18 6 0>,
