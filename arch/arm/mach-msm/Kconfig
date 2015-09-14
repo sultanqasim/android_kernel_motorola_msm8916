@@ -1063,7 +1063,7 @@ config MMI_LUX_DTB
 	  Only include Motorola Lux specific DTBs to limit the number that
 	  get built during kernel compilation.
 
-	  Lux is a Motorola device that uses MSM8916 chipset, which uses the
+	  Lux is a Motorola device that uses MSM8939 chipset, which uses the
 	  MSM8916 defconfig.  Due to its many revisions, adding all of the device
 	  trees will consume at least 1MB of space.
 
@@ -1078,6 +1078,20 @@ config MMI_OSPREY_DTB
 	  get built during kernel compilation.
 
 	  Osprey is a Motorola device that uses MSM8916 chipset, which uses the
+	  MSM8916 defconfig.  Due to its many revisions, adding all of the device
+	  trees will consume at least 1MB of space.
+
+	  If unsure, say 'n'.
+
+config MMI_SURNIA_DTB
+	depends on ARCH_MSM8916
+	default n
+	bool "Motorola Surnia Device DTBs"
+	help
+	  Only include Motorola Surnia specific DTBs to limit the number that
+	  get built during kernel compilation.
+
+	  Surnia is a Motorola device that uses MSM8916 chipset, which uses the
 	  MSM8916 defconfig.  Due to its many revisions, adding all of the device
 	  trees will consume at least 1MB of space.
 
