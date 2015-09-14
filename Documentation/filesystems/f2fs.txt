@@ -20,7 +20,7 @@ layout, but also for selecting allocation and cleaning algorithms.
 
 The following git tree provides the file system formatting tool (mkfs.f2fs),
 a consistency checking tool (fsck.f2fs), and a debugging tool (dump.f2fs).
->> git://git.kernel.org/pub/scm/linux/git/jaegeuk/f2fs-tools.git
+>> git://git.kernel.org/pub/scm/linux/kernel/git/jaegeuk/f2fs-tools.git
 
 For reporting bugs and sending patches, please use the following mailing list:
 >> linux-f2fs-devel@lists.sourceforge.net
@@ -151,10 +151,10 @@ noinline_data          Disable the inline data feature, inline data feature is
 DEBUGFS ENTRIES
 ================================================================================
 
-/sys/debug/f2fs/ contains information about all the partitions mounted as
+/sys/kernel/debug/f2fs/ contains information about all the partitions mounted as
 f2fs. Each file shows the whole f2fs information.
 
-/sys/debug/f2fs/status includes:
+/sys/kernel/debug/f2fs/status includes:
  - major file system information managed by f2fs currently
  - average SIT information about whole segments
  - current memory footprint consumed by f2fs.
