@@ -377,7 +377,9 @@ struct reg_settings_t {
 	enum msm_actuator_data_type data_type;
 	enum msm_actuator_i2c_operation i2c_operation;
 	uint32_t delay;
+#if !defined(CONFIG_MSM_LEGACY_CAMERA_COMPATIBILITY)
 	uint16_t eeprom_offset;
+#endif
 };
 
 struct msm_camera_i2c_reg_setting_array {
