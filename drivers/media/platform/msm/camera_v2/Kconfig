@@ -274,3 +274,12 @@ config MSM_FD
 	 depends on MSMB_CAMERA
 	 ---help---
 	    Enables support for the MSM FD face detection engine.
+
+
+config MSM_LEGACY_CAMERA_COMPATIBILITY
+	bool "Legacy camera compatibility"
+	default n
+	depends on MSM_CAMERA_SENSOR
+	---help---
+	  Older binaries didn't have the uint16_t eeprom_offset;
+	  In order to keep compatibility with those blobs activate this config
