@@ -12,3 +12,10 @@ config SENSORS_STML0XX
 	help
 	  Say yes here if you wish to include the STM
 	  STML0XX Sensor processor driver.
+
+config STML0XX_LED
+	bool "enable led notification"
+	default n
+	help
+	  Enable the led notification in the STML0XX
+	  Only activate if your phone has led notification

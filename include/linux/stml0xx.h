@@ -411,6 +411,10 @@ struct stml0xx_data {
 
 	bool is_suspended;
 	bool pending_wake_work;
+
+#ifdef CONFIG_STML0XX_LED
+	struct led_classdev led_cdev;
+#endif
 };
 
 #ifndef ts_to_ns
