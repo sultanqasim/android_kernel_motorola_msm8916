@@ -19,3 +19,10 @@ config MMI_HALL_NOTIFICATIONS
 	depends on SENSORS_STML0XX
 	help
 	  Support for hall effect sensor notifications.
+
+config STML0XX_LED
+	bool "enable led notification"
+	default n
+	help
+	  Enable the led notification in the STML0XX
+	  Only activate if your phone has led notification
