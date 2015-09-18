@@ -21,7 +21,7 @@ config CPU_QUIET_STATS
 
 config CPU_QUIET_GOVERNOR_USERSPACE
 	bool "userspace"
-	default y
+	default n
 	help
 	  Manual control of the number of CPUs online.
 	  This governor allows userspace to control the number of online CPUs.
@@ -30,7 +30,7 @@ config CPU_QUIET_GOVERNOR_USERSPACE
 
 config CPU_QUIET_GOVERNOR_BALANCED
 	bool "balanced"
-	default y
+	default n
 	depends on CPU_FREQ
 	help
 	  Scale the number of CPUs online depending on the CPU load.
@@ -41,7 +41,7 @@ config CPU_QUIET_GOVERNOR_BALANCED
 
 config CPU_QUIET_GOVERNOR_RUNNABLE
 	bool "runnable threads"
-	default y
+	default n
 	help
 	  Scale the number of CPUs online depending on the number of runnable
 	  threads.  This governor will scale the number of CPUs online depending
@@ -61,7 +61,7 @@ config CPU_QUIET_GOVERNOR_RQBALANCE
 	  If in doubt, say Y.
 choice
 	prompt "Default CPUQuiet governor"
-	default CPU_QUIET_DEFAULT_GOV_USERSPACE
+	default CPU_QUIET_DEFAULT_GOV_RQBALANCE
 	help
 	  This option sets which CPUQuiet governor shall be loaded at
 	  startup. If in doubt, select 'userspace'.
