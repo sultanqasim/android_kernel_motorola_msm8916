@@ -822,7 +822,7 @@ int rqbalance_pm_notify(struct notifier_block *notify_block,
 static int rqbalance_get_package_info(void)
 {
 	struct cpufreq_frequency_table *table;
-	int count, i, prev_cluster, cur_cluster;
+	int count, i, prev_cluster=-1, cur_cluster;
 
 	/* Paranoid initialization is needed in some conditions */
 	num_of_cores[CLUSTER_LITTLE] = 0;
