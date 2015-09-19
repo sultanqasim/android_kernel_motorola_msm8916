@@ -236,6 +236,12 @@ extern const struct soc_enum arizona_in_dmic_osr[];
 extern const struct soc_enum arizona_anc_input_src[];
 extern const struct soc_enum arizona_output_anc_src[];
 
+extern const struct soc_enum arizona_anc_ng_enum;
+extern int arizona_get_anc_ng(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol);
+extern int arizona_put_anc_ng(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+
 extern int arizona_put_anc_input(struct snd_kcontrol *kcontrol,
 			  struct snd_ctl_elem_value *ucontrol);
 
@@ -283,6 +289,7 @@ struct arizona_fll {
 	unsigned int sync_freq;
 	int ref_src;
 	unsigned int ref_freq;
+	struct mutex lock;
 
 	char lock_name[ARIZONA_FLL_NAME_LEN];
 	char clock_ok_name[ARIZONA_FLL_NAME_LEN];
@@ -294,11 +301,15 @@ extern int arizona_set_fll_refclk(struct arizona_fll *fll, int source,
 				  unsigned int Fref, unsigned int Fout);
 extern int arizona_set_fll(struct arizona_fll *fll, int source,
 			   unsigned int Fref, unsigned int Fout);
+extern int arizona_get_fll(struct arizona_fll *fll, int *source,
+			   unsigned int *Fref, unsigned int *Fout);
+
 
 extern int arizona_init_spk(struct snd_soc_codec *codec);
 extern int arizona_init_gpio(struct snd_soc_codec *codec);
 extern int arizona_init_mono(struct snd_soc_codec *codec);
 extern int arizona_init_input(struct snd_soc_codec *codec);
+extern int arizona_init_codec(struct snd_soc_codec *codec);
 
 extern int arizona_init_dai(struct arizona_priv *priv, int dai);
 
