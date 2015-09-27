@@ -27093,8 +27093,7 @@ WDI_ProcessReceiveFilterSetFilterReq
    if ( NULL == pBSSSes )
    {
        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
-                 " %s : Association for this BSSID does not exist, filter Id =%d",
-                 __func__, pwdiSetRcvPktFilterReqInfo->wdiPktFilterCfg.filterId); // IKJB42MAIN-1244, Motorola, a19091
+                 " %s : Association for this BSSID does not exist",__func__);
        return WDI_STATUS_E_FAILURE; 
    }
 
@@ -27481,8 +27480,7 @@ WDI_ProcessReceiveFilterClearFilterReq
    if ( NULL == pBSSSes )
    {
        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
-                 " %s : Association for this BSSID does not exist, filter ID = %d",
-                 __func__, pwdiRcvFltPktClearReqParamsType->filterClearParam.filterId); // IKJB42MAIN-1244, Motorola, a19091
+                 " %s : Association for this BSSID does not exist",__func__);
        return WDI_STATUS_E_FAILURE; 
    }
 

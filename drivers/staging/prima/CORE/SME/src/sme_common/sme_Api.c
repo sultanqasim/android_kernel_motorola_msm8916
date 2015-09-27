@@ -2187,21 +2187,6 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                           "(PACKET_COALESCING_FILTER_MATCH_COUNT_RSP), nothing to process");
                 }
                 break;
-          // IKJB42MAIN-1244, Motorola, a19091 - BEGIN
-          case eWNI_SME_SET_V6_MC_FILTER:
-                if(pMsg->bodyptr)
-                {
-                   tSirInvokeV6Filter *invokeV6Filter=(tSirInvokeV6Filter*)(pMsg->bodyptr);
-                   invokeV6Filter->configureFilterFn(invokeV6Filter->pHddAdapter, invokeV6Filter->set, FALSE);
-                   kfree(pMsg->bodyptr);
-                   status = eHAL_STATUS_SUCCESS;
-                }
-                else
-                {
-                   smsLog(pMac, LOGE, "Empty callback for eWNI_SME_SET_V6_MC_FILTER ");
-                }
-                break;
-          // IKJB42MAIN-1244, Motorola, a19091 - END
 #endif // WLAN_FEATURE_PACKET_FILTERING
           case eWNI_SME_PRE_SWITCH_CHL_IND:
              {
@@ -8004,39 +7989,6 @@ eHalStatus sme_8023MulticastList (tHalHandle hHal, tANI_U8 sessionId, tpSirRcvFl
 
     return eHAL_STATUS_SUCCESS;
 }
-
-// IKJB42MAIN-1244, Motorola, a19091 - BEGIN
-eHalStatus sme_ReceiveSetMcFilter(tSirInvokeV6Filter *filterConfig)
-{
-    vos_msg_t               msg;
-    tSirInvokeV6Filter      *passFilterConfig = kmalloc(sizeof(tSirInvokeV6Filter), GFP_ATOMIC);
-
-    if(passFilterConfig == NULL) {
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to "
-            "allocate memory for Receive Filter Set Filter MC request", __func__);
-        return eHAL_STATUS_FAILED_ALLOC;
-    }
-
-    vos_mem_copy(passFilterConfig, filterConfig, sizeof(tSirInvokeV6Filter));
-
-    msg.type = eWNI_SME_SET_V6_MC_FILTER;
-    msg.reserved = 0;
-    msg.bodyptr = passFilterConfig;
-
-    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-            " MC set rcieved .. post for processing!");
-
-    if(VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MQ_ID_SME, &msg))
-    {
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to post "
-            "WDA_RECEIVE_FILTER_SET_FILTER_MC_REQ message to WDA", __func__);
-        kfree(passFilterConfig);
-        return eHAL_STATUS_FAILURE;
-    }
-
-    return eHAL_STATUS_SUCCESS;
-}
-// IKJB42MAIN-1244, Motorola, a19091 - END
 
 eHalStatus sme_ReceiveFilterSetFilter(tHalHandle hHal, tpSirRcvPktFilterCfgType pRcvPktFilterCfg,
                                            tANI_U8 sessionId)
