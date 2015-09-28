@@ -443,6 +443,7 @@ struct mdss_panel_info {
 	enum cabc_mode cabc_mode;
 	bool hbm_feature_enabled;
 	bool hbm_state;
+	bool blank_progress_notify_enabled;
 };
 
 struct mdss_panel_data {
@@ -465,6 +466,7 @@ struct mdss_panel_data {
 	int (*event_handler) (struct mdss_panel_data *pdata, int e, void *arg);
 
 	struct mdss_panel_data *next;
+	struct msm_fb_data_type *mfd;
 };
 
 /**
