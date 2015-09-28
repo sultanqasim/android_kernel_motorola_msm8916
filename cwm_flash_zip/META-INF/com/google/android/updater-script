@@ -32,13 +32,5 @@ delete("/tmp/unpackbootimg");
 delete("/tmp/flash_kernel.sh");
 set_progress(0.7);
 
-ui_print("Installing kernel modules...");
-mount("ext4", "EMMC", "/dev/block/bootdevice/by-name/system", "/system");
-package_extract_dir("system", "/system");
-set_perm_recursive(0, 0, 0755, 0644, "/system/lib/modules");
-symlink("/system/lib/modules/pronto/pronto_wlan.ko", "/system/lib/modules/wlan.ko");
-unmount("/system");
-set_progress(0.9);
-
 ui_print("Kernel installation completed!");
 set_progress(1.0);
