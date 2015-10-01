@@ -27,7 +27,9 @@
 #include "sd.h"
 #include "sd_ops.h"
 
-#define PARANOID_SD_INIT_RETRIES 5
+#define PARANOID_SD_INIT_RETRIES	5
+#define PARANOID_SD_INIT_DELAY		5000
+#define PARANOID_SD_INIT_INCREMENT	10000
 
 #define UHS_SDR104_MIN_DTR	(100 * 1000 * 1000)
 #define UHS_DDR50_MIN_DTR	(50 * 1000 * 1000)
@@ -999,6 +1001,10 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
 					       mmc_hostname(host));
 				}
 				break;
+			} else if (err == -ENOMEDIUM) {
+				pr_warn("%s: read switch failed on removed card\n",
+				       mmc_hostname(host));
+				break;
 			} else {
 				pr_warn("%s: read switch failed (attempt %d)\n",
 				       mmc_hostname(host), retries);
@@ -1229,17 +1235,33 @@ static void mmc_sd_detect(struct mmc_host *host)
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	while(retries) {
 		err = mmc_send_status(host->card, NULL);
-		if (err) {
+		if (err == -ENOMEDIUM) {
+			pr_warn("%s: failed to re-detect removed SD card\n",
+			       mmc_hostname(host));
+		} else if (err) {
 			retries--;
 			udelay(5);
 			continue;
 		}
 		break;
 	}
-	if (!retries) {
+	if (!retries)
 		pr_err("%s: failed to re-detect SD card after %d attempts (%d)\n",
 		       mmc_hostname(host), PARANOID_SD_INIT_RETRIES, err);
-		err = _mmc_detect_card_removed(host);
+	if (err) {
+		/* Power cycle the card once and attempt to reinitialize. */
+		mmc_power_off(host);
+		usleep_range(PARANOID_SD_INIT_DELAY,
+			     PARANOID_SD_INIT_DELAY + 500);
+		mmc_power_up(host);
+		mmc_select_voltage(host, host->ocr);
+		usleep_range(PARANOID_SD_INIT_DELAY,
+			     PARANOID_SD_INIT_DELAY + 500);
+		err = mmc_sd_init_card(host, host->ocr, host->card);
+		if (err)
+			mmc_card_set_removed(host->card);
+		else
+			pr_info("%s: card reinitialized\n", mmc_hostname(host));
 	}
 #else
 	err = _mmc_detect_card_removed(host);
@@ -1300,7 +1322,7 @@ static int mmc_sd_resume(struct mmc_host *host)
 	int err;
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	int retries = PARANOID_SD_INIT_RETRIES;
-	unsigned long delay = 5000, settle = 0;
+	unsigned long delay = PARANOID_SD_INIT_DELAY, settle = 0;
 #endif
 
 	BUG_ON(!host);
@@ -1310,12 +1332,15 @@ static int mmc_sd_resume(struct mmc_host *host)
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	while (retries) {
 		err = mmc_sd_init_card(host, host->ocr, host->card);
-
-		if (err) {
+		if (err == -ENOMEDIUM) {
+			pr_warn("%s: failed to reinitialize removed SD card\n",
+			       mmc_hostname(host));
+		} else if (err == -EILSEQ) {
+			if (mmc_sd_throttle_back(host) == 0)
+				continue;
+		} else if (err) {
 			pr_err("%s: failed to reinitialize SD card (%d) after %lums\n",
 				mmc_hostname(host), err, delay / 1000);
-			if (err == -EILSEQ && mmc_sd_throttle_back(host) == 0)
-				continue;
 			retries--;
 			mmc_power_off(host);
 			usleep_range(delay, delay + 500);
@@ -1324,8 +1349,8 @@ static int mmc_sd_resume(struct mmc_host *host)
 			if (settle)
 				usleep_range(settle, settle + 500);
 			/* Increase settle times on each attempt */
-			delay += 10000;
-			settle += 10000;
+			delay += PARANOID_SD_INIT_INCREMENT;
+			settle += PARANOID_SD_INIT_INCREMENT;
 			continue;
 		}
 		break;
@@ -1405,7 +1430,7 @@ int mmc_attach_sd(struct mmc_host *host)
 	u32 ocr;
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	int retries = PARANOID_SD_INIT_RETRIES;
-	unsigned long delay = 5000, settle = 0;
+	unsigned long delay = PARANOID_SD_INIT_DELAY, settle = 0;
 #endif
 
 	BUG_ON(!host);
@@ -1469,9 +1494,10 @@ int mmc_attach_sd(struct mmc_host *host)
 	 */
 	while (retries && !host->rescan_disable) {
 		err = mmc_sd_init_card(host, host->ocr, NULL);
-		if (err) {
-			if (err == -EILSEQ && mmc_sd_throttle_back(host) == 0)
-				continue;
+		if (err == -ENOMEDIUM) {
+			pr_warn("%s: failed to initialize removed SD card\n",
+			       mmc_hostname(host));
+		} else if (err) {
 			retries--;
 			mmc_power_off(host);
 			usleep_range(delay, delay + 500);
@@ -1480,17 +1506,20 @@ int mmc_attach_sd(struct mmc_host *host)
 			if (settle)
 				usleep_range(settle, settle + 500);
 			/* Increase settle times on each attempt */
-			delay += 10000;
-			settle += 10000;
+			delay += PARANOID_SD_INIT_INCREMENT;
+			settle += PARANOID_SD_INIT_INCREMENT;
 			continue;
 		}
 		break;
 	}
 
-	if (!retries) {
+	if (!retries)
 		pr_err("%s: failed to initialize SD card after %d attempts (%d)\n",
 		       mmc_hostname(host), PARANOID_SD_INIT_RETRIES, err);
+	if (err) {
 		/* A card was detected, but we couldn't initialize it. */
+		pr_err("%s: could not initialize detected card\n",
+			mmc_hostname(host));
 		host->card_bad = 1;
 		goto err;
 	}

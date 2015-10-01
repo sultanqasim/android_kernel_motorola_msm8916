@@ -18,6 +18,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/wakelock.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -38,6 +39,8 @@
 
 #define FLORIDA_DEFAULT_FRAGMENTS       1
 #define FLORIDA_DEFAULT_FRAGMENT_SIZE   4096
+
+#define FLORIDA_SYSCLK_RATE (48000 * 1024 * 3)
 
 #define ADSP2_CONTROL	0x0
 #define ADSP2_CORE_ENA  0x0002
@@ -60,8 +63,10 @@ struct florida_priv {
 	struct arizona_priv core;
 	struct arizona_fll fll[2];
 	struct florida_compr compr_info[FLORIDA_NUM_COMPR_DEVICES];
+	bool dsp_enabled[4];
 
 	struct mutex fw_lock;
+	struct wake_lock wakelock;
 };
 
 static const struct wm_adsp_region florida_dsp1_regions[] = {
@@ -225,10 +230,75 @@ static int florida_sysclk_ev(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static bool florida_check_all_dsps(struct florida_priv *florida)
+{
+	int i;
+	for (i = 0; i < 4; i++) {
+		if (florida->dsp_enabled[i])
+			return true;
+	}
+	return false;
+}
+
+static int florida_set_fll(struct snd_soc_codec *codec, int fll_id, int source,
+		unsigned int Fref, unsigned int Fout)
+{
+	struct florida_priv *florida = snd_soc_codec_get_drvdata(codec);
+	if (!florida_check_all_dsps(florida) && Fref == 32768) {
+		if (fll_id == FLORIDA_FLL1)
+			return arizona_set_fll(&florida->fll[0], source, 0, 0);
+		if (fll_id == FLORIDA_FLL2)
+			return arizona_set_fll(&florida->fll[1], source, 0, 0);
+	}
+
+	switch (fll_id) {
+	case FLORIDA_FLL1:
+		return arizona_set_fll(&florida->fll[0], source, Fref, Fout);
+	case FLORIDA_FLL2:
+		return arizona_set_fll(&florida->fll[1], source, Fref, Fout);
+	case FLORIDA_FLL1_REFCLK:
+		return arizona_set_fll_refclk(&florida->fll[0], source, Fref,
+			Fout);
+	case FLORIDA_FLL2_REFCLK:
+		return arizona_set_fll_refclk(&florida->fll[1], source, Fref,
+			Fout);
+	default:
+		return -EINVAL;
+	}
+}
+
 static int florida_virt_dsp_power_ev(struct snd_soc_dapm_widget *w,
 				    struct snd_kcontrol *kcontrol, int event)
 {
 	struct florida_priv *florida = snd_soc_codec_get_drvdata(w->codec);
+	int source;
+	unsigned int Fref, Fout;
+
+	arizona_get_fll(&florida->fll[0], &source, &Fref, &Fout);
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		if (!florida_check_all_dsps(florida) && Fref <= 0)
+			arizona_set_fll(&florida->fll[0],
+				ARIZONA_FLL_SRC_MCLK2,
+				32768, FLORIDA_SYSCLK_RATE);
+
+		florida->dsp_enabled[w->shift] = true;
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		florida->dsp_enabled[w->shift] = false;
+		if (!florida_check_all_dsps(florida)
+			&& Fref == 32768
+			&& source == ARIZONA_FLL_SRC_MCLK2)
+			arizona_set_fll(&florida->fll[0],
+				ARIZONA_FLL_SRC_MCLK1,
+				0, 0);
+		break;
+	default:
+		break;
+	}
+
+	if (w->shift != 2)
+		return 0;
 
 	/* The compr_info is hardcoded for DSP3 */
 	mutex_lock(&florida->compr_info[2].lock);
@@ -254,20 +324,6 @@ static DECLARE_TLV_DB_SCALE(eq_tlv, -1200, 100, 0);
 static DECLARE_TLV_DB_SCALE(digital_tlv, -6400, 50, 0);
 static DECLARE_TLV_DB_SCALE(noise_tlv, 0, 600, 0);
 static DECLARE_TLV_DB_SCALE(ng_tlv, -10200, 600, 0);
-
-#define FLORIDA_NG_SRC(name, base) \
-	SOC_SINGLE(name " NG HPOUT1L Switch",  base,  0, 1, 0), \
-	SOC_SINGLE(name " NG HPOUT1R Switch",  base,  1, 1, 0), \
-	SOC_SINGLE(name " NG HPOUT2L Switch",  base,  2, 1, 0), \
-	SOC_SINGLE(name " NG HPOUT2R Switch",  base,  3, 1, 0), \
-	SOC_SINGLE(name " NG HPOUT3L Switch",  base,  4, 1, 0), \
-	SOC_SINGLE(name " NG HPOUT3R Switch",  base,  5, 1, 0), \
-	SOC_SINGLE(name " NG SPKOUTL Switch",  base,  6, 1, 0), \
-	SOC_SINGLE(name " NG SPKOUTR Switch",  base,  7, 1, 0), \
-	SOC_SINGLE(name " NG SPKDAT1L Switch", base,  8, 1, 0), \
-	SOC_SINGLE(name " NG SPKDAT1R Switch", base,  9, 1, 0), \
-	SOC_SINGLE(name " NG SPKDAT2L Switch", base, 10, 1, 0), \
-	SOC_SINGLE(name " NG SPKDAT2R Switch", base, 11, 1, 0)
 
 #define FLORIDA_RXANC_INPUT_ROUTES(widget, name) \
 	{ widget, NULL, name " Input" }, \
@@ -422,57 +478,15 @@ ARIZONA_MIXER_CONTROLS("EQ2", ARIZONA_EQ2MIX_INPUT_1_SOURCE),
 ARIZONA_MIXER_CONTROLS("EQ3", ARIZONA_EQ3MIX_INPUT_1_SOURCE),
 ARIZONA_MIXER_CONTROLS("EQ4", ARIZONA_EQ4MIX_INPUT_1_SOURCE),
 
-SND_SOC_BYTES("EQ1 Coefficients", ARIZONA_EQ1_3, 19),
 SOC_SINGLE("EQ1 Mode Switch", ARIZONA_EQ1_2, ARIZONA_EQ1_B1_MODE_SHIFT, 1, 0),
 SOC_SINGLE_TLV("EQ1 B1 Volume", ARIZONA_EQ1_1, ARIZONA_EQ1_B1_GAIN_SHIFT,
 	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ1 B2 Volume", ARIZONA_EQ1_1, ARIZONA_EQ1_B2_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ1 B3 Volume", ARIZONA_EQ1_1, ARIZONA_EQ1_B3_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ1 B4 Volume", ARIZONA_EQ1_2, ARIZONA_EQ1_B4_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ1 B5 Volume", ARIZONA_EQ1_2, ARIZONA_EQ1_B5_GAIN_SHIFT,
-	       24, 0, eq_tlv),
 
-SND_SOC_BYTES("EQ2 Coefficients", ARIZONA_EQ2_3, 19),
 SOC_SINGLE("EQ2 Mode Switch", ARIZONA_EQ2_2, ARIZONA_EQ2_B1_MODE_SHIFT, 1, 0),
-SOC_SINGLE_TLV("EQ2 B1 Volume", ARIZONA_EQ2_1, ARIZONA_EQ2_B1_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ2 B2 Volume", ARIZONA_EQ2_1, ARIZONA_EQ2_B2_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ2 B3 Volume", ARIZONA_EQ2_1, ARIZONA_EQ2_B3_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ2 B4 Volume", ARIZONA_EQ2_2, ARIZONA_EQ2_B4_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ2 B5 Volume", ARIZONA_EQ2_2, ARIZONA_EQ2_B5_GAIN_SHIFT,
-	       24, 0, eq_tlv),
 
-SND_SOC_BYTES("EQ3 Coefficients", ARIZONA_EQ3_3, 19),
 SOC_SINGLE("EQ3 Mode Switch", ARIZONA_EQ3_2, ARIZONA_EQ3_B1_MODE_SHIFT, 1, 0),
-SOC_SINGLE_TLV("EQ3 B1 Volume", ARIZONA_EQ3_1, ARIZONA_EQ3_B1_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ3 B2 Volume", ARIZONA_EQ3_1, ARIZONA_EQ3_B2_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ3 B3 Volume", ARIZONA_EQ3_1, ARIZONA_EQ3_B3_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ3 B4 Volume", ARIZONA_EQ3_2, ARIZONA_EQ3_B4_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ3 B5 Volume", ARIZONA_EQ3_2, ARIZONA_EQ3_B5_GAIN_SHIFT,
-	       24, 0, eq_tlv),
 
-SND_SOC_BYTES("EQ4 Coefficients", ARIZONA_EQ4_3, 19),
 SOC_SINGLE("EQ4 Mode Switch", ARIZONA_EQ4_2, ARIZONA_EQ4_B1_MODE_SHIFT, 1, 0),
-SOC_SINGLE_TLV("EQ4 B1 Volume", ARIZONA_EQ4_1, ARIZONA_EQ4_B1_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ4 B2 Volume", ARIZONA_EQ4_1, ARIZONA_EQ4_B2_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ4 B3 Volume", ARIZONA_EQ4_1, ARIZONA_EQ4_B3_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ4 B4 Volume", ARIZONA_EQ4_2, ARIZONA_EQ4_B4_GAIN_SHIFT,
-	       24, 0, eq_tlv),
-SOC_SINGLE_TLV("EQ4 B5 Volume", ARIZONA_EQ4_2, ARIZONA_EQ4_B5_GAIN_SHIFT,
-	       24, 0, eq_tlv),
 
 ARIZONA_MIXER_CONTROLS("DRC1L", ARIZONA_DRC1LMIX_INPUT_1_SOURCE),
 ARIZONA_MIXER_CONTROLS("DRC1R", ARIZONA_DRC1RMIX_INPUT_1_SOURCE),
@@ -571,18 +585,6 @@ SOC_DOUBLE_R_TLV("HPOUT1 Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_1L,
 SOC_DOUBLE_R_TLV("HPOUT2 Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_2L,
 		 ARIZONA_DAC_DIGITAL_VOLUME_2R, ARIZONA_OUT2L_VOL_SHIFT,
 		 0xbf, 0, digital_tlv),
-SOC_DOUBLE_R_TLV("HPOUT3 Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_3L,
-		 ARIZONA_DAC_DIGITAL_VOLUME_3R, ARIZONA_OUT3L_VOL_SHIFT,
-		 0xbf, 0, digital_tlv),
-SOC_DOUBLE_R_TLV("Speaker Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_4L,
-		 ARIZONA_DAC_DIGITAL_VOLUME_4R, ARIZONA_OUT4L_VOL_SHIFT,
-		 0xbf, 0, digital_tlv),
-SOC_DOUBLE_R_TLV("SPKDAT1 Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_5L,
-		 ARIZONA_DAC_DIGITAL_VOLUME_5R, ARIZONA_OUT5L_VOL_SHIFT,
-		 0xbf, 0, digital_tlv),
-SOC_DOUBLE_R_TLV("SPKDAT2 Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_6L,
-		 ARIZONA_DAC_DIGITAL_VOLUME_6R, ARIZONA_OUT6L_VOL_SHIFT,
-		 0xbf, 0, digital_tlv),
 
 SOC_DOUBLE("SPKDAT1 Switch", ARIZONA_PDM_SPK1_CTRL_1, ARIZONA_SPK1L_MUTE_SHIFT,
 	   ARIZONA_SPK1R_MUTE_SHIFT, 1, 1),
@@ -607,19 +609,6 @@ SOC_ENUM("Noise Gate Hold", arizona_ng_hold),
 
 SOC_VALUE_ENUM("Output Rate 1", arizona_output_rate),
 SOC_VALUE_ENUM("In Rate", arizona_input_rate),
-
-FLORIDA_NG_SRC("HPOUT1L", ARIZONA_NOISE_GATE_SELECT_1L),
-FLORIDA_NG_SRC("HPOUT1R", ARIZONA_NOISE_GATE_SELECT_1R),
-FLORIDA_NG_SRC("HPOUT2L", ARIZONA_NOISE_GATE_SELECT_2L),
-FLORIDA_NG_SRC("HPOUT2R", ARIZONA_NOISE_GATE_SELECT_2R),
-FLORIDA_NG_SRC("HPOUT3L", ARIZONA_NOISE_GATE_SELECT_3L),
-FLORIDA_NG_SRC("HPOUT3R", ARIZONA_NOISE_GATE_SELECT_3R),
-FLORIDA_NG_SRC("SPKOUTL", ARIZONA_NOISE_GATE_SELECT_4L),
-FLORIDA_NG_SRC("SPKOUTR", ARIZONA_NOISE_GATE_SELECT_4R),
-FLORIDA_NG_SRC("SPKDAT1L", ARIZONA_NOISE_GATE_SELECT_5L),
-FLORIDA_NG_SRC("SPKDAT1R", ARIZONA_NOISE_GATE_SELECT_5R),
-FLORIDA_NG_SRC("SPKDAT2L", ARIZONA_NOISE_GATE_SELECT_6L),
-FLORIDA_NG_SRC("SPKDAT2R", ARIZONA_NOISE_GATE_SELECT_6R),
 
 ARIZONA_MIXER_CONTROLS("AIF1TX1", ARIZONA_AIF1TX1MIX_INPUT_1_SOURCE),
 ARIZONA_MIXER_CONTROLS("AIF1TX2", ARIZONA_AIF1TX2MIX_INPUT_1_SOURCE),
@@ -767,6 +756,7 @@ static const char * const florida_dsp_output_texts[] = {
 	"None",
 	"DSP2",
 	"DSP3",
+	"DSP4",
 };
 
 static const struct soc_enum florida_dsp_output_enum =
@@ -776,6 +766,7 @@ static const struct soc_enum florida_dsp_output_enum =
 static const struct snd_kcontrol_new florida_dsp_output_mux[] = {
 	SOC_DAPM_ENUM_VIRT("DSP2 Virtual Output Mux", florida_dsp_output_enum),
 	SOC_DAPM_ENUM_VIRT("DSP3 Virtual Output Mux", florida_dsp_output_enum),
+	SOC_DAPM_ENUM_VIRT("DSP4 Virtual Output Mux", florida_dsp_output_enum),
 };
 
 static const char * const florida_memory_mux_texts[] = {
@@ -788,8 +779,8 @@ static const struct soc_enum florida_memory_enum =
 			florida_memory_mux_texts);
 
 static const struct snd_kcontrol_new florida_memory_mux[] = {
-	SOC_DAPM_ENUM_VIRT("DSP2 Virtual Input", florida_memory_enum),
-	SOC_DAPM_ENUM_VIRT("DSP3 Virtual Input", florida_memory_enum),
+	SOC_DAPM_ENUM_VIRT("DSP2 Virtual Input Mux", florida_memory_enum),
+	SOC_DAPM_ENUM_VIRT("DSP3 Virtual Input Mux", florida_memory_enum),
 };
 
 static const char * const florida_aec_loopback_texts[] = {
@@ -862,12 +853,14 @@ SND_SOC_DAPM_INPUT("IN3L"),
 SND_SOC_DAPM_INPUT("IN3R"),
 SND_SOC_DAPM_INPUT("IN4L"),
 SND_SOC_DAPM_INPUT("IN4R"),
+SND_SOC_DAPM_INPUT("DSP Virtual Input"),
 
 SND_SOC_DAPM_OUTPUT("DRC1 Signal Activity"),
 SND_SOC_DAPM_OUTPUT("DRC2 Signal Activity"),
 
 SND_SOC_DAPM_OUTPUT("DSP2 Virtual Output"),
 SND_SOC_DAPM_OUTPUT("DSP3 Virtual Output"),
+SND_SOC_DAPM_OUTPUT("DSP4 Virtual Output"),
 
 SND_SOC_DAPM_PGA_E("IN1L PGA", ARIZONA_INPUT_ENABLES, ARIZONA_IN1L_ENA_SHIFT,
 		   0, NULL, 0, arizona_in_ev,
@@ -1119,42 +1112,50 @@ SND_SOC_DAPM_AIF_IN_E("SLIMRX1", "Slim1 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX1_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 SND_SOC_DAPM_AIF_IN_E("SLIMRX2", "Slim1 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX2_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 SND_SOC_DAPM_AIF_IN_E("SLIMRX3", "Slim1 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX3_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 SND_SOC_DAPM_AIF_IN_E("SLIMRX4", "Slim1 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX4_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 SND_SOC_DAPM_AIF_IN_E("SLIMRX5", "Slim2 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX5_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 SND_SOC_DAPM_AIF_IN_E("SLIMRX6", "Slim2 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX6_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 SND_SOC_DAPM_AIF_IN_E("SLIMRX7", "Slim3 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX7_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 SND_SOC_DAPM_AIF_IN_E("SLIMRX8", "Slim3 Playback", 0,
 		    ARIZONA_SLIMBUS_RX_CHANNEL_ENABLE,
 		    ARIZONA_SLIMRX8_ENA_SHIFT, 0,
 		    arizona_slim_rx_ev,
-		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		    SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD
+			| SND_SOC_DAPM_PRE_PMU),
 
 SND_SOC_DAPM_AIF_OUT_E("SLIMTX1", "Slim1 Capture", 0,
 		     ARIZONA_SLIMBUS_TX_CHANNEL_ENABLE,
@@ -1312,17 +1313,23 @@ ARIZONA_DSP_WIDGETS(DSP2, "DSP2"),
 ARIZONA_DSP_WIDGETS(DSP3, "DSP3"),
 ARIZONA_DSP_WIDGETS(DSP4, "DSP4"),
 
-SND_SOC_DAPM_VIRT_MUX("DSP2 Virtual Input", SND_SOC_NOPM, 0, 0,
+SND_SOC_DAPM_VIRT_MUX("DSP2 Virtual Input Mux", SND_SOC_NOPM, 0, 0,
 		      &florida_memory_mux[0]),
-SND_SOC_DAPM_VIRT_MUX("DSP3 Virtual Input", SND_SOC_NOPM, 0, 0,
+SND_SOC_DAPM_VIRT_MUX("DSP3 Virtual Input Mux", SND_SOC_NOPM, 0, 0,
 		      &florida_memory_mux[1]),
 
-SND_SOC_DAPM_VIRT_MUX("DSP2 Virtual Output Mux", SND_SOC_NOPM, 0, 0,
-		      &florida_dsp_output_mux[0]),
+SND_SOC_DAPM_VIRT_MUX_E("DSP2 Virtual Output Mux", SND_SOC_NOPM, 1, 0,
+		      &florida_dsp_output_mux[0], florida_virt_dsp_power_ev,
+		      SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
-SND_SOC_DAPM_VIRT_MUX_E("DSP3 Virtual Output Mux", SND_SOC_NOPM, 0, 0,
+SND_SOC_DAPM_VIRT_MUX_E("DSP3 Virtual Output Mux", SND_SOC_NOPM, 2, 0,
 		      &florida_dsp_output_mux[1], florida_virt_dsp_power_ev,
-		      SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+		      SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD |
+		      SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+
+SND_SOC_DAPM_VIRT_MUX_E("DSP4 Virtual Output Mux", SND_SOC_NOPM, 3, 0,
+		      &florida_dsp_output_mux[2], florida_virt_dsp_power_ev,
+		      SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 ARIZONA_MUX_WIDGETS(ISRC1DEC1, "ISRC1DEC1"),
 ARIZONA_MUX_WIDGETS(ISRC1DEC2, "ISRC1DEC2"),
@@ -1696,11 +1703,12 @@ static const struct snd_soc_dapm_route florida_dapm_routes[] = {
 	ARIZONA_DSP_ROUTES("DSP3"),
 	ARIZONA_DSP_ROUTES("DSP4"),
 
-	{ "DSP2 Preloader",  NULL, "DSP2 Virtual Input" },
-	{ "DSP2 Virtual Input", "Shared Memory", "DSP3" },
-	{ "DSP3 Preloader", NULL, "DSP3 Virtual Input" },
-	{ "DSP3 Virtual Input", "Shared Memory", "DSP2" },
+	{ "DSP2 Preloader",  NULL, "DSP2 Virtual Input Mux" },
+	{ "DSP2 Virtual Input Mux", "Shared Memory", "DSP3" },
+	{ "DSP3 Preloader", NULL, "DSP3 Virtual Input Mux" },
+	{ "DSP3 Virtual Input Mux", "Shared Memory", "DSP2" },
 
+	{ "DSP2 Preloader", NULL, "DSP Virtual Input"},
 	{ "DSP2 Virtual Output", NULL, "DSP2 Virtual Output Mux" },
 	{ "DSP2 Virtual Output Mux", "DSP2", "DSP2" },
 	{ "DSP2 Virtual Output", NULL, "SYSCLK" },
@@ -1708,6 +1716,10 @@ static const struct snd_soc_dapm_route florida_dapm_routes[] = {
 	{ "DSP3 Virtual Output", NULL, "DSP3 Virtual Output Mux" },
 	{ "DSP3 Virtual Output Mux", "DSP3", "DSP3" },
 	{ "DSP3 Virtual Output", NULL, "SYSCLK" },
+
+	{ "DSP4 Virtual Output", NULL, "DSP4 Virtual Output Mux" },
+	{ "DSP4 Virtual Output Mux", "DSP4", "DSP4" },
+	{ "DSP4 Virtual Output", NULL, "SYSCLK" },
 
 	ARIZONA_MUX_ROUTES("ISRC1INT1", "ISRC1INT1"),
 	ARIZONA_MUX_ROUTES("ISRC1INT2", "ISRC1INT2"),
@@ -1795,27 +1807,6 @@ static const struct snd_soc_dapm_route florida_dapm_routes[] = {
 	{ "DRC2 Signal Activity", NULL, "DRC2L" },
 	{ "DRC2 Signal Activity", NULL, "DRC2R" },
 };
-
-static int florida_set_fll(struct snd_soc_codec *codec, int fll_id, int source,
-			  unsigned int Fref, unsigned int Fout)
-{
-	struct florida_priv *florida = snd_soc_codec_get_drvdata(codec);
-
-	switch (fll_id) {
-	case FLORIDA_FLL1:
-		return arizona_set_fll(&florida->fll[0], source, Fref, Fout);
-	case FLORIDA_FLL2:
-		return arizona_set_fll(&florida->fll[1], source, Fref, Fout);
-	case FLORIDA_FLL1_REFCLK:
-		return arizona_set_fll_refclk(&florida->fll[0], source, Fref,
-					      Fout);
-	case FLORIDA_FLL2_REFCLK:
-		return arizona_set_fll_refclk(&florida->fll[1], source, Fref,
-					      Fout);
-	default:
-		return -EINVAL;
-	}
-}
 
 #define FLORIDA_RATES SNDRV_PCM_RATE_8000_192000
 
@@ -2165,6 +2156,8 @@ static irqreturn_t adsp2_irq(int irq, void *data)
 				regmap_write(arizona->regmap, reg, scratch_reg);
 				if (adsp2_ez2ctrl_trigger(florida, i)) {
 					pr_debug("Calling AOV callback\n");
+					wake_lock_timeout(&florida->wakelock,
+						msecs_to_jiffies(500));
 					adsp2_ez2ctrl_set_trigger(florida);
 				}
 			}
@@ -2281,7 +2274,10 @@ static int florida_set_params(struct snd_compr_stream *stream,
 		goto out;
 	}
 
-	ret = wm_adsp_stream_alloc(compr->adsp, params);
+	if (!strcmp(rtd->codec_dai->name, "florida-dsp3-txt"))
+		ret = wm_adsp_stream_alloc2(compr->adsp, params);
+	else
+		ret = wm_adsp_stream_alloc(compr->adsp, params);
 	if (ret == 0)
 		compr->allocated = true;
 
@@ -2314,6 +2310,10 @@ static int florida_trigger(struct snd_compr_stream *stream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+	if (!strcmp(rtd->codec_dai->name, "florida-dsp3-txt"))
+		ret = wm_adsp_stream_start2(
+			florida->compr_info[compr_dev_index].adsp);
+	else
 		ret = wm_adsp_stream_start(florida->compr_info[compr_dev_index].adsp);
 
 		/**
@@ -2439,6 +2439,7 @@ static int florida_codec_probe(struct snd_soc_codec *codec)
 	arizona_init_gpio(codec);
 	arizona_init_mono(codec);
 	arizona_init_input(codec);
+	arizona_init_codec(codec);
 
 	ret = snd_soc_add_codec_controls(codec, wm_adsp2_fw_controls, 8);
 	if (ret != 0) {
@@ -2466,6 +2467,7 @@ static int florida_codec_probe(struct snd_soc_codec *codec)
 			"Failed to set DSP IRQ to wake source: %d\n",
 			ret);
 
+	wake_lock_init(&priv->wakelock, 0, "aov_wakelock");
 	mutex_lock(&codec->card->dapm_mutex);
 	snd_soc_dapm_enable_pin(&codec->dapm, "DRC2 Signal Activity");
 	mutex_unlock(&codec->card->dapm_mutex);
@@ -2490,6 +2492,7 @@ static int florida_codec_remove(struct snd_soc_codec *codec)
 
 	irq_set_irq_wake(arizona->irq, 0);
 	arizona_free_irq(arizona, ARIZONA_IRQ_DSP_IRQ1, priv);
+	wake_lock_destroy(&priv->wakelock);
 	regmap_update_bits(arizona->regmap, ARIZONA_IRQ2_STATUS_3_MASK,
 			   ARIZONA_IM_DRC2_SIG_DET_EINT2,
 			   ARIZONA_IM_DRC2_SIG_DET_EINT2);

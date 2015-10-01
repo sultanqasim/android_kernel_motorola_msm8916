@@ -1,6 +1,18 @@
 ui_print("Squid Kernel for Motorola MSM8916 Devices");
 
-assert(getprop("ro.product.device") == "surnia" || getprop("ro.product.device") == "osprey" || getprop("ro.product.device") == "lux" || abort("This package is for device: surnia,osprey,lux; this device is " + getprop("ro.product.device") + "."););
+assert(getprop("ro.product.device") == "surnia" ||
+       getprop("ro.product.device") == "surnia_umts" ||
+       getprop("ro.product.device") == "surnia_uds" ||
+       getprop("ro.product.device") == "surnia_udstv" ||
+       getprop("ro.product.device") == "osprey" ||
+       getprop("ro.product.device") == "osprey_umts" ||
+       getprop("ro.product.device") == "osprey_u2" ||
+       getprop("ro.product.device") == "osprey_ud2" ||
+       getprop("ro.product.device") == "osprey_uds" ||
+       getprop("ro.product.device") == "osprey_cdma" ||
+       getprop("ro.product.device") == "osprey_udstv" ||
+       getprop("ro.product.device") == "lux" ||
+       abort("This package is for device: surnia,osprey,lux; this device is " + getprop("ro.product.device") + "."););
 
 ui_print("Extracting flashing tools...");
 package_extract_dir("tools", "/tmp");

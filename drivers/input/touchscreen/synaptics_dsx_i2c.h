@@ -23,8 +23,9 @@
 #define SYNAPTICS_DSX_DRIVER_VERSION "DSX 1.1"
 
 #include <linux/version.h>
+#include <linux/power_supply.h>
 #if defined(CONFIG_MMI_PANEL_NOTIFICATIONS)
-#include <mach/mmi_panel_notifier.h>
+#include <linux/mmi_panel_notifier.h>
 #elif defined(CONFIG_FB)
 #include <linux/notifier.h>
 #include <linux/fb.h>
@@ -56,6 +57,7 @@
 #define SYNAPTICS_RMI4_F12 (0x12)
 #define SYNAPTICS_RMI4_F1A (0x1a)
 #define SYNAPTICS_RMI4_F34 (0x34)
+#define SYNAPTICS_RMI4_F51 (0x51)
 #define SYNAPTICS_RMI4_F54 (0x54)
 #define SYNAPTICS_RMI4_F55 (0x55)
 
@@ -200,7 +202,7 @@ struct synaptics_rmi4_device_info {
 };
 
 struct synaptics_dsx_func_patch {
-	unsigned char func;
+	unsigned short func;
 	unsigned char regstr;
 	unsigned char subpkt;
 	unsigned char size;
@@ -215,118 +217,13 @@ struct synaptics_dsx_patch {
 	struct list_head cfg_head;
 };
 
-struct synaptics_dsx_patchset {
-	int	patch_num;
-	struct synaptics_dsx_patch *patch_data;
-};
-
 #define ACTIVE_IDX	0
 #define SUSPEND_IDX	1
 #define MAX_NUM_STATES	2
 
-/*
- * struct synaptics_rmi4_data - rmi4 device instance data
- * @i2c_client: pointer to associated i2c client
- * @input_dev: pointer to associated input device
- * @board: constant pointer to platform data
- * @rmi4_mod_info: device information
- * @regulator: pointer to associated regulator
- * @rmi4_io_ctrl_mutex: mutex for i2c i/o control
- * @det_work: work thread instance for expansion function detection
- * @det_workqueue: pointer to work queue for work thread instance
- * @early_suspend: instance to support early suspend power management
- * @current_page: current page in sensor to acess
- * @button_0d_enabled: flag for 0d button support
- * @full_pm_cycle: flag for full power management cycle in early suspend stage
- * @num_of_intr_regs: number of interrupt registers
- * @f01_query_base_addr: query base address for f01
- * @f01_cmd_base_addr: command base address for f01
- * @f01_ctrl_base_addr: control base address for f01
- * @f01_data_base_addr: data base address for f01
- * @irq: attention interrupt
- * @sensor_max_x: sensor maximum x value
- * @sensor_max_y: sensor maximum y value
- * @irq_enabled: flag for indicating interrupt enable status
- * @touch_stopped: touch is in suspend state
- * @flash_enabled: allow flashing once transition to active state is complete
- * @ic_on: touch ic power state
- * @fingers_on_2d: flag to indicate presence of fingers in 2d area
- * @wait: wait queue for touch data polling in interrupt thread
- * @number_resumes: total number of remembered resumes
- * @last_resume: last resume's number (index of the location of resume)
- * @resume_info:  information about last few resumes
- * @number_irq: total number of remembered interrupt times
- * @last_irq: last interrup time's number (index of the location of interrupt)
- * @irq_info:  information about last few interrupt times
- * @i2c_read: pointer to i2c read function
- * @i2c_write: pointer to i2c write function
- * @irq_enable: pointer to irq enable function
- */
-struct synaptics_rmi4_data {
-	struct i2c_client *i2c_client;
-	struct input_dev *input_dev;
-	const struct synaptics_dsx_platform_data *board;
-	struct synaptics_rmi4_device_info rmi4_mod_info;
-	struct regulator *regulator;
-	struct mutex rmi4_io_ctrl_mutex;
-	struct mutex state_mutex;
-#if defined(CONFIG_MMI_PANEL_NOTIFICATIONS)
-	struct mmi_notifier panel_nb;
-#elif defined(CONFIG_FB)
-	struct notifier_block panel_nb;
-#endif
-	atomic_t panel_off_flag;
-	unsigned char current_page;
-	unsigned char button_0d_enabled;
-	unsigned char num_of_rx;
-	unsigned char num_of_tx;
-	unsigned char num_of_fingers;
-	unsigned char f01_ctrl_register_0;
-	unsigned char intr_mask[MAX_INTR_REGISTERS];
-	unsigned short num_of_intr_regs;
-	unsigned short f01_query_base_addr;
-	unsigned short f01_cmd_base_addr;
-	unsigned short f01_ctrl_base_addr;
-	unsigned short f01_data_base_addr;
-	unsigned int active_fn_intr_mask;
-	int state;
-	int irq;
-	int sensor_max_x;
-	int sensor_max_y;
-	bool irq_enabled;
-	atomic_t touch_stopped;
-	bool flash_enabled;
-	bool ic_on;
-	bool fingers_on_2d;
-	bool input_registered;
-	bool in_bootloader;
-	bool purge_enabled;
-	wait_queue_head_t wait;
-	int (*i2c_read)(struct synaptics_rmi4_data *pdata, unsigned short addr,
-			unsigned char *data, unsigned short length);
-	int (*i2c_write)(struct synaptics_rmi4_data *pdata, unsigned short addr,
-			unsigned char *data, unsigned short length);
-	void (*set_state)(struct synaptics_rmi4_data *rmi4_data, int state);
-	int (*ready_state)(struct synaptics_rmi4_data *rmi4_data, bool standby);
-	int (*irq_enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
-	int (*reset_device)(struct synaptics_rmi4_data *rmi4_data,
-			unsigned char *f01_cmd_base_addr);
-	int number_resumes;
-	int last_resume;
-	struct synaptics_rmi4_resume_info *resume_info;
-	int number_irq;
-	int last_irq;
-	struct synaptics_rmi4_irq_info *irq_info;
-
-	bool mode_is_wakeable;
-	bool mode_is_persistent;
-
-	bool patching_enabled;
-	struct synaptics_dsx_patchset *default_mode;
-	struct synaptics_dsx_patchset *alternate_mode;
-	struct synaptics_dsx_patchset *current_mode;
-
-	struct work_struct resume_work;
+struct synaptics_dsx_patchset {
+	int	patch_num;
+	struct synaptics_dsx_patch *patch_data[MAX_NUM_STATES];
 };
 
 struct f34_properties {
@@ -345,19 +242,45 @@ struct f34_properties {
 	};
 };
 
-#define SYNAPTICS_DSX_STATES { \
-	DSX(UNKNOWN), \
-	DSX(ACTIVE), \
-	DSX(STANDBY), \
-	DSX(SUSPEND), \
-	DSX(BL), \
-	DSX(INIT), \
-	DSX(FLASH), \
-	DSX(INVALID) }
+struct f54_control_95n {
+	union {
+		struct {
+			/* byte 0 - flags*/
+			unsigned char c95_filter_bw:3;
+			unsigned char c95_byte0_b3_b6:4;
+			unsigned char c95_disable:1;
 
-#define DSX(a)	STATE_##a
-enum SYNAPTICS_DSX_STATES;
-#undef DSX
+			/* bytes 1 - 10 */
+			unsigned char c95_first_burst_length_lsb;
+			unsigned char c95_first_burst_length_msb;
+			unsigned char c95_addl_burst_length_lsb;
+			unsigned char c95_addl_burst_length_msb;
+			unsigned char c95_i_stretch;
+			unsigned char c95_r_stretch;
+			unsigned char c95_noise_control1;
+			unsigned char c95_noise_control2;
+			unsigned char c95_noise_control3;
+			unsigned char c95_noise_control4;
+		} __packed;
+		struct {
+			unsigned char data[11];
+		} __packed;
+	};
+};
+
+enum {
+	STATE_UNKNOWN,
+	STATE_ACTIVE,
+	STATE_SUSPEND,
+	STATE_STANDBY = 4,
+	STATE_BL,
+	STATE_INIT,
+	STATE_FLASH,
+	STATE_QUERY,
+	STATE_INVALID
+};
+
+#define STATE_UI       (STATE_ACTIVE | STATE_SUSPEND)
 
 enum ic_modes {
 	IC_MODE_ANY = 0,
@@ -372,21 +295,6 @@ enum exp_fn {
 	RMI_FW_UPDATER,
 	RMI_LAST,
 };
-
-struct synaptics_rmi4_exp_fn_ptr {
-	int (*read)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-			unsigned char *data, unsigned short length);
-	int (*write)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-			unsigned char *data, unsigned short length);
-	int (*enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
-};
-
-void synaptics_rmi4_new_function(enum exp_fn fn_type, bool insert,
-		int (*func_init)(struct synaptics_rmi4_data *rmi4_data),
-		void (*func_remove)(struct synaptics_rmi4_data *rmi4_data),
-		void (*func_attn)(struct synaptics_rmi4_data *rmi4_data,
-				unsigned char intr_mask),
-		enum ic_modes mode);
 
 static inline ssize_t synaptics_rmi4_show_error(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -439,6 +347,8 @@ struct synaptics_rmi4_subpkt {
 
 struct synaptics_rmi4_packet_reg {
 	unsigned short r_number;
+	bool updated;	/* indicate that value in *data has been updated */
+	bool modified;	/* indicate that value in *data has been modified */
 	bool expected;
 	short offset;
 	unsigned int size;
@@ -448,21 +358,156 @@ struct synaptics_rmi4_packet_reg {
 };
 
 #define RMI4_NO_REG(r) {\
-	.r_number = r, .offset = -1, .expected = 0, .size = 0, .data = NULL,\
+	.r_number = r, .offset = -1, .updated = 0, .modified = 0,\
+	.expected = 0, .size = 0, .data = NULL,\
 	.nr_subpkts = 0, .subpkt = NULL}
 #define RMI4_REG(r, s) {\
-	.r_number = r, .offset = -1, .expected = 1, .size = 0, .data = NULL,\
+	.r_number = r, .offset = -1, .updated = 0, .modified = 0,\
+	.expected = 1, .size = 0, .data = NULL,\
 	.nr_subpkts = ARRAY_SIZE(s), .subpkt = s}
 #define RMI4_REG_STATIC(r, s, sz) {\
-	.r_number = r, .offset = r, .expected = 1, .size = sz, .data = NULL,\
+	.r_number = r, .offset = r, .updated = 0, .modified = 0,\
+	.expected = 1, .size = sz, .data = NULL,\
 	.nr_subpkts = ARRAY_SIZE(s), .subpkt = s}
 
 struct synaptics_rmi4_func_packet_regs {
 	unsigned short f_number;
 	unsigned short base_addr;
+	unsigned short query_offset;
 	int nr_regs;
 	struct synaptics_rmi4_packet_reg *regs;
 };
+
+/*
+ * struct synaptics_rmi4_data - rmi4 device instance data
+ * @i2c_client: pointer to associated i2c client
+ * @input_dev: pointer to associated input device
+ * @board: constant pointer to platform data
+ * @rmi4_mod_info: device information
+ * @regulator: pointer to associated regulator
+ * @vdd_quirk: pointer to associated regulator for 'quirk' config
+ * @rmi4_io_ctrl_mutex: mutex for i2c i/o control
+ * @det_work: work thread instance for expansion function detection
+ * @det_workqueue: pointer to work queue for work thread instance
+ * @early_suspend: instance to support early suspend power management
+ * @current_page: current page in sensor to acess
+ * @button_0d_enabled: flag for 0d button support
+ * @full_pm_cycle: flag for full power management cycle in early suspend stage
+ * @num_of_intr_regs: number of interrupt registers
+ * @f01_query_base_addr: query base address for f01
+ * @f01_cmd_base_addr: command base address for f01
+ * @f01_ctrl_base_addr: control base address for f01
+ * @f01_data_base_addr: data base address for f01
+ * @irq: attention interrupt
+ * @sensor_max_x: sensor maximum x value
+ * @sensor_max_y: sensor maximum y value
+ * @irq_enabled: flag for indicating interrupt enable status
+ * @touch_stopped: touch is in suspend state
+ * @flash_enabled: allow flashing once transition to active state is complete
+ * @ic_on: touch ic power state
+ * @fingers_on_2d: flag to indicate presence of fingers in 2d area
+ * @wait: wait queue for touch data polling in interrupt thread
+ * @number_resumes: total number of remembered resumes
+ * @last_resume: last resume's number (index of the location of resume)
+ * @resume_info:  information about last few resumes
+ * @number_irq: total number of remembered interrupt times
+ * @last_irq: last interrup time's number (index of the location of interrupt)
+ * @irq_info:  information about last few interrupt times
+ * @i2c_read: pointer to i2c read function
+ * @i2c_write: pointer to i2c write function
+ * @irq_enable: pointer to irq enable function
+ */
+struct synaptics_rmi4_data {
+	struct i2c_client *i2c_client;
+	struct input_dev *input_dev;
+	const struct synaptics_dsx_platform_data *board;
+	struct synaptics_rmi4_device_info rmi4_mod_info;
+	struct regulator *regulator;
+	struct regulator *vdd_quirk;
+	struct mutex rmi4_io_ctrl_mutex;
+	struct mutex state_mutex;
+#if defined(CONFIG_MMI_PANEL_NOTIFICATIONS)
+	struct mmi_notifier panel_nb;
+#elif defined(CONFIG_FB)
+	struct notifier_block panel_nb;
+#endif
+#ifdef CONFIG_MMI_HALL_NOTIFICATIONS
+	struct notifier_block folio_notif;
+#endif
+	atomic_t panel_off_flag;
+	unsigned char current_page;
+	unsigned char button_0d_enabled;
+	unsigned char num_of_rx;
+	unsigned char num_of_tx;
+	unsigned char num_of_fingers;
+	unsigned char f01_ctrl_register_0;
+	unsigned char intr_mask[MAX_INTR_REGISTERS];
+	unsigned short num_of_intr_regs;
+	unsigned short f01_query_base_addr;
+	unsigned short f01_cmd_base_addr;
+	unsigned short f01_ctrl_base_addr;
+	unsigned short f01_data_base_addr;
+	unsigned int active_fn_intr_mask;
+	int state;
+	int irq;
+	int sensor_max_x;
+	int sensor_max_y;
+	bool irq_enabled;
+	atomic_t touch_stopped;
+	bool flash_enabled;
+	bool ic_on;
+	bool fingers_on_2d;
+	bool input_registered;
+	bool in_bootloader;
+	bool purge_enabled;
+	bool charger_detection;
+	wait_queue_head_t wait;
+	int (*i2c_read)(struct synaptics_rmi4_data *pdata, unsigned short addr,
+			unsigned char *data, unsigned short length);
+	int (*i2c_write)(struct synaptics_rmi4_data *pdata, unsigned short addr,
+			unsigned char *data, unsigned short length);
+	void (*set_state)(struct synaptics_rmi4_data *rmi4_data, int state);
+	int (*ready_state)(struct synaptics_rmi4_data *rmi4_data, bool standby);
+	int (*irq_enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
+	int (*reset_device)(struct synaptics_rmi4_data *rmi4_data,
+			unsigned char *f01_cmd_base_addr);
+	int number_resumes;
+	int last_resume;
+	struct synaptics_rmi4_resume_info *resume_info;
+	int number_irq;
+	int last_irq;
+	struct synaptics_rmi4_irq_info *irq_info;
+
+	bool mode_is_wakeable;
+	bool mode_is_persistent;
+
+	bool patching_enabled;
+	struct synaptics_dsx_patchset *default_mode;
+	struct synaptics_dsx_patchset *alternate_mode;
+	struct synaptics_dsx_patchset *current_mode;
+
+	struct work_struct resume_work;
+
+	struct synaptics_rmi4_func_packet_regs *f12_data_registers_ptr;
+	struct notifier_block rmi_reboot;
+
+	struct power_supply psy;
+};
+
+struct synaptics_rmi4_exp_fn_ptr {
+	int (*read)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
+			unsigned char *data, unsigned short length);
+	int (*write)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
+			unsigned char *data, unsigned short length);
+	int (*enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
+};
+
+void synaptics_rmi4_new_function(enum exp_fn fn_type, bool insert,
+		int (*func_init)(struct synaptics_rmi4_data *rmi4_data),
+		void (*func_remove)(struct synaptics_rmi4_data *rmi4_data),
+		void (*func_attn)(struct synaptics_rmi4_data *rmi4_data,
+				unsigned char intr_mask),
+		enum ic_modes mode);
 
 int synaptics_rmi4_scan_packet_reg_info(
 	struct synaptics_rmi4_data *rmi4_data,
@@ -477,4 +522,22 @@ int synaptics_rmi4_read_packet_reg(
 int synaptics_rmi4_read_packet_regs(
 	struct synaptics_rmi4_data *rmi4_data,
 	struct synaptics_rmi4_func_packet_regs *regs);
+
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_TEST_REPORTING)
+int synaptics_rmi4_scan_f54_ctrl_reg_info(
+	struct synaptics_rmi4_func_packet_regs *regs);
+
+int synaptics_rmi4_scan_f54_cmd_reg_info(
+	struct synaptics_rmi4_func_packet_regs *regs);
+#else
+static inline int synaptics_rmi4_scan_f54_ctrl_reg_info(
+	struct synaptics_rmi4_func_packet_regs *regs) {
+	return -ENOSYS;
+}
+
+static inline int synaptics_rmi4_scan_f54_cmd_reg_info(
+	struct synaptics_rmi4_func_packet_regs *regs) {
+	return -ENOSYS;
+}
+#endif
 #endif

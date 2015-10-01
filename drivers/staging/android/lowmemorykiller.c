@@ -576,6 +576,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 				"   Slab UnReclaimable is %ldkB\n" \
 				"   Total Slab is %ldkB\n" \
 				"   ION is %ldkB\n" \
+				"   ION_POOL is %ldkB\n" \
 				"   ION_CMA is %ldkB\n" \
 				"   GFP mask is 0x%x\n",
 			     selected->comm, selected->pid,
@@ -604,6 +605,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			     global_page_state(NR_SLAB_UNRECLAIMABLE) *
 				(long)(PAGE_SIZE / 1024),
 			     global_page_state(NR_ION_PAGES) *
+				(long)(PAGE_SIZE / 1024),
+			     global_page_state(NR_ION_POOL_PAGES) *
 				(long)(PAGE_SIZE / 1024),
 			     global_page_state(NR_ION_CMA_PAGES) *
 				(long)(PAGE_SIZE / 1024),
@@ -748,37 +751,45 @@ static const struct kparam_array __param_arr_adj = {
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 DEFINE_SPINLOCK(lmk_lock);
 struct rb_root tasks_scoreadj = RB_ROOT;
+/*
+ * Makesure to invoke the function with holding sighand->siglock
+ */
 void add_2_adj_tree(struct task_struct *task)
 {
-	struct rb_node **link = &tasks_scoreadj.rb_node;
+	struct rb_node **link;
 	struct rb_node *parent = NULL;
-	struct task_struct *task_entry;
+	struct signal_struct *sig_entry;
 	s64 key = task->signal->oom_score_adj;
+
 	/*
 	 * Find the right place in the rbtree:
 	 */
 	spin_lock(&lmk_lock);
+	link =  &tasks_scoreadj.rb_node;
 	while (*link) {
 		parent = *link;
-		task_entry = rb_entry(parent, struct task_struct, adj_node);
+		sig_entry = rb_entry(parent, struct signal_struct, adj_node);
 
-		if (key < task_entry->signal->oom_score_adj)
+		if (key < sig_entry->oom_score_adj)
 			link = &parent->rb_right;
 		else
 			link = &parent->rb_left;
 	}
 
-	rb_link_node(&task->adj_node, parent, link);
-	rb_insert_color(&task->adj_node, &tasks_scoreadj);
+	rb_link_node(&task->signal->adj_node, parent, link);
+	rb_insert_color(&task->signal->adj_node, &tasks_scoreadj);
 	spin_unlock(&lmk_lock);
 }
 
+/*
+ * Makesure to invoke the function with holding sighand->siglock
+ */
 void delete_from_adj_tree(struct task_struct *task)
 {
 	spin_lock(&lmk_lock);
-	if (!RB_EMPTY_NODE(&task->adj_node)) {
-		rb_erase(&task->adj_node, &tasks_scoreadj);
-		RB_CLEAR_NODE(&task->adj_node);
+	if (!RB_EMPTY_NODE(&task->signal->adj_node)) {
+		rb_erase(&task->signal->adj_node, &tasks_scoreadj);
+		RB_CLEAR_NODE(&task->signal->adj_node);
 	}
 	spin_unlock(&lmk_lock);
 }
@@ -786,20 +797,23 @@ void delete_from_adj_tree(struct task_struct *task)
 static struct task_struct *pick_next_from_adj_tree(struct task_struct *task)
 {
 	struct rb_node *next;
+	struct signal_struct *next_tsk_sig;
 
 	spin_lock(&lmk_lock);
-	next = rb_next(&task->adj_node);
+	next = rb_next(&task->signal->adj_node);
 	spin_unlock(&lmk_lock);
 
 	if (!next)
 		return NULL;
 
-	return rb_entry(next, struct task_struct, adj_node);
+	next_tsk_sig = rb_entry(next, struct signal_struct, adj_node);
+	return next_tsk_sig->curr_target->group_leader;
 }
 
 static struct task_struct *pick_first_task(void)
 {
 	struct rb_node *left;
+	struct signal_struct *first_tsk_sig;
 
 	spin_lock(&lmk_lock);
 	left = rb_first(&tasks_scoreadj);
@@ -808,11 +822,13 @@ static struct task_struct *pick_first_task(void)
 	if (!left)
 		return NULL;
 
-	return rb_entry(left, struct task_struct, adj_node);
+	first_tsk_sig = rb_entry(left, struct signal_struct, adj_node);
+	return first_tsk_sig->curr_target->group_leader;
 }
 static struct task_struct *pick_last_task(void)
 {
 	struct rb_node *right;
+	struct signal_struct *last_tsk_sig;
 
 	spin_lock(&lmk_lock);
 	right = rb_last(&tasks_scoreadj);
@@ -821,7 +837,8 @@ static struct task_struct *pick_last_task(void)
 	if (!right)
 		return NULL;
 
-	return rb_entry(right, struct task_struct, adj_node);
+	last_tsk_sig = rb_entry(right, struct signal_struct, adj_node);
+	return last_tsk_sig->curr_target->group_leader;
 }
 #endif
 
