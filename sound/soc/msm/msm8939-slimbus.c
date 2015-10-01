@@ -39,7 +39,11 @@
 #include "../codecs/fsa8500-core.h"
 #ifdef CONFIG_SND_SOC_FLORIDA
 #include "../codecs/florida.h"
+#include "../codecs/arizona.h"
 #include "../codecs/aov_trigger.h"
+
+#include <linux/mfd/arizona/core.h>
+#include <linux/mfd/arizona/registers.h>
 #endif
 
 #define DRV_NAME "msm8939-slimbus-wcd"
@@ -68,6 +72,9 @@
 #define WCD9XXX_MBHC_DEF_BUTTONS    8
 #define WCD9XXX_MBHC_DEF_RLOADS     5
 #define CODEC_EXT_CLK_RATE         9600000
+#ifdef CONFIG_SND_SOC_FLORIDA
+#define FLORIDA_SYSCLK_RATE (48000 * 1024 * 3)
+#endif
 
 #define PRI_MI2S_ID	(1 << 0)
 #define SEC_MI2S_ID	(1 << 1)
@@ -91,6 +98,9 @@ static int msm_slim_1_tx_ch = 1;
 static int msm_btsco_rate = BTSCO_RATE_8KHZ;
 static int msm_btsco_ch = 1;
 static int msm8939_spk_control = 1;
+#ifdef CONFIG_SND_SOC_FLORIDA
+static struct clk *codec_clk;
+#endif
 static int clk_users;
 static struct platform_device *spdev;
 
@@ -376,18 +386,125 @@ exit:
 	return ret;
 }
 
+#ifdef CONFIG_SND_SOC_FLORIDA
+static int msm_snd_enable_pmic_bb_clk2(struct snd_soc_codec *codec, int enable,
+					bool dapm)
+{
+	int ret = 0;
+	struct snd_soc_card *card = codec->card;
+	struct msm8939_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+
+	pr_debug("%s: enable = %d clk_users = %d\n",
+		__func__, enable, clk_users);
+
+	mutex_lock(&pdata->cdc_mclk_mutex);
+
+	if (enable) {
+		if (!codec_clk) {
+			dev_err(codec->dev, "%s: did not get codec MCLK\n",
+				__func__);
+			ret = -EINVAL;
+			goto exit;
+		}
+		clk_users++;
+		if (clk_users != 1)
+			goto exit;
+
+		ret = clk_prepare_enable(codec_clk);
+		if (ret) {
+			pr_err("%s: clk_prepare failed, err:%d\n",
+				__func__, ret);
+			clk_users--;
+			goto exit;
+		}
+	} else {
+		if (clk_users > 0) {
+			clk_users--;
+			if (clk_users == 0)
+				clk_disable_unprepare(codec_clk);
+		} else {
+			pr_err("%s: Error releasing codec MCLK\n", __func__);
+			ret = -EINVAL;
+			goto exit;
+		}
+	}
+exit:
+	mutex_unlock(&pdata->cdc_mclk_mutex);
+	return ret;
+}
+#endif
+
 static int msm8x16_mclk_event(struct snd_soc_dapm_widget *w,
 		struct snd_kcontrol *kcontrol, int event)
 {
+#ifdef CONFIG_SND_SOC_FLORIDA
+	int ret;
+	struct snd_soc_codec *codec = w->codec;
+#endif
 	pr_debug("%s: event = %d\n", __func__, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+#ifdef CONFIG_SND_SOC_FLORIDA
+		ret = msm_snd_enable_pmic_bb_clk2(codec, 1, true);
+		if (ret < 0) {
+			pr_err("%s Cannot set ext clk %d\n", __func__, ret);
+			goto exit;
+		}
+		ret = snd_soc_codec_set_pll(codec, FLORIDA_FLL1_REFCLK,
+			ARIZONA_FLL_SRC_MCLK1,
+			19200000,
+			FLORIDA_SYSCLK_RATE);
+		if (ret < 0) {
+			pr_err("%s Cannot set REFCLK 9.6MHz %d\n", __func__,
+				ret);
+			goto exit;
+		}
+		ret = snd_soc_codec_set_pll(codec, FLORIDA_FLL1,
+			ARIZONA_FLL_SRC_MCLK1,
+			19200000,
+			FLORIDA_SYSCLK_RATE);
+		if (ret < 0)
+			pr_err("%s Cannot set SYNC CLK 9.6MHz %d\n", __func__,
+				ret);
+		break;
+#else
 		return msm_snd_enable_codec_ext_clk(w->codec, 1, true);
+#endif
 	case SND_SOC_DAPM_POST_PMD:
+#ifdef CONFIG_SND_SOC_FLORIDA
+		ret = snd_soc_codec_set_pll(codec, FLORIDA_FLL1_REFCLK,
+			ARIZONA_FLL_SRC_MCLK2,
+			32768,
+			FLORIDA_SYSCLK_RATE);
+		if (ret < 0) {
+			pr_err("%s Cannot set REFCLK 32kHz %d\n", __func__,
+				ret);
+			goto exit;
+		}
+		ret = snd_soc_codec_set_pll(codec, FLORIDA_FLL1,
+			ARIZONA_FLL_SRC_MCLK2,
+			32768,
+			FLORIDA_SYSCLK_RATE);
+		if (ret < 0)
+			pr_err("%s Cant set SYNC CLK 32kHz %d\n", __func__,
+				ret);
+
+		ret = msm_snd_enable_pmic_bb_clk2(codec, 0, true);
+		if (ret < 0) {
+			pr_err("%s Cannot set ext clk %d\n", __func__, ret);
+			goto exit;
+		}
+		break;
+#else
 		return msm_snd_enable_codec_ext_clk(w->codec, 0, true);
+#endif
 	}
 	return 0;
+#ifdef CONFIG_SND_SOC_FLORIDA
+exit:
+	return ret;
+#endif
 }
 
 static const struct snd_soc_dapm_widget msm8939_dapm_widgets[] = {
@@ -414,6 +531,10 @@ static const struct snd_soc_dapm_widget msm8939_dapm_widgets[] = {
 
 #ifdef CONFIG_SND_SOC_FLORIDA
 static const struct snd_soc_dapm_route florida_audio_routes[] = {
+	{"Slim1 Playback", NULL, "MCLK"},
+	{"Slim1 Capture", NULL, "MCLK"},
+	{"Slim2 Playback", NULL, "MCLK"},
+	{"Slim2 Capture", NULL, "MCLK"},
 	{"IN1L", NULL, "MICBIAS3"},
 	{"IN2L", NULL, "MICBIAS3"},
 	{"IN2R", NULL, "MICBIAS3"},
@@ -596,6 +717,38 @@ static char const *slim0_rx_sample_rate_text[] = {"KHZ_48", "KHZ_96",
 					"KHZ_192"};
 static const char *const slim1_tx_ch_text[] = {"One", "Two"};
 
+static const char *const btsco_rate_text[] = {"8000", "16000"};
+static const struct soc_enum msm_btsco_enum[] = {
+	SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
+};
+
+static int msm_btsco_rate_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: msm_btsco_rate  = %d", __func__, msm_btsco_rate);
+	ucontrol->value.integer.value[0] = msm_btsco_rate;
+	return 0;
+}
+
+static int msm_btsco_rate_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		msm_btsco_rate = BTSCO_RATE_8KHZ;
+		break;
+	case 1:
+		msm_btsco_rate = BTSCO_RATE_16KHZ;
+		break;
+	default:
+		msm_btsco_rate = BTSCO_RATE_8KHZ;
+		break;
+	}
+
+	pr_debug("%s: msm_btsco_rate = %d\n", __func__, msm_btsco_rate);
+	return 0;
+}
+
 static const struct soc_enum msm_snd_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, spk_function),
 	SOC_ENUM_SINGLE_EXT(2, slim0_rx_ch_text),
@@ -618,6 +771,8 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			slim0_rx_sample_rate_get, slim0_rx_sample_rate_put),
 	SOC_ENUM_EXT("SLIM_1_TX Channels", msm_snd_enum[5],
 			msm_slim_1_tx_ch_get, msm_slim_1_tx_ch_put),
+	SOC_ENUM_EXT("Internal BTSCO SampleRate", msm_btsco_enum[0],
+			msm_btsco_rate_get, msm_btsco_rate_put),
 };
 
 static int msm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
@@ -786,7 +941,6 @@ static int  msm8939_adsp_state_callback(struct notifier_block *nb,
 #define MSM8939_AIF1_BCLK_RATE (SAMPLE_RATE_48KHZ * \
 					MSM8939_AIF1_SAMPLE_DEPTH * \
 					MSM8939_AIF1_CHANNELS)
-#define FLORIDA_SYSCLK_RATE (48000 * 1024 * 3)
 static struct snd_soc_codec *florida_codec;
 static int florida_dai_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -797,19 +951,13 @@ static int florida_dai_init(struct snd_soc_pcm_runtime *rtd)
 	/* BODGE */
 	florida_codec = rtd->codec;
 
-#if 0
 	/* This is for if you want to have MCLK connected MCLK1 on the FLORIDA. */
-	codec_clk = clk_get(&spdev->dev, "osr_clk");
+	codec_clk = clk_get(&spdev->dev, "bb_clk2");
 	if (IS_ERR(codec_clk)) {
 		pr_err("%s: error clk_get %lu\n",
 			__func__, PTR_ERR(codec_clk));
 		return -EINVAL;
 	}
-#endif
-
-	ret = msm_snd_enable_codec_ext_clk(codec, 1, true);
-	if (ret != 0)
-		dev_err(codec->dev, "Failed to turn on the clock\n");
 
 	dev_crit(codec->dev, "florida_dai_init first BE dai initing ...\n");
 
@@ -845,6 +993,7 @@ static int florida_dai_init(struct snd_soc_pcm_runtime *rtd)
 
 	snd_soc_dapm_ignore_suspend(dapm, "DSP2 Virtual Output");
 	snd_soc_dapm_ignore_suspend(dapm, "DSP3 Virtual Output");
+	snd_soc_dapm_ignore_suspend(dapm, "DSP Virtual Input");
 	snd_soc_dapm_ignore_suspend(dapm, "MICBIAS1");
 	snd_soc_dapm_ignore_suspend(dapm, "MICBIAS2");
 	snd_soc_dapm_ignore_suspend(dapm, "MICBIAS3");
@@ -861,6 +1010,8 @@ static int florida_dai_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "HPOUT1R");
 	snd_soc_dapm_ignore_suspend(dapm, "HPOUT2L");
 	snd_soc_dapm_ignore_suspend(dapm, "HPOUT2R");
+	snd_soc_dapm_ignore_suspend(dapm, "SLIMTX5");
+	snd_soc_dapm_ignore_suspend(dapm, "Slim2 Capture");
 
 	if (ret != 0)
 		dev_err(codec->dev, "Failed to add florida_audio_routes\n");

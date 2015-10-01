@@ -48,6 +48,8 @@
 
 #define COMMAND_GET_REPORT 1
 #define COMMAND_FORCE_CAL 2
+#define COMMAND_FORCE_UPDATE 4
+#define COMMAND_ENTER_IN_CELL_TESTMODE 16
 
 #define HIGH_RESISTANCE_DATA_SIZE 6
 #define FULL_RAW_CAP_MIN_MAX_DATA_SIZE 4
@@ -364,8 +366,8 @@ show_store_replicated_func(rtype, rgrp, propname, "%u")
 		control->reg_##reg->data = kzalloc(size, GFP_KERNEL);\
 		if (!control->reg_##reg->data)\
 			goto exit_no_mem;\
-		pr_debug("c%s addr = 0x%02x size = %d added\n",\
-			 #reg, reg_addr, (unsigned int)size);\
+		pr_debug("c%s addr = 0x%02x size = %zu added\n",\
+			 #reg, reg_addr, size);\
 		control->reg_##reg->length = size;\
 		control->reg_##reg->address = reg_addr;\
 		reg_addr += skip;\
@@ -865,7 +867,7 @@ struct f54_query38 {
 struct f54_query39 {
 	union {
 		struct {
-			unsigned char f54_b0_to_b6:1;
+			unsigned char f54_b0_to_b6:7;
 			unsigned char has_query40:1;
 		} __packed;
 		unsigned char data[1];
@@ -1337,32 +1339,6 @@ struct f54_control_40 {
 	unsigned char length;
 };
 
-struct f54_control_95n {
-	union {
-		struct {
-			/* byte 0 - flags*/
-			unsigned char c95_filter_bw:3;
-			unsigned char c95_byte0_b3_b6:4;
-			unsigned char c95_disable:1;
-
-			/* bytes 1 - 10 */
-			unsigned char c95_first_burst_length_lsb;
-			unsigned char c95_first_burst_length_msb;
-			unsigned char c95_addl_burst_length_lsb;
-			unsigned char c95_addl_burst_length_msb;
-			unsigned char c95_i_stretch;
-			unsigned char c95_r_stretch;
-			unsigned char c95_noise_control1;
-			unsigned char c95_noise_control2;
-			unsigned char c95_noise_control3;
-			unsigned char c95_noise_control4;
-		} __packed;
-		struct {
-			unsigned char data[11];
-		} __packed;
-	};
-};
-
 struct f54_control_89 {
 	union {
 		struct {
@@ -1487,6 +1463,8 @@ struct f54_control {
 	struct f54_control_99 *reg_99;
 	struct f54_control_107 *reg_107;
 	struct f54_control_137 *reg_137;
+	struct f55_control_0 *reg_0_f55;
+	struct f55_control_8 *reg_8_f55;
 };
 
 struct f54_data_4 {
@@ -1592,6 +1570,19 @@ struct f54_data_14 {
 	};
 };
 
+struct f54_data_16 {
+	union {
+		struct {
+			unsigned char d16_freq_scan_im_lsb;
+			unsigned char d16_freq_scan_im_msb;
+		} __packed;
+		struct {
+			unsigned char data[2];
+			unsigned short address;
+		} __packed;
+	};
+};
+
 struct f54_data_17 {
 	union {
 		struct {
@@ -1614,10 +1605,11 @@ struct f54_data {
 	struct f54_data_9 *reg_9;
 	struct f54_data_10 *reg_10;
 	struct f54_data_14 *reg_14;
+	struct f54_data_16 *reg_16;
 	struct f54_data_17 *reg_17;
 };
 
-struct f55_query {
+struct f55_query_0_2 {
 	union {
 		struct {
 			/* query 0 */
@@ -1630,12 +1622,55 @@ struct f55_query {
 			unsigned char has_sensor_assignment:1;
 			unsigned char has_edge_compensation:1;
 			unsigned char curve_compensation_mode:2;
-			unsigned char reserved:4;
+			unsigned char has_ctrl6:1;
+			unsigned char has_alternate_tx_assignment:1;
+			unsigned char f55_q2_has_single_layer_multitouch:1;
+			unsigned char has_query5:1;
 		} __packed;
 		unsigned char data[3];
 	};
 };
 
+struct f55_query_3 {
+	union {
+		struct {
+			unsigned char f55_q3_has_ctrl8:1;
+			unsigned char has_ctrl9:1;
+			unsigned char has_on_cell_pattern:1;
+			unsigned char has_data0:1;
+			unsigned char has_single_wide_pattern:1;
+			unsigned char has_mirrored_tx_pattern:1;
+			unsigned char has_discrete_pattern:1;
+			unsigned char has_query9:1;
+		} __packed;
+		unsigned char data[1];
+	};
+};
+
+struct f55_control_0 {
+	union {
+		struct {
+			unsigned char f55_c0_receivers_on_x:1;
+			unsigned char f55_c0_curve_compensation_on_tx:1;
+			unsigned char f55_c0_trx_sense:1;
+			unsigned char f55_c0_trx_config:1;
+			unsigned char f55_c0_guard_disable:1;
+			unsigned char f55_c0_b5_b7:3;
+		} __packed;
+		unsigned char data[1];
+		unsigned short address;
+	};
+};
+
+struct f55_control_8 {
+	union {
+		struct {
+			unsigned char f55_c8_pattern_type;
+		} __packed;
+		unsigned char data[1];
+		unsigned short address;
+	};
+};
 
 struct synaptics_rmi4_fn55_desc {
 	unsigned short query_base_addr;
@@ -1704,6 +1739,8 @@ struct synaptics_rmi4_f54_handle {
 	struct synaptics_rmi4_exp_fn_ptr *fn_ptr;
 	struct synaptics_rmi4_data *rmi4_data;
 	struct synaptics_rmi4_fn55_desc *fn55;
+	struct f55_query_0_2 query_f55_0_2;
+	struct f55_query_3 query_f55_3;
 	struct wake_lock test_wake_lock;
 };
 
@@ -1720,7 +1757,9 @@ show_prototype_ext(user_get_report1, S_IRUGO)
 show_prototype_ext(user_get_report2, S_IRUGO)
 show_store_prototype(fifoindex)
 store_prototype(get_report)
+show_store_prototype(force_update)
 store_prototype(force_cal)
+show_store_prototype(enter_in_cell_test_mode)
 show_prototype_ext(num_of_rx_electrodes, S_IRUGO)
 show_prototype_ext(num_of_tx_electrodes, S_IRUGO)
 show_prototype(has_image16)
@@ -1762,7 +1801,6 @@ show_prototype(has_noise_state)
 show_prototype(has_energy_ratio_relaxation)
 show_prototype(number_of_sensing_frequencies)
 show_prototype(q17_num_of_sense_freqs)
-
 show_store_prototype(no_relax)
 show_store_prototype(no_scan)
 show_store_prototype(bursts_per_cluster)
@@ -1823,6 +1861,8 @@ show_prototype(d8_variance_metric_msb)
 show_prototype(d9_averaged_im_lsb)
 show_prototype(d9_averaged_im_msb)
 show_prototype(d10_noise_state)
+show_store_prototype(d16_freq_scan_im_lsb)
+show_store_prototype(d16_freq_scan_im_msb)
 show_prototype(d14_cid_im_lsb)
 show_prototype(d14_cid_im_msb)
 show_store_prototype(d17_inhibit_freq_shift)
@@ -1864,6 +1904,9 @@ show_store_prototype(c107_abs_adc_clock_div)
 show_store_prototype(c107_abs_sub_burtst_size)
 show_store_prototype(c107_abs_trigger_delay)
 show_store_prototype(c137_cmnr_adjust)
+show_prototype(f55_q2_has_single_layer_multitouch)
+show_prototype(f55_c0_receivers_on_x)
+show_prototype(f55_c8_pattern_type)
 
 static ssize_t synaptics_rmi4_f54_data_read(struct file *data_file,
 		struct kobject *kobj, struct bin_attribute *attributes,
@@ -1883,7 +1926,9 @@ static struct attribute *attrs[] = {
 	attrify(user_get_report2),
 	attrify(fifoindex),
 	attrify(get_report),
+	attrify(force_update),
 	attrify(force_cal),
+	attrify(enter_in_cell_test_mode),
 	attrify(num_of_rx_electrodes),
 	attrify(num_of_tx_electrodes),
 	attrify(has_image16),
@@ -1925,6 +1970,7 @@ static struct attribute *attrs[] = {
 	attrify(has_energy_ratio_relaxation),
 	attrify(number_of_sensing_frequencies),
 	attrify(q17_num_of_sense_freqs),
+	attrify(f55_q2_has_single_layer_multitouch),
 	NULL,
 };
 
@@ -2135,6 +2181,16 @@ static struct attribute *attrs_reg_137[] = {
 	NULL,
 };
 
+static struct attribute *attrs_f55_c0[] = {
+	attrify(f55_c0_receivers_on_x),
+	NULL,
+};
+
+static struct attribute *attrs_f55_c8[] = {
+	attrify(f55_c8_pattern_type),
+	NULL,
+};
+
 static struct attribute_group attrs_ctrl_regs[] = {
 	GROUP(attrs_reg_0),
 	GROUP(attrs_reg_1),
@@ -2166,6 +2222,8 @@ static struct attribute_group attrs_ctrl_regs[] = {
 	GROUP(attrs_reg_99),
 	GROUP(attrs_reg_107),
 	GROUP(attrs_reg_137),
+	GROUP(attrs_f55_c0),
+	GROUP(attrs_f55_c8),
 };
 
 static bool attrs_ctrl_regs_exist[ARRAY_SIZE(attrs_ctrl_regs)];
@@ -2216,6 +2274,12 @@ static struct attribute *data_attrs_reg_14[] = {
 	NULL,
 };
 
+static struct attribute *data_attrs_reg_16[] = {
+	attrify(d16_freq_scan_im_lsb),
+	attrify(d16_freq_scan_im_msb),
+	NULL,
+};
+
 static struct attribute *data_attrs_reg_17[] = {
 	attrify(d17_freq),
 	attrify(d17_inhibit_freq_shift),
@@ -2231,6 +2295,7 @@ static struct attribute_group attrs_data_regs[] = {
 	GROUP(data_attrs_reg_9),
 	GROUP(data_attrs_reg_10),
 	GROUP(data_attrs_reg_14),
+	GROUP(data_attrs_reg_16),
 	GROUP(data_attrs_reg_17),
 };
 
@@ -2617,6 +2682,7 @@ static void free_data_mem(void)
 	kfree(data.reg_9);
 	kfree(data.reg_10);
 	kfree(data.reg_14);
+	kfree(data.reg_16);
 	kfree(data.reg_17);
 }
 
@@ -2974,6 +3040,121 @@ static ssize_t synaptics_rmi4_f54_get_report_store(struct device *dev,
 	return count;
 }
 
+static ssize_t synaptics_rmi4_f54_force_update_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int retval;
+	unsigned char data[1];
+	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+
+	retval = f54->fn_ptr->read(rmi4_data,
+			f54->command_base_addr,
+			data,
+			sizeof(data));
+	if (retval < 0) {
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to read command 0 register\n",
+				__func__);
+		return retval;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		(data[0] & COMMAND_FORCE_UPDATE) == COMMAND_FORCE_UPDATE);
+}
+
+static ssize_t synaptics_rmi4_f54_force_update_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned char command;
+	unsigned long setting;
+	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+
+	retval = sstrtoul(buf, 10, &setting);
+	if (retval)
+		return retval;
+
+	if (setting != 1)
+		return count;
+
+	command = (unsigned char)COMMAND_FORCE_UPDATE;
+
+	if (f54->status == STATUS_BUSY)
+		return -EBUSY;
+
+	retval = f54->fn_ptr->write(rmi4_data,
+			f54->command_base_addr,
+			&command,
+			sizeof(command));
+	if (retval < 0) {
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to write force update command\n",
+				__func__);
+		return retval;
+	}
+
+	return count;
+}
+
+static ssize_t synaptics_rmi4_f54_enter_in_cell_test_mode_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int retval;
+	unsigned char data[1];
+	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+
+	retval = f54->fn_ptr->read(rmi4_data,
+			f54->command_base_addr,
+			data,
+			sizeof(data));
+	if (retval < 0) {
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to read command 0 register\n",
+				__func__);
+		return retval;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		(data[0] & COMMAND_ENTER_IN_CELL_TESTMODE) ==
+			COMMAND_ENTER_IN_CELL_TESTMODE);
+}
+
+
+static ssize_t synaptics_rmi4_f54_enter_in_cell_test_mode_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned char command;
+	unsigned long setting;
+	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+
+	retval = sstrtoul(buf, 10, &setting);
+	if (retval)
+		return retval;
+
+	if (setting != 1)
+		return count;
+
+	command = (unsigned char)COMMAND_ENTER_IN_CELL_TESTMODE;
+
+	if (f54->status == STATUS_BUSY)
+		return -EBUSY;
+
+	retval = f54->fn_ptr->write(rmi4_data,
+			f54->command_base_addr,
+			&command,
+			sizeof(command));
+	if (retval < 0) {
+		dev_err(&rmi4_data->i2c_client->dev,
+		"%s: Failed to write Enter In-Cell Test Mode command\n",
+			__func__);
+		return retval;
+	}
+
+	return count;
+}
+
+
 static ssize_t synaptics_rmi4_f54_force_cal_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -3052,6 +3233,8 @@ simple_show_func_unsigned(query17, q17_num_of_sense_freqs)
 show_store_func_unsigned(data, reg_4, d4_inhibit_freq_shift)
 show_store_func_unsigned(data, reg_4, d4_baseline_sel)
 show_store_func_unsigned(data, reg_4, d4_sense_freq_sel)
+show_store_func_unsigned(data, reg_16, d16_freq_scan_im_lsb)
+show_store_func_unsigned(data, reg_16, d16_freq_scan_im_msb)
 show_store_func_unsigned(data, reg_17, d17_inhibit_freq_shift)
 show_store_func_unsigned(data, reg_17, d17_freq)
 show_func_unsigned(data, reg_6, d6_interference_metric_lsb)
@@ -3158,6 +3341,10 @@ show_store_func_unsigned(control, reg_107, c107_abs_sub_burtst_size)
 show_store_func_unsigned(control, reg_107, c107_abs_trigger_delay)
 
 show_store_func_unsigned(control, reg_137, c137_cmnr_adjust)
+
+simple_show_func_unsigned(query_f55_0_2, f55_q2_has_single_layer_multitouch)
+show_func_unsigned(control, reg_0_f55, f55_c0_receivers_on_x)
+show_func_unsigned(control, reg_8_f55, f55_c8_pattern_type)
 
 static ssize_t synaptics_rmi4_f54_burst_count_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -3368,6 +3555,85 @@ exit_2:
 
 exit_1:
 	return -ENODEV;
+}
+
+/*
+ * Fill in base register address and offset of F54
+ * control registers to allow run time patching
+ */
+int synaptics_rmi4_scan_f54_ctrl_reg_info(
+	struct synaptics_rmi4_func_packet_regs *f54_ctrl_regs)
+{
+	int ii, error = f54_ctrl_regs->nr_regs;
+	unsigned char *data;
+	struct synaptics_rmi4_packet_reg *reg;
+	struct synaptics_rmi4_subpkt *subpkt;
+
+	f54_ctrl_regs->base_addr = f54->control_base_addr;
+	for (ii = 0; ii < f54_ctrl_regs->nr_regs; ii++) {
+		reg = &f54_ctrl_regs->regs[ii];
+		subpkt = &reg->subpkt[0];
+		if (reg->r_number == 2 && f54->control.reg_2) {
+			data = kzalloc(sizeof(f54->control.reg_2->data),
+					GFP_KERNEL);
+			if (!data)
+				return -ENOMEM;
+			/* need an offset off of base address here */
+			reg->offset = f54->control.reg_2->address -
+					f54->control_base_addr;
+			reg->size = 2;
+			reg->data = data;
+			subpkt->present = true;
+			subpkt->offset = 0;
+			error--;
+		}
+		if (reg->r_number == 95 && f54->control.reg_95) {
+			int jj, num_of_subpkts;
+			data = kzalloc(f54->control.reg_95->length, GFP_KERNEL);
+			if (!data)
+				return -ENOMEM;
+			/* need an offset off of base address here */
+			reg->offset = f54->control.reg_95->address -
+					f54->control_base_addr;
+			reg->size = f54->control.reg_95->length;
+			reg->data = data;
+			/* not going over the number of predefined subpackets */
+			num_of_subpkts = min((int)reg->nr_subpkts,
+				(int)(f54->control.reg_95->length /
+				subpkt->size));
+			for (jj = 0; jj < num_of_subpkts; jj++) {
+				subpkt = &reg->subpkt[jj];
+				subpkt->present = true;
+				subpkt->offset = jj * subpkt->size;
+			}
+			error--;
+		}
+	}
+	return error;
+}
+
+/*
+ * Fill in base register address and offset of F54
+ * command register to allow run time patching
+ */
+int synaptics_rmi4_scan_f54_cmd_reg_info(
+	struct synaptics_rmi4_func_packet_regs *f54_cmd_regs)
+{
+	unsigned char *data;
+	struct synaptics_rmi4_packet_reg *reg = f54_cmd_regs->regs;
+	struct synaptics_rmi4_subpkt *subpkt = &reg->subpkt[0];
+
+	f54_cmd_regs->base_addr = f54->command_base_addr;
+	data = kzalloc(1, GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+	reg->offset = 0;
+	reg->size = 1;
+	reg->data = data;
+	subpkt->present = true;
+	subpkt->offset = 0;
+
+	return 0;
 }
 
 static int synaptics_rmi4_f54_set_ctrl(void)
@@ -3815,9 +4081,12 @@ static int synaptics_rmi4_f54_set_ctrl(void)
 	CTRL_REG_PRESENCE(57, 1, query->has_0d_acquisition_control);
 	CTRL_REG_PRESENCE(58, 1, query->has_0d_acquisition_control);
 	CTRL_REG_PRESENCE(59, 2, query->has_h_blank);
-	CTRL_REG_PRESENCE(60, 1, query->has_h_blank);
-	CTRL_REG_PRESENCE(61, 1, query->has_h_blank || query->has_v_blank);
-	CTRL_REG_PRESENCE(62, 1, query->has_h_blank || query->has_v_blank);
+	CTRL_REG_PRESENCE(60, 1, query->has_h_blank || query->has_v_blank ||
+				query->has_long_h_blank);
+	CTRL_REG_PRESENCE(61, 1, query->has_h_blank || query->has_v_blank ||
+				query->has_long_h_blank);
+	CTRL_REG_PRESENCE(62, 1, query->has_h_blank || query->has_v_blank ||
+				query->has_long_h_blank);
 	CTRL_REG_PRESENCE(63, 1, query->has_h_blank || query->has_v_blank ||
 				query->has_long_h_blank ||
 				query->has_slew_metric ||
@@ -3937,37 +4206,54 @@ static int synaptics_rmi4_f54_set_ctrl(void)
 	CTRL_REG_PRESENCE(147, 1, query38->has_ctrl147);
 	CTRL_REG_PRESENCE(148, 1, query38->has_ctrl148);
 	CTRL_REG_PRESENCE(149, 1, query38->has_ctrl149);
-	CTRL_REG_RESERVED_PRESENCE(150, 1, 1);
+	CTRL_REG_RESERVED_PRESENCE(150, 1, 0);
 	CTRL_REG_PRESENCE(151, 1, query38->has_ctrl151);
-	CTRL_REG_RESERVED_PRESENCE(152, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(153, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(154, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(155, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(156, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(157, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(158, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(159, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(160, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(161, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(162, 1, 1);
+	CTRL_REG_RESERVED_PRESENCE(152, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(153, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(154, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(155, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(156, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(157, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(158, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(159, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(160, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(161, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(162, 1, 0);
 	CTRL_REG_PRESENCE(163, 1, query40->has_ctrl163_query41);
-	CTRL_REG_RESERVED_PRESENCE(164, 1, 1);
+	CTRL_REG_RESERVED_PRESENCE(164, 1, 0);
 	CTRL_REG_PRESENCE(165, 1, query40->has_ctrl165_query42);
-	CTRL_REG_RESERVED_PRESENCE(166, 1, 1);
+	CTRL_REG_RESERVED_PRESENCE(166, 1, 0);
 	CTRL_REG_PRESENCE(167, 1, query40->has_ctrl167);
-	CTRL_REG_RESERVED_PRESENCE(168, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(169, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(170, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(171, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(172, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(173, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(174, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(175, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(176, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(177, 1, 1);
-	CTRL_REG_RESERVED_PRESENCE(178, 1, 1);
+	CTRL_REG_RESERVED_PRESENCE(168, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(169, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(170, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(171, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(172, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(173, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(174, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(175, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(176, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(177, 1, 0);
+	CTRL_REG_RESERVED_PRESENCE(178, 1, 0);
 	CTRL_REG_PRESENCE(179, 1, query46->has_ctrl179);
 
+	/* add F55 control registers */
+	reg_addr = f54->fn55->control_base_addr;
+
+	CTRL_REG_ADD(0_f55, 1, f54->query_f55_0_2.has_sensor_assignment);
+
+	CTRL_REG_PRESENCE(1_f55, 1, f54->query_f55_0_2.has_sensor_assignment);
+	CTRL_REG_PRESENCE(2_f55, 1, f54->query_f55_0_2.has_sensor_assignment);
+	CTRL_REG_PRESENCE(3_f55, 1, f54->query_f55_0_2.has_edge_compensation);
+	CTRL_REG_PRESENCE(4_f55, 1, f54->query_f55_0_2.curve_compensation_mode);
+	CTRL_REG_PRESENCE(5_f55, 1, f54->query_f55_0_2.curve_compensation_mode);
+	CTRL_REG_PRESENCE(6_f55, 1, f54->query_f55_0_2.has_ctrl6);
+	CTRL_REG_PRESENCE(7_f55, 1,
+		f54->query_f55_0_2.has_alternate_tx_assignment);
+
+	CTRL_REG_ADD(8_f55, 1,
+		f54->query_f55_0_2.f55_q2_has_single_layer_multitouch &&
+		f54->query_f55_3.f55_q3_has_ctrl8);
 	return 0;
 
 exit_no_mem:
@@ -4114,9 +4400,15 @@ static int synaptics_rmi4_f54_set_data(void)
 
 	/* data 16 */
 	if (f54->query13.has_noise_mitigation_enh) {
-		pr_debug("d16 addr = 0x%02x\n", reg_addr);
+		pr_debug("d16 addr = 0x%02x num = %d\n", reg_addr, reg_num);
+		attrs_data_regs_exist[reg_num] = true;
+		data->reg_16 = kzalloc(sizeof(*data->reg_16), GFP_KERNEL);
+		if (!data->reg_16)
+			goto exit_no_mem;
+		data->reg_16->address = reg_addr;
 		reg_addr += 1;
 	}
+	reg_num++;
 
 	/* data 17 */
 	if (f54->query16.has_data17) {
@@ -4139,6 +4431,34 @@ exit_no_mem:
 	return -ENOMEM;
 }
 
+static int synaptics_rmi4_f55_read_query(void)
+{
+	int retval;
+	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+	uint16_t reg_addr;
+
+	retval = f54->fn_ptr->read(rmi4_data,
+			f54->fn55->query_base_addr,
+			f54->query_f55_0_2.data,
+			sizeof(f54->query_f55_0_2.data));
+	if (retval < 0) {
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to read F55 query registers 0-2\n",
+				__func__);
+		goto err;
+	}
+
+	reg_addr  = f54->fn55->query_base_addr;
+
+	QUERY_REG_READ(_f55_0_2, 1);
+	QUERY_REG_READ(_f55_3,
+		f54->query_f55_0_2.f55_q2_has_single_layer_multitouch);
+return 0;
+
+err:
+	return retval;
+}
+
 static void synaptics_rmi4_f54_sensor_mapping(void)
 {
 	int retval;
@@ -4149,7 +4469,6 @@ static void synaptics_rmi4_f54_sensor_mapping(void)
 	unsigned char *buffer;
 	unsigned char *rx_buffer;
 	unsigned char *tx_buffer;
-	struct f55_query query;
 	unsigned short offset;
 	int i;
 
@@ -4162,20 +4481,9 @@ static void synaptics_rmi4_f54_sensor_mapping(void)
 		offset = control->reg_15->address;
 
 	} else if (f54->fn55) {
-		retval = f54->fn_ptr->read(rmi4_data,
-				f54->fn55->query_base_addr,
-				query.data,
-				sizeof(query.data));
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to read query registers\n",
-					__func__);
-			return;
-		}
-
-		if (query.has_sensor_assignment) {
-			rx_len = query.num_of_rx_electrodes;
-			tx_len = query.num_of_tx_electrodes;
+		if (f54->query_f55_0_2.has_sensor_assignment) {
+			rx_len = f54->query_f55_0_2.num_of_rx_electrodes;
+			tx_len = f54->query_f55_0_2.num_of_tx_electrodes;
 
 			offset = f54->fn55->control_base_addr + 1;
 		} else {
@@ -4497,6 +4805,14 @@ found:
 		goto exit_free_mem;
 	}
 
+	retval = synaptics_rmi4_f55_read_query();
+	if (retval < 0) {
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to set up F55 query registers\n",
+				__func__);
+		goto exit_free_control;
+	}
+
 	retval = synaptics_rmi4_f54_set_ctrl();
 	if (retval < 0) {
 		dev_err(&rmi4_data->i2c_client->dev,
@@ -4504,6 +4820,7 @@ found:
 				__func__);
 		goto exit_free_control;
 	}
+
 	synaptics_rmi4_f54_sensor_mapping();
 
 	retval = synaptics_rmi4_f54_set_data();

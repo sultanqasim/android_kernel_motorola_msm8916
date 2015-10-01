@@ -668,6 +668,23 @@ static struct attribute *default_attrs[] = {
 	NULL
 };
 
+static struct kset *cpufreq_kset;
+struct kobject *cpufreq_global_kobject;
+EXPORT_SYMBOL(cpufreq_global_kobject);
+
+static bool cpu_frozen;
+static int cpufreq_uevent_filter(struct kset *kset, struct kobject *kobj)
+{
+	if (cpu_frozen)
+		return 0;
+	else
+		return 1;
+}
+
+static const struct kset_uevent_ops cpufreq_uevent_ops = {
+	.filter = cpufreq_uevent_filter,
+};
+
 #define to_policy(k) container_of(k, struct cpufreq_policy, kobj)
 #define to_attr(a) container_of(a, struct freq_attr, attr)
 
@@ -748,49 +765,6 @@ static struct kobj_type ktype_cpufreq = {
 	.release	= cpufreq_sysfs_release,
 };
 
-struct kobject *cpufreq_global_kobject;
-EXPORT_SYMBOL(cpufreq_global_kobject);
-
-static int cpufreq_global_kobject_usage;
-
-int cpufreq_get_global_kobject(void)
-{
-	if (!cpufreq_global_kobject_usage++)
-		return kobject_add(cpufreq_global_kobject,
-				&cpu_subsys.dev_root->kobj, "%s", "cpufreq");
-
-	return 0;
-}
-EXPORT_SYMBOL(cpufreq_get_global_kobject);
-
-void cpufreq_put_global_kobject(void)
-{
-	if (!--cpufreq_global_kobject_usage)
-		kobject_del(cpufreq_global_kobject);
-}
-EXPORT_SYMBOL(cpufreq_put_global_kobject);
-
-int cpufreq_sysfs_create_file(const struct attribute *attr)
-{
-	int ret = cpufreq_get_global_kobject();
-
-	if (!ret) {
-		ret = sysfs_create_file(cpufreq_global_kobject, attr);
-		if (ret)
-			cpufreq_put_global_kobject();
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL(cpufreq_sysfs_create_file);
-
-void cpufreq_sysfs_remove_file(const struct attribute *attr)
-{
-	sysfs_remove_file(cpufreq_global_kobject, attr);
-	cpufreq_put_global_kobject();
-}
-EXPORT_SYMBOL(cpufreq_sysfs_remove_file);
-
 /* symlink affected CPUs */
 static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
 {
@@ -820,6 +794,7 @@ static int cpufreq_add_dev_interface(struct cpufreq_policy *policy,
 	int ret = 0;
 
 	/* prepare interface data */
+	policy->kobj.kset = cpufreq_kset;
 	ret = kobject_init_and_add(&policy->kobj, &ktype_cpufreq,
 				   &dev->kobj, "cpufreq");
 	if (ret)
@@ -2162,6 +2137,11 @@ static int cpufreq_cpu_callback(struct notifier_block *nfb,
 	struct device *dev;
 	bool frozen = false;
 
+	if (action & CPU_TASKS_FROZEN)
+		cpu_frozen = true;
+	else
+		cpu_frozen = false;
+
 	dev = get_cpu_device(cpu);
 	if (dev) {
 
@@ -2309,8 +2289,9 @@ static int __init cpufreq_core_init(void)
 	if (cpufreq_disabled())
 		return -ENODEV;
 
-	cpufreq_global_kobject = kobject_create();
-	BUG_ON(!cpufreq_global_kobject);
+	cpufreq_kset = kset_create_and_add("cpufreq", &cpufreq_uevent_ops, &cpu_subsys.dev_root->kobj);
+	BUG_ON(!cpufreq_kset);
+	cpufreq_global_kobject = &cpufreq_kset->kobj;
 	register_syscore_ops(&cpufreq_syscore_ops);
 
 	return 0;
