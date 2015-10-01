@@ -82,6 +82,8 @@
 #define MAX_CHGR_RETRY_COUNT    3
 #define USB_DEFAULT_SYSTEM_CLOCK 80000000	/* 80 MHz */
 
+#define USB_DEFAULT_SYSTEM_CLOCK 80000000	/* 80 MHz */
+
 enum msm_otg_phy_reg_mode {
 	USB_PHY_REG_OFF,
 	USB_PHY_REG_ON,
@@ -4438,8 +4440,11 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 		 * does not exist in power supply enum and it
 		 * gets overridden as DCP.
 		 */
-		if (motg->chg_state == USB_CHG_STATE_DETECTED)
+		if (motg->chg_state == USB_CHG_STATE_DETECTED) {
+			if (psy->type == POWER_SUPPLY_TYPE_UNKNOWN)
+				psy->type = POWER_SUPPLY_TYPE_USB;
 			break;
+		}
 
 		switch (psy->type) {
 		case POWER_SUPPLY_TYPE_USB:
@@ -4469,6 +4474,21 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_HEALTH:
 		motg->usbin_health = val->intval;
 		break;
+	/* PMIC notification to remove pull down on Dp and Dm */
+	case POWER_SUPPLY_PROP_ALLOW_DETECTION:
+		if (!!(motg->phy.flags & PHY_RM_PULLDOWN) == val->intval)
+			break;
+
+		if (val->intval) {
+			msm_hsusb_ldo_enable(motg, USB_PHY_REG_ON);
+			motg->phy.flags |= PHY_RM_PULLDOWN;
+		} else {
+			msm_hsusb_ldo_enable(motg, USB_PHY_REG_OFF);
+			motg->phy.flags &= ~PHY_RM_PULLDOWN;
+		}
+
+		dev_dbg(motg->phy.dev, "RM Pulldown %d\n", val->intval);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -4486,6 +4506,7 @@ static int otg_power_property_is_writeable_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_ALLOW_DETECTION:
 		return 1;
 	default:
 		break;

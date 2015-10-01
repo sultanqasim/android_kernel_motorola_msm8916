@@ -197,6 +197,9 @@
 		qcom,cdc-us-euro-gpios = <&msm_gpio 120 0>;
 		qcom,headset-jack-type-NC;
 
+		clock-names = "bb_clk2";
+		clocks = <&clock_rpm clk_bb_clk2>;
+
 		pinctrl-names = "cdc_slim_lines_act", "cdc_slim_lines_sus";
 		pinctrl-0 = <&cdc_slim_lines_act>;
 		pinctrl-1 = <&cdc_slim_lines_sus>;
@@ -277,6 +280,7 @@
 		intersil,no-reset;
 		intersil,init-level = <255>;
 		intersil,dimm-threshold = <0x02>;
+		intersil,current-scale = <63>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&backlight_reset_default>;
 	};
@@ -627,6 +631,7 @@
 &i2c_4 {
 	qcom,clk-freq-out = <400000>;
 
+	/delete-node/ fan53555-regulator@60;
 	synaptics_dsx_i2c@20 {
 		compatible = "synaptics,synaptics_dsx_i2c";
 		reg = <0x20>;
@@ -635,17 +640,25 @@
 		gpios = <&msm_gpio 21 0>, /* IRQ */
 			<&msm_gpio 20 0>; /* RESET */
 		synaptics,gpio-config;
+		synaptics,charger-detection;
 		pinctrl-names = "default", "active";
 		pinctrl-0 = <&touch_reset_active &touch_int_default>;
 		pinctrl-1 = <&touch_reset_active &touch_int_active>;
 		touchstate_modes {
 			touchmode-default = <&default_active &default_suspended>;
+			touchmode-alternate = <&alternate_active &alternate_suspended>;
 		};
 		default_active: touchstate_default_active {
 			patch-data = "";
 		};
 		default_suspended: touchstate_aod_suspended {
-			patch-data = "F12@20=0505,23=3,23:1=1;F1@0=1&7";
+			patch-data = "F1@0=1&7";
+		};
+		alternate_active: touchstate_folio_active {
+			patch-data = "F54@2=7800;F54M@0=4";
+		};
+		alternate_suspended: touchstate_folio_suspended {
+			patch-data = "F1@0=1&7";
 		};
 	};
 };
@@ -829,6 +842,16 @@
 		qcom,cpr-down-threshold = <8>;
 };
 
+&pm8916_chg {
+	status = "ok";
+	qcom,use-external-charger;
+};
+
+&pm8916_bms {
+	status = "ok";
+	qcom,disable-bms;
+};
+
 &i2c_1 {
         smb1357_otg_vreg: smb1357-charger@1c {
                 compatible = "qcom,smb1359-charger";
@@ -856,8 +879,7 @@
                                           <500>, <400>, <300>;
                 qcom,bms-psy-name = "max170xx_battery";
                 qcom,max-batt-curr-ma = <2600>;
-                qcom,ext-temp-volt-mv = <4000>;
-                qcom,ext-temp-soc = <65>;
+                qcom,ext-temp-volt-mv = <4200>;
                 qcom,low-voltage-uv = <3200000>;
                 qcom,max-voltage-uv = <4350000>;
 		qcom,stepchg-voltage-mv = <4100>;
@@ -1001,13 +1023,13 @@
 		bslen_pin_active_value = <1>;
 		accel_orientation_1 = <7>;       /* Accel 1  Orientation value */
 		accel_orientation_2 = <7>;       /* Accel 2  Orientation value */
-		ct406_detect_threshold = <0x00C8>;
-		ct406_undetect_threshold = <0x00A5>;
+		ct406_detect_threshold = <0x0082>;
+		ct406_undetect_threshold = <0x0064>;
 		ct406_recalibrate_threshold = <0x0064>;
 		ct406_pulse_count = <0x02>;
 		ct406_prox_gain = <0x02>;
-		ct406_als_lux1_c0_mult = <0x386>;
-		ct406_als_lux1_c1_mult = <0x693>;
+		ct406_als_lux1_c0_mult = <0x46E>;
+		ct406_als_lux1_c1_mult = <0x85A>;
 		ct406_als_lux1_div = <0x80>;
 		ct406_als_lux2_c0_mult = <0x11F>;
 		ct406_als_lux2_c1_mult = <0x1DE>;
@@ -1074,6 +1096,9 @@
 		wlf,reset = <&msm_gpio 31 0>;
 		wlf,irq = <&msm_gpio 98 0>;
 		wlf,out-mono = <0 1 0 0 0 0>;
+		wlf,micbias1 = <1800 1 1 0 0>;
+		wlf,micbias2 = <1800 1 1 0 0>;
+		wlf,micbias3 = <1800 1 1 0 0>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&florida_irq_default &florida_reset_default>;

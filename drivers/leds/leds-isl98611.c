@@ -28,6 +28,7 @@
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #include <linux/dropbox.h>
+#include <soc/qcom/bootinfo.h>
 
 #define ISL98611_NAME				"isl98611"
 #define ISL98611_REVISION			0x01
@@ -52,6 +53,7 @@
 /* BIT7 in ENABLE register can only be 0 while IC is resetting. */
 /* BIT3 can be 0 or 1 depending on brightness state. */
 #define REG_ENABLE_DEFAULT			0x37
+#define ISL98611_RESET_DELAY_US			8000
 
 #define REG_REVISION		0x00
 #define REG_STATUS		0x01
@@ -71,6 +73,7 @@
 #define REG_VLEDFREQ		0x16
 #define REG_VLEDCONFIG		0x17
 #define REG_MAX			0x17
+#define REGS_CNT		(REG_MAX+1)
 
 #define VPLEVEL_MASK		0x1F
 #define VNLEVEL_MASK		0x1F
@@ -100,6 +103,11 @@
 #define CABC_VAL		0x80
 #define HIGH_CURRENT_VAL	0x40
 #define EFF_VAL			0xF3
+
+/* Set default panel as a no-correction case */
+#define ISL98611_DEFAULT_PANEL 0x07
+#define ISL98611_DEFAULT_PANEL_BRIGHTNESS 0x09
+#define PANEL_MASK 0x00FF00
 
 struct isl98611_chip {
 	struct isl98611_platform_data *pdata;
@@ -154,6 +162,33 @@ static int isl98611_update(struct isl98611_chip *pchip,
 	return rc;
 }
 
+static void isl98611_reset(struct isl98611_chip *pchip)
+{
+	int rval =  0, status;
+
+	rval = isl98611_update(pchip, REG_ENABLE, RESET_MASK, RESET_VAL);
+	usleep(ISL98611_RESET_DELAY_US);
+	status = isl98611_read(pchip, REG_STATUS);
+	/* status register should read 0 after reset */
+	if (status)
+		dev_err(pchip->dev, "%s failed: status %#x ret %#x\n",
+			__func__, status, rval);
+	else
+		dev_info(pchip->dev, "%s success\n", __func__);
+}
+
+static void isl98611_cabc(struct isl98611_chip *pchip)
+{
+	int rval =  0;
+	struct isl98611_platform_data *pdata = pchip->pdata;
+
+	dev_info(pchip->dev, "Enabling CABC");
+	rval |= isl98611_update(pchip, REG_PWMCTRL, PWMRES_MASK, pdata->pwm_res);
+	rval |= isl98611_update(pchip, REG_DIMMCTRL, CABC_MASK, CABC_VAL);
+	if (rval)
+		dev_err(pchip->dev, "%s failed ret %#x\n", __func__, rval);
+}
+
 /* ils98611A specific initialization */
 static int isl98611A_init(struct isl98611_chip *pchip)
 {
@@ -183,8 +218,7 @@ static int isl98611_chip_init(struct isl98611_chip *pchip)
 	}
 
 	if (!pdata->no_reset)
-		rval |= isl98611_update(pchip, REG_ENABLE,
-			RESET_MASK, RESET_VAL);
+		isl98611_reset(pchip);
 
 	if (pdata->cabc_off)
 		isl98611_update(pchip, REG_DIMMCTRL, CABC_MASK, 0x00);
@@ -271,12 +305,8 @@ static void isl98611_brightness_set(struct work_struct *work)
 	}
 
 	/* set configure pwm input on first brightness command */
-	if (old_level == -1 && !pdata->cabc_off) {
-		dev_info(pchip->dev, "Enabling CABC");
-		isl98611_update(pchip, REG_PWMCTRL,
-			PWMRES_MASK, pdata->pwm_res);
-		isl98611_update(pchip, REG_DIMMCTRL, CABC_MASK, CABC_VAL);
-	}
+	if (old_level == -1 && !pdata->cabc_off)
+		isl98611_cabc(pchip);
 
 	if (level != old_level && old_level == 0) {
 		rc = isl98611_update(pchip, REG_ENABLE,
@@ -324,6 +354,44 @@ static void isl98611_led_set(struct led_classdev *led_cdev,
 
 
 #ifdef CONFIG_OF
+
+void isl98611_dt_panel_info(struct i2c_client *client,
+	struct isl98611_platform_data *pdata)
+{
+	struct device_node *np;
+	u64 full_version;
+	int rc;
+
+	pdata->panel_version = ISL98611_DEFAULT_PANEL;
+	pdata->panel_brightness = ISL98611_DEFAULT_PANEL_BRIGHTNESS;
+
+	np = of_find_node_by_path("/chosen");
+	if (!np) {
+		dev_err(&client->dev, "Chosen node error. Using defaults\n");
+		return;
+	}
+
+	rc = of_property_read_u64(np, "mmi,panel_ver", &full_version);
+	if (rc) {
+		dev_err(&client->dev, "Panel version err %d, Using defaults\n",
+			rc);
+		return;
+	}
+
+	pdata->panel_version = (full_version & PANEL_MASK) >> 8;
+	of_property_read_u32(np, "mmi,panel_brightness",
+		&pdata->panel_brightness);
+
+	pdata->cur_scale = ISL98611_90p62SCALE;
+	of_property_read_u32(np, "mmi,led_current_multiplier",
+		&pdata->cur_scale);
+
+	dev_info(&client->dev,
+		"Panel tuning: ver %#llx brightness %#x multiplier %#x\n",
+		pdata->panel_version, pdata->panel_brightness,
+		pdata->cur_scale);
+}
+
 static int isl98611_dt_init(struct i2c_client *client,
 	struct isl98611_platform_data *pdata)
 {
@@ -360,9 +428,6 @@ static int isl98611_dt_init(struct i2c_client *client,
 	pdata->led_current = ISL98611_25MA;
 	of_property_read_u32(np, "intersil,led-current", &pdata->led_current);
 
-	pdata->cur_scale = ISL98611_90p62SCALE;
-	of_property_read_u32(np, "intersil,current-scale", &pdata->cur_scale);
-
 	pdata->pfm_value = ISL98611_DEFAULT_PFM;
 	of_property_read_u32(np, "intersil,pfm-value", &pdata->pfm_value);
 
@@ -390,6 +455,16 @@ static int isl98611_dt_init(struct i2c_client *client,
 	dev_info(&client->dev, "I2C switch supply: %s\n",
 		(rc ? "not provided" : pdata->supply_name));
 
+	pdata->panel_tune = of_property_read_bool(np, "intersil,panel-tune");
+	if (pdata->panel_tune)
+		isl98611_dt_panel_info(client, pdata);
+	else {
+		pdata->cur_scale = ISL98611_90p62SCALE;
+		of_property_read_u32(np, "intersil,current-scale",
+			&pdata->cur_scale);
+	}
+
+
 	return 0;
 
 }
@@ -412,19 +487,23 @@ static const struct of_device_id of_isl98611_leds_match;
 
 void isl98611_dropbox_report_recovery(struct isl98611_chip *pchip)
 {
-	char dropbox_entry[REG_MAX*7+1];
+	char dropbox_entry[REGS_CNT*7+14+1];
 	size_t size = sizeof(dropbox_entry);
 	char *cur = dropbox_entry;
 	u8 buf[REG_MAX+1];
-	int i = 0;
+	int i = 0, len;
 
-	regmap_bulk_read(pchip->regmap, REG_STATUS, buf, REG_MAX);
+	regmap_bulk_read(pchip->regmap, REG_REVISION, buf, REGS_CNT);
 
 	for (i = 0; i <= REG_MAX; i++) {
-		int len = scnprintf(cur, size, "%02x: %02x\n", i, buf[i]);
+		len = scnprintf(cur, size, "%02x: %02x\n", i, buf[i]);
 		cur += len;
 		size -= len;
 	}
+
+	len = scnprintf(cur, size, "hwrev: %#04x\n", system_rev);
+	cur += len;
+	size -= len;
 
 	pr_err("%s: dump:\n%s\n", __func__, dropbox_entry);
 	dropbox_queue_event_text("isl98611_reset_recovery", dropbox_entry,
@@ -437,21 +516,23 @@ static int isl98611_fb_notifier_callback(struct notifier_block *self,
 	struct fb_event *evdata = data;
 	struct isl98611_chip *pchip = container_of(self, struct isl98611_chip,
 		fb_notif);
+	struct isl98611_platform_data *pdata = pchip->pdata;
 
 	/* Return immediately if we don't care about the event */
-	if (event != FB_EVENT_BLANK)
+	if (event != FB_EARLY_EVENT_BLANK)
 		return 0;
 
 	dev_dbg(pchip->dev, "%s+\n", __func__);
 
-	if (*(int *)evdata->data == FB_BLANK_UNBLANK) {
-		int regval, reg2;
+	if (*(int *)evdata->data != FB_BLANK_POWERDOWN) {
+		int regval, reg2, status;
 		/* Non zero REG_BRGHT_LSB => chip is reset to PON defaults */
 		regval = isl98611_read(pchip, REG_BRGHT_LSB);
 		reg2 = isl98611_read(pchip, REG_ENABLE);
+		status = isl98611_read(pchip, REG_STATUS);
 		/* REG_ENABLE_DEFAULT - must have bitmask in enable register */
 		reg2 &= REG_ENABLE_DEFAULT;
-		if (regval || (reg2 != REG_ENABLE_DEFAULT)) {
+		if (status || regval || (reg2 != REG_ENABLE_DEFAULT)) {
 			/* IC reset or reg ENABLE messed up => reinit the IC */
 			dev_err(pchip->dev,
 				"%s: REG_BRGHT_LSB is %#x, expected 0x00\n",
@@ -461,9 +542,18 @@ static int isl98611_fb_notifier_callback(struct notifier_block *self,
 				__func__, reg2, REG_ENABLE_DEFAULT);
 			dev_err(pchip->dev, "%s: Re-initialize the chip\n",
 				__func__);
+			if (status)
+				dev_err(pchip->dev, "%s: FAULT detected %#x\n",
+					__func__, status);
 			isl98611_dropbox_report_recovery(pchip);
 			pchip->cdev.brightness = 0;
 			isl98611_write(pchip, REG_BRGHT_MSB, 0);
+			/* If reset is not part of config - reset here*/
+			if (status && pdata->no_reset)
+				isl98611_reset(pchip);
+			/* CABC is not part of the init call. Add it here */
+			if (!pdata->cabc_off)
+				isl98611_cabc(pchip);
 			isl98611_chip_init(pchip);
 		}
 	}

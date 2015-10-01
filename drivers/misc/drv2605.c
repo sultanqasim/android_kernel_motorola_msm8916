@@ -777,6 +777,11 @@ static int drv260x_probe(struct i2c_client *client,
 	drv260x->trigger_gpio = pdata->trigger_gpio;
 	drv260x->external_trigger = pdata->external_trigger;
 	drv260x->vibrator_vdd = pdata->vibrator_vdd;
+	if (PTR_ERR(drv260x->vibrator_vdd) == -EPROBE_DEFER) {
+		if (!IS_ERR(pdata->static_vdd))
+			regulator_disable(pdata->static_vdd);
+		return -EPROBE_DEFER;
+	}
 	if(IS_ERR(drv260x->vibrator_vdd))
 		printk(KERN_ALERT "drv260x->vibrator_vdd not initialized\n");
 
@@ -1089,13 +1094,7 @@ static ssize_t drv260x_write(struct file *filp, const char *buff, size_t len,
 		}
 	case HAPTIC_CMDID_STOP:
 		{
-			if (vibrator_is_playing) {
-				vibrator_is_playing = NO;
-				if (audio_haptics_enabled)
-					setAudioHapticsEnabled(YES);
-				else
-					drv260x_standby();
-			}
+			schedule_work(&vibdata.work);
 			vibdata.should_stop = YES;
 			break;
 		}
