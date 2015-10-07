@@ -25,9 +25,6 @@
  * to the Linux Foundation.
  */
 
-/* Some GCC versions throw false array bounds warnings on this file */
-#pragma GCC diagnostic ignored "-Warray-bounds"
-
 /******************************************************************************
 *
 * Name:  btcApi.c
