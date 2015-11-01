@@ -115,10 +115,11 @@ static int get_iommu_unit(struct device *dev, struct kgsl_mmu **mmu_out,
 
 		iommu = mmu->priv;
 
-		for (j = 0; j < iommu->unit_count; j++) {
+		for (j = 0; j < iommu->unit_count && j < KGSL_IOMMU_MAX_UNITS; j++) {
 			struct kgsl_iommu_unit *iommu_unit =
 				&iommu->iommu_units[j];
-			for (k = 0; k < iommu_unit->dev_count; k++) {
+			for (k = 0; k < iommu_unit->dev_count &&
+					k < KGSL_IOMMU_CONTEXT_MAX; k++) {
 				if (iommu_unit->dev[k].dev == dev) {
 					*mmu_out = mmu;
 					*iommu_unit_out = iommu_unit;
@@ -708,7 +709,7 @@ static void kgsl_detach_pagetable_iommu_domain(struct kgsl_mmu *mmu)
 	for (i = 0; i < iommu->unit_count; i++) {
 		struct kgsl_iommu_unit *iommu_unit = &iommu->iommu_units[i];
 		iommu_pt = mmu->defaultpagetable->priv;
-		for (j = 0; j < iommu_unit->dev_count; j++) {
+		for (j = 0; j < iommu_unit->dev_count && j < KGSL_IOMMU_CONTEXT_MAX; j++) {
 			/*
 			 * If there is a 2nd default pagetable then priv domain
 			 * is attached with this pagetable
@@ -1470,7 +1471,7 @@ static void kgsl_iommu_lock_rb_in_tlb(struct kgsl_mmu *mmu)
 
 	for (i = 0; i < iommu->unit_count; i++) {
 		struct kgsl_iommu_unit *iommu_unit = &iommu->iommu_units[i];
-		for (j = 0; j < iommu_unit->dev_count; j++) {
+		for (j = 0; j < iommu_unit->dev_count && j < KGSL_IOMMU_CONTEXT_MAX; j++) {
 			if (!iommu_unit->dev[j].attached)
 				continue;
 			tlblkcr = 0;
@@ -1530,7 +1531,8 @@ static void kgsl_iommu_lock_rb_in_tlb(struct kgsl_mmu *mmu)
 				}
 			}
 		}
-		for (j = 0; j < iommu_unit->dev_count; j++) {
+		for (j = 0; j < iommu_unit->dev_count &&
+				j < KGSL_IOMMU_CONTEXT_MAX; j++) {
 			if (!iommu_unit->dev[j].attached)
 				continue;
 			tlblkcr = KGSL_IOMMU_GET_CTX_REG(iommu, iommu_unit,
@@ -1804,7 +1806,8 @@ static void kgsl_iommu_pagefault_resume(struct kgsl_mmu *mmu)
 		for (i = 0; i < iommu->unit_count; i++) {
 			struct kgsl_iommu_unit *iommu_unit =
 						&iommu->iommu_units[i];
-			for (j = 0; j < iommu_unit->dev_count; j++) {
+			for (j = 0; j < iommu_unit->dev_count &&
+					j < KGSL_IOMMU_CONTEXT_MAX; j++) {
 
 				/*
 				 *  1) HLOS cannot program secure context bank.
@@ -2108,7 +2111,7 @@ static int kgsl_iommu_set_pf_policy(struct kgsl_mmu *mmu,
 
 	for (i = 0; i < iommu->unit_count; i++) {
 		struct kgsl_iommu_unit *iommu_unit = &iommu->iommu_units[i];
-		for (j = 0; j < iommu_unit->dev_count; j++) {
+		for (j = 0; j < iommu_unit->dev_count && j < KGSL_IOMMU_CONTEXT_MAX; j++) {
 
 			/*
 			 *  1) HLOS cannot program secure context bank.
@@ -2160,7 +2163,8 @@ static void kgsl_iommu_set_pagefault(struct kgsl_mmu *mmu)
 
 	/* Loop through all IOMMU devices to check for fault */
 	for (i = 0; i < iommu->unit_count; i++) {
-		for (j = 0; j < iommu->iommu_units[i].dev_count; j++) {
+		for (j = 0; j < iommu->iommu_units[i].dev_count &&
+				j < KGSL_IOMMU_CONTEXT_MAX; j++) {
 
 			/*
 			 *  1) HLOS cannot program secure context bank.

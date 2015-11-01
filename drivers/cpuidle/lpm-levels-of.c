@@ -176,7 +176,7 @@ static int create_cpu_lvl_nodes(struct lpm_cluster *p, struct kobject *parent)
 		}
 
 		for (i = 0; i < MSM_PM_SLEEP_MODE_NR; i++) {
-			for (j = 0; j < p->cpu->nlevels; j++)
+			for (j = 0; j < p->cpu->nlevels && j < NR_LPM_LEVELS; j++)
 				if (p->cpu->levels[j].mode == i)
 					break;
 			if (j == p->cpu->nlevels) {

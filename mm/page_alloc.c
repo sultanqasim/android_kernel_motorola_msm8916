@@ -1750,7 +1750,7 @@ static bool __zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 
 	if (free_pages - free_cma <= min + lowmem_reserve)
 		return false;
-	for (o = 0; o < order; o++) {
+	for (o = 0; o < order && o < MAX_ORDER; o++) {
 		/* At the next order, this order's pages become unavailable */
 		free_pages -= z->free_area[o].nr_free << o;
 
