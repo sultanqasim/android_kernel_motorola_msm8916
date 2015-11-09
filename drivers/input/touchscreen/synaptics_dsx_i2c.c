@@ -35,6 +35,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/reboot.h>
 #include <linux/input/synaptics_rmi_dsx.h>
+
 #include "synaptics_dsx_i2c.h"
 #ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
 #include "touchx.h"
@@ -110,6 +111,9 @@ static void synaptics_dsx_resumeinfo_touch(
 		struct synaptics_rmi4_data *rmi4_data);
 static void synaptics_dsx_free_patch(
 		struct synaptics_dsx_patch *patch);
+static void synaptics_dsx_modify_patch(
+		struct synaptics_dsx_patch *patch_set,
+		struct synaptics_dsx_func_patch *patch, bool remove);
 static struct synaptics_dsx_patch *
 		synaptics_dsx_init_patch(const char *name);
 static int synaptics_rmi4_set_page(
@@ -1312,8 +1316,7 @@ static int synaptics_rmi4_i2c_write(struct synaptics_rmi4_data *rmi4_data,
 		unsigned short addr, unsigned char *data,
 		unsigned short length);
 
-static int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data,
-		unsigned char *f01_cmd_base_addr);
+static int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data);
 
 static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 		bool enable);
@@ -1720,6 +1723,7 @@ static void synaptics_dsx_patch_func(
 	function = regs->f_number & 0xff;
 	rt_mod = register_type_to_ascii(regs->f_number & 0xf00);
 	pr_debug("patching F%x%c\n",  function, rt_mod);
+	mutex_lock(&patch->list_mutex);
 	list_for_each_entry(fp, &patch->cfg_head, link) {
 		if (fp->func != f_number)
 			continue;
@@ -1740,7 +1744,7 @@ static void synaptics_dsx_patch_func(
 			error =	synaptics_rmi4_read_packet_reg(
 					rmi4_data, regs, reg->r_number);
 			if (error < 0)
-				return;
+				goto unlock_and_leave;
 #if defined(CONFIG_DYNAMIC_DEBUG) || defined(DEBUG)
 			{
 				int ss, kk;
@@ -1808,6 +1812,9 @@ static void synaptics_dsx_patch_func(
 		}
 		reg->updated = false;
 	}
+
+unlock_and_leave:
+	mutex_unlock(&patch->list_mutex);
 }
 
 static void synaptics_dsx_enable_wakeup_source(
@@ -1940,8 +1947,6 @@ static int synaptics_dsx_sensor_ready_state(
 			return retval;
 		}
 
-		state = synaptics_dsx_get_state_safe(rmi4_data);
-
 		ui_mode = status.flash_prog == 0;
 		pr_debug("(%d) UI mode: %s\n", i, ui_mode ? "true" : "false");
 
@@ -1951,6 +1956,7 @@ static int synaptics_dsx_sensor_ready_state(
 		msleep(20);
 	}
 
+	state = synaptics_dsx_get_state_safe(rmi4_data);
 	if (!ui_mode && state == STATE_SUSPEND && rmi4_data->input_registered) {
 		/* expecting touch IC to enter UI mode based on */
 		/* its previous known good state */
@@ -1996,7 +2002,7 @@ static void synaptics_dsx_sensor_state(struct synaptics_rmi4_data *rmi4_data,
 		if (rmi4_data->input_registered)
 			synaptics_rmi4_irq_enable(rmi4_data, true);
 		else {
-			synaptics_rmi4_irq_enable(rmi4_data, true);
+			synaptics_rmi4_irq_enable(rmi4_data, false);
 			pr_err("Active state without input device\n");
 		}
 
@@ -4174,6 +4180,7 @@ static int synaptics_rmi4_query_device(struct synaptics_rmi4_data *rmi4_data)
 	struct synaptics_rmi4_fn *fhandler;
 	struct synaptics_rmi4_device_info *rmi;
 	struct f34_properties f34_query;
+	struct f34_properties_v2 f34_query_v2;
 	struct synaptics_rmi4_f01_device_status status;
 
 	rmi = &(rmi4_data->rmi4_mod_info);
@@ -4203,9 +4210,9 @@ static int synaptics_rmi4_query_device(struct synaptics_rmi4_data *rmi4_data)
 			}
 
 			dev_dbg(&rmi4_data->i2c_client->dev,
-					"%s: F%02x found (page %d)\n",
-					__func__, rmi_fd.fn_number,
-					page_number);
+				"%s: F%02x v%d found (page %d)\n",
+				__func__, rmi_fd.fn_number, rmi_fd.fn_version,
+				page_number);
 
 			switch (rmi_fd.fn_number) {
 			case SYNAPTICS_RMI4_F51:
@@ -4225,22 +4232,44 @@ static int synaptics_rmi4_query_device(struct synaptics_rmi4_data *rmi4_data)
 					break;
 
 			case SYNAPTICS_RMI4_F34:
-				retval = synaptics_rmi4_i2c_read(rmi4_data,
+				if (rmi_fd.fn_version < 2) {
+					retval = synaptics_rmi4_i2c_read(
+						rmi4_data,
 						rmi_fd.query_base_addr +
 							F34_PROPERTIES_OFFSET,
 						&f34_query.data[0],
 						sizeof(f34_query));
-				if (retval < 0)
-					return retval;
+					if (retval < 0)
+						return retval;
 
-				if (f34_query.has_config_id) {
-					retval = synaptics_rmi4_i2c_read(
+					if (f34_query.has_config_id) {
+						retval = synaptics_rmi4_i2c_read(
 							rmi4_data,
 							rmi_fd.ctrl_base_addr,
 							rmi->config_id,
 							sizeof(rmi->config_id));
+						if (retval < 0)
+							return retval;
+					}
+				} else if (rmi_fd.fn_version == 2) {
+					retval = synaptics_rmi4_i2c_read(
+							rmi4_data,
+							rmi_fd.query_base_addr +
+							F34_PROPERTIES_OFFSET_V2,
+							&f34_query_v2.data[0],
+							sizeof(f34_query_v2));
 					if (retval < 0)
 						return retval;
+
+					if (f34_query_v2.has_config_id) {
+						retval = synaptics_rmi4_i2c_read(
+							rmi4_data,
+							rmi_fd.ctrl_base_addr,
+							rmi->config_id,
+							sizeof(rmi->config_id));
+						if (retval < 0)
+							return retval;
+					}
 				}
 				break;
 
@@ -4500,8 +4529,7 @@ static void synaptics_dsx_release_all(struct synaptics_rmi4_data *rmi4_data)
 	}
 }
 
-static int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data,
-		unsigned char *f01_cmd_base_addr)
+static int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data)
 {
 	int current_state, retval;
 	bool need_to_query = false;
@@ -4698,23 +4726,43 @@ exit:
 }
 EXPORT_SYMBOL(synaptics_rmi4_new_function);
 
-static void synaptics_dsx_free_patch(struct synaptics_dsx_patch *patch)
+static void synaptics_dsx_free_patch(struct synaptics_dsx_patch *patch_set)
 {
-	struct synaptics_dsx_func_patch *fp;
-	list_for_each_entry(fp, &patch->cfg_head, link)
+	struct synaptics_dsx_func_patch *fp, *next_list_entry;
+	mutex_lock(&patch_set->list_mutex);
+	list_for_each_entry_safe(fp, next_list_entry,
+				&patch_set->cfg_head, link) {
 		kfree(fp->data);
-	kfree(patch);
+		list_del(&fp->link);
+	}
+	mutex_unlock(&patch_set->list_mutex);
+	kfree(patch_set);
+}
+
+static void synaptics_dsx_modify_patch(struct synaptics_dsx_patch *patch_set,
+	struct synaptics_dsx_func_patch *patch, bool remove)
+{
+	mutex_lock(&patch_set->list_mutex);
+	if (!remove) {
+		list_add_tail(&patch->link, &patch_set->cfg_head);
+		patch_set->cfg_num++;
+	} else {
+		list_del(&patch->link);
+		patch_set->cfg_num--;
+	}
+	mutex_unlock(&patch_set->list_mutex);
 }
 
 static struct synaptics_dsx_patch *synaptics_dsx_init_patch(const char *name)
 {
-	struct synaptics_dsx_patch *patch;
-	patch = kzalloc(sizeof(struct synaptics_dsx_patch), GFP_KERNEL);
-	if (patch) {
-		patch->name = name;
-		INIT_LIST_HEAD(&patch->cfg_head);
+	struct synaptics_dsx_patch *patch_set;
+	patch_set = kzalloc(sizeof(struct synaptics_dsx_patch), GFP_KERNEL);
+	if (patch_set) {
+		patch_set->name = name;
+		mutex_init(&patch_set->list_mutex);
+		INIT_LIST_HEAD(&patch_set->cfg_head);
 	}
-	return patch;
+	return patch_set;
 }
 
 static int synaptics_dsx_init_mode(struct synaptics_rmi4_data *data,
@@ -4819,6 +4867,7 @@ static int rmi_reboot(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
+#if defined(USB_CHARGER_DETECTION)
 /***************************************************************/
 /* USB charging source info from power_supply driver directly  */
 /***************************************************************/
@@ -4827,16 +4876,28 @@ static enum power_supply_property ps_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 };
 
-static const char *ps_usb_supply[] = { "usb", };
+static const char * const ps_usb_supply[] = { "usb", };
 static bool ps_usb_present;
 static unsigned char ps_data[2] = { 0x20, 0 };
-static struct synaptics_dsx_func_patch ps_active = {
-	.func = 1,
-	.regstr = 0,
-	.subpkt = 0,
-	.size = 1,
-	.bitmask = 0x20,
-	.data = &ps_data[0],
+/* need separate copies of the same patch, since it has */
+/* to be added into active and suspended configurations */
+static struct synaptics_dsx_func_patch ps_on[MAX_NUM_STATES] = {
+	{
+		.func = 1,
+		.regstr = 0,
+		.subpkt = 0,
+		.size = 1,
+		.bitmask = 0x20,
+		.data = &ps_data[0],
+	},
+	{
+		.func = 1,
+		.regstr = 0,
+		.subpkt = 0,
+		.size = 1,
+		.bitmask = 0x20,
+		.data = &ps_data[0],
+	},
 };
 static struct synaptics_dsx_func_patch ps_set = {
 	.func = 1,
@@ -4878,6 +4939,7 @@ static void ps_external_power_changed(struct power_supply *psy)
 	struct synaptics_rmi4_data *rmi4_data = container_of(psy,
 				struct synaptics_rmi4_data, psy);
 	struct device *dev = &rmi4_data->i2c_client->dev;
+	int state;
 
 	if (!usb_psy || !usb_psy->get_property)
 		return;
@@ -4886,19 +4948,22 @@ static void ps_external_power_changed(struct power_supply *psy)
 	dev_dbg(dev, "external_power_changed: %d\n", pval.intval);
 
 	if (ps_usb_present != (pval.intval == 1)) {
-		int index = !!pval.intval;
-		struct synaptics_dsx_patch *patch_ptr =
-				rmi4_data->default_mode->patch_data[ACTIVE_IDX];
-		if (index == 1) {
-			list_add_tail(&ps_active.link, &patch_ptr->cfg_head);
-			patch_ptr->cfg_num++;
-		} else {
-			list_del(&ps_active.link);
-			patch_ptr->cfg_num--;
-		}
-		synaptics_dsx_patch_func(rmi4_data,
+		int i, index = !!pval.intval;
+
+		/* charging patch has to be added into */
+		/* both patch sets: active and suspend */
+		for (i = 0; i < MAX_NUM_STATES; i++)
+			synaptics_dsx_modify_patch(
+				rmi4_data->default_mode->patch_data[i],
+				&ps_on[i], index == 0);
+
+		state = synaptics_dsx_get_state_safe(rmi4_data);
+		dev_info(dev, "power supply presence %d in state %d\n",
+			pval.intval, state);
+
+		if (state == STATE_ACTIVE)
+			synaptics_dsx_patch_func(rmi4_data,
 				SYNAPTICS_RMI4_F01, &ps_patch[index]);
-		dev_info(dev, "power supply presence %d\n", pval.intval);
 	}
 	ps_usb_present = pval.intval == 1;
 }
@@ -4920,9 +4985,11 @@ static int ps_notifier_register(struct synaptics_rmi4_data *rmi4_data)
 	rmi4_data->psy.external_power_changed = ps_external_power_changed;
 
 	INIT_LIST_HEAD(&ps_patch[0].cfg_head);
+	mutex_init(&ps_patch[0].list_mutex);
 	list_add_tail(&ps_clear.link, &ps_patch[0].cfg_head);
 
 	INIT_LIST_HEAD(&ps_patch[1].cfg_head);
+	mutex_init(&ps_patch[1].list_mutex);
 	list_add_tail(&ps_set.link, &ps_patch[1].cfg_head);
 
 	error = power_supply_register(dev, &rmi4_data->psy);
@@ -4932,6 +4999,10 @@ static int ps_notifier_register(struct synaptics_rmi4_data *rmi4_data)
 	}
 	return 0;
 }
+#else
+#define ps_notifier_register(r)
+#define ps_notifier_unregister(r)
+#endif
 
  /**
  * synaptics_rmi4_probe()
@@ -5340,7 +5411,8 @@ static int synaptics_dsx_panel_cb(struct notifier_block *nb,
 		container_of(nb, struct synaptics_rmi4_data, panel_nb);
 
 	if ((event == FB_EARLY_EVENT_BLANK || event == FB_EVENT_BLANK) &&
-			evdata && evdata->data && rmi4_data) {
+			evdata && evdata->info && evdata->info->node == 0 &&
+			evdata->data && rmi4_data) {
 		int *blank = evdata->data;
 		pr_debug("fb notification: event = %lu blank = %d\n", event, *blank);
 		/* entering suspend upon early blank event */
@@ -5385,7 +5457,7 @@ static int folio_notifier_callback(struct notifier_block *self,
 		else	/* open */
 			synaptics_dsx_restore_default_mode(rmi4_data);
 
-		dev_dbg(&rmi4_data->i2c_client->dev, "folio: %s\n",
+		dev_info(&rmi4_data->i2c_client->dev, "folio: %s\n",
 			folio_state ? "CLOSED" : "OPENED");
 
 		if (!(state & STATE_UI)) {
