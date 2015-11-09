@@ -1,0 +1,11 @@
+Build tools required:
+- Linaro GCC for 32-bit ARM
+- GCC for your host
+
+How to build:
+export ARCH=arm
+export SUBARCH=arm
+export CROSS_COMPILE=arm-linux-gnueabihf-
+make mrproper
+make lux_defconfig
+make -j5
