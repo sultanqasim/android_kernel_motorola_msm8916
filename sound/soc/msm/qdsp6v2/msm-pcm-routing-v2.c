@@ -60,7 +60,7 @@ static int fm_switch_enable;
 static int fm_pcmrx_switch_enable;
 static int lsm_mux_slim_port;
 static int slim0_rx_aanc_fb_port;
-static int msm_route_ec_ref_rx = 8; /* NONE */
+static int msm_route_ec_ref_rx = 9; /* NONE */
 static uint32_t voc_session_id = ALL_SESSION_VSID;
 static int msm_route_ext_ec_ref = AFE_PORT_INVALID;
 static bool is_custom_stereo_on;
@@ -842,6 +842,11 @@ void msm_pcm_routing_dereg_phy_stream(int fedai_id, int stream_type)
 			}
 			topology = adm_get_topology_for_port_from_copp_id(
 					msm_bedais[i].port_id, idx);
+			/*adm fails to get topology id during ssr. Fallback
+			to msm_routing_get_adm_topology in that case */
+			if (topology == 0)
+				topology = msm_routing_get_adm_topology(
+						path_type, fedai_id);
 			adm_close(msm_bedais[i].port_id, fdai->perf_mode, idx);
 			pr_debug("%s:copp:%ld,idx bit fe:%d,type:%d,be:%d\n",
 				 __func__, copp, fedai_id, session_type, i);
@@ -1556,6 +1561,10 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 		msm_route_ec_ref_rx = 7;
 		ec_ref_port_id = AFE_PORT_ID_SECONDARY_MI2S_RX;
 		break;
+	case 8:
+		msm_route_ec_ref_rx = 8;
+		ec_ref_port_id = AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_TX;
+		break;
 	default:
 		msm_route_ec_ref_rx = 0; /* NONE */
 		pr_err("%s EC ref rx %ld not valid\n",
@@ -1573,9 +1582,10 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 
 static const char *const ec_ref_rx[] = { "None", "SLIM_RX", "I2S_RX",
 	"PRI_MI2S_TX", "SEC_MI2S_TX",
-	"TERT_MI2S_TX", "QUAT_MI2S_TX", "SEC_I2S_RX", "PROXY_RX"};
+	"TERT_MI2S_TX", "QUAT_MI2S_TX", "SEC_I2S_RX", "SLIMBUS_1_TX",
+	"PROXY_RX"};
 static const struct soc_enum msm_route_ec_ref_rx_enum[] = {
-	SOC_ENUM_SINGLE_EXT(9, ec_ref_rx),
+	SOC_ENUM_SINGLE_EXT(10, ec_ref_rx),
 };
 
 static const struct snd_kcontrol_new ext_ec_ref_mux_ul1 =
