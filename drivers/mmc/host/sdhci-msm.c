@@ -628,7 +628,7 @@ static int msm_find_most_appropriate_phase(struct sdhci_host *host,
 		/* Check if cycle exist between 2 valid windows */
 		for (cnt = 1; cnt <= row_index; cnt++) {
 			if (phases_per_row[cnt]) {
-				for (i = 0; i < phases_per_row[cnt]; i++) {
+				for (i = 0; i < phases_per_row[cnt] && i < MAX_PHASES; i++) {
 					if (ranges[cnt][i] == 15) {
 						phase_15_found = true;
 						phase_15_raw_index = cnt;

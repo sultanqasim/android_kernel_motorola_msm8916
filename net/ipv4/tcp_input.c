@@ -1662,7 +1662,7 @@ tcp_sacktag_write_queue(struct sock *sk, const struct sk_buff *ack_skb,
 
 	/* order SACK blocks to allow in order walk of the retrans queue */
 	for (i = used_sacks - 1; i > 0; i--) {
-		for (j = 0; j < i; j++) {
+		for (j = 0; j < i && j < (TCP_NUM_SACKS - 1); j++) {
 			if (after(sp[j].start_seq, sp[j + 1].start_seq)) {
 				swap(sp[j], sp[j + 1]);
 
