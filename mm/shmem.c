@@ -403,8 +403,11 @@ static int shmem_free_swap(struct address_space *mapping,
 static void shmem_deswap_pagevec(struct pagevec *pvec)
 {
 	int i, j;
+	int pvcnt = pagevec_count(pvec);
+	if (pvcnt > PAGEVEC_SIZE)
+		pvcnt = PAGEVEC_SIZE;
 
-	for (i = 0, j = 0; i < pagevec_count(pvec); i++) {
+	for (i = 0, j = 0; i < pvcnt; i++) {
 		struct page *page = pvec->pages[i];
 		if (!radix_tree_exceptional_entry(page))
 			pvec->pages[j++] = page;

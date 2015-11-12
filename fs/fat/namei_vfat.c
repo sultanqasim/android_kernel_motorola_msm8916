@@ -377,6 +377,9 @@ static int vfat_create_shortname(struct inode *dir, struct nls_table *nls,
 		if (chl == 0)
 			continue;
 
+		if (chl > NLS_MAX_CHARSET_SIZE)
+			chl = NLS_MAX_CHARSET_SIZE;
+
 		if (baselen < 2 && (baselen + chl) > 2)
 			numtail2_baselen = baselen;
 		if (baselen < 6 && (baselen + chl) > 6)
