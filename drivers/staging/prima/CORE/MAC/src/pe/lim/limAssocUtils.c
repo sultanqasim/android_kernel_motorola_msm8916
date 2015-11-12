@@ -2121,7 +2121,7 @@ limPopulateMatchingRateSet(tpAniSirGlobal pMac,
         min = 0;
         val = 0xff;
 
-        for(j = 0;j < tempRateSet.numRates; j++)
+        for(j = 0; j < tempRateSet.numRates && j < SIR_MAC_RATESET_EID_MAX; j++)
             if ((tANI_U32) (tempRateSet.rate[j] & 0x7f) < val)
             {
                 val = tempRateSet.rate[j] & 0x7f;

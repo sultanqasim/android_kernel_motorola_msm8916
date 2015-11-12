@@ -275,7 +275,7 @@ void msm_isp_axi_reserve_wm(struct msm_vfe_axi_shared_data *axi_data,
 {
 	int i, j;
 	for (i = 0; i < stream_info->num_planes; i++) {
-		for (j = 0; j < axi_data->hw_info->num_wm; j++) {
+		for (j = 0; j < axi_data->hw_info->num_wm && j < MAX_NUM_WM; j++) {
 			if (!axi_data->free_wm[j]) {
 				axi_data->free_wm[j] =
 					stream_info->stream_handle;
@@ -945,7 +945,7 @@ static void msm_isp_get_done_buf(struct vfe_device *vfe_dev,
 {
 	uint32_t pingpong_bit = 0, i;
 	pingpong_bit = (~(pingpong_status >> stream_info->wm[0]) & 0x1);
-	for (i = 0; i < stream_info->num_planes; i++) {
+	for (i = 0; i < stream_info->num_planes && i < MAX_PLANES_PER_STREAM; i++) {
 		if (pingpong_bit !=
 			(~(pingpong_status >> stream_info->wm[i]) & 0x1)) {
 			pr_err("%s: Write master ping pong mismatch. Status: 0x%x\n",
