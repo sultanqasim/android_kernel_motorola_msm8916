@@ -30,7 +30,7 @@
 #define MAX_SAMPLING_FACTOR		(10)
 
 #define LIONFISH_VERSION_MAJOR		(1)
-#define LIONFISH_VERSION_MINOR		(0)
+#define LIONFISH_VERSION_MINOR		(1)
 
 /************************** type definitions ****************************/
 struct lf_cpu_dbs_info_s {
@@ -39,6 +39,7 @@ struct lf_cpu_dbs_info_s {
 	unsigned int down_ticks;
 	unsigned int requested_freq;
 	unsigned int enable:1;
+	unsigned int prev_load;
 };
 
 struct lf_dbs_tuners {
@@ -158,6 +159,67 @@ static inline unsigned int get_freq_target(struct lf_dbs_tuners *lf_tuners,
 	return freq_target;
 }
 
+/* Computes the maximum absolute load for the policy  */
+static unsigned int lf_get_load(cpumask_var_t cpus, unsigned int sampling_rate,
+	unsigned int ignore_nice_load, struct cpu_dbs_common_info *cdbs)
+{
+	unsigned int j;
+	unsigned int load = 0;
+
+	for_each_cpu(j, cpus) {
+		struct cpu_dbs_common_info *j_cdbs;
+		u64 cur_wall_time, cur_idle_time;
+		unsigned int idle_time, wall_time;
+		unsigned int cpu_load;
+
+		j_cdbs = &per_cpu(lf_cpu_dbs_info, j).cdbs;
+
+		/* last parameter 0 means that IO wait is considered idle */
+		cur_idle_time = get_cpu_idle_time(j, &cur_wall_time, 0);
+
+		if (cur_wall_time < j_cdbs->prev_cpu_wall + sampling_rate) {
+			cpu_load = per_cpu(lf_cpu_dbs_info, j).prev_load;
+		} else {
+			wall_time = (unsigned int)
+				(cur_wall_time - j_cdbs->prev_cpu_wall);
+			j_cdbs->prev_cpu_wall = cur_wall_time;
+
+			idle_time = (unsigned int)
+				(cur_idle_time - j_cdbs->prev_cpu_idle);
+			j_cdbs->prev_cpu_idle = cur_idle_time;
+
+			if (ignore_nice_load) {
+				u64 cur_nice;
+				unsigned long cur_nice_jiffies;
+
+				cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
+						cdbs->prev_cpu_nice;
+				/*
+				* Assumption: nice time between sampling periods
+				* will be less than 2^32 jiffies for 32 bit sys
+				*/
+				cur_nice_jiffies = (unsigned long)
+						cputime64_to_jiffies64(cur_nice);
+
+				cdbs->prev_cpu_nice =
+					kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+				idle_time += jiffies_to_usecs(cur_nice_jiffies);
+			}
+
+			if (unlikely(!wall_time || wall_time < idle_time))
+				continue;
+
+			cpu_load = 100 * (wall_time - idle_time) / wall_time;
+			per_cpu(lf_cpu_dbs_info, j).prev_load = cpu_load;
+		}
+
+		if (cpu_load > load)
+			load = cpu_load;
+	}
+
+	return load;
+}
+
 /*
  * This function is the heart of the governor. It is called periodically
  * for each CPU core.
@@ -192,56 +254,12 @@ static void lf_check_cpu(struct lf_gdbs_data *dbs_data, int cpu)
 	unsigned int freq_shift;
 	unsigned int hispeed;
 	unsigned int new_frequency;
-	unsigned int load = 0;
-	unsigned int j;
+	unsigned int load;
 	bool voted = false;
 
 	/* compute the maximum absolute load */
-	for_each_cpu(j, policy->cpus) {
-		struct cpu_dbs_common_info *j_cdbs;
-		u64 cur_wall_time, cur_idle_time;
-		unsigned int idle_time, wall_time;
-		unsigned int cpu_load;
-
-		j_cdbs = &per_cpu(lf_cpu_dbs_info, j).cdbs;
-
-		/* last parameter 0 means that IO wait is considered idle */
-		cur_idle_time = get_cpu_idle_time(j, &cur_wall_time, 0);
-
-		wall_time = (unsigned int)
-			(cur_wall_time - j_cdbs->prev_cpu_wall);
-		j_cdbs->prev_cpu_wall = cur_wall_time;
-
-		idle_time = (unsigned int)
-			(cur_idle_time - j_cdbs->prev_cpu_idle);
-		j_cdbs->prev_cpu_idle = cur_idle_time;
-
-		if (lf_tuners->ignore_nice_load) {
-			u64 cur_nice;
-			unsigned long cur_nice_jiffies;
-
-			cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
-					 cdbs->prev_cpu_nice;
-			/*
-			 * Assumption: nice time between sampling periods will
-			 * be less than 2^32 jiffies for 32 bit sys
-			 */
-			cur_nice_jiffies = (unsigned long)
-					cputime64_to_jiffies64(cur_nice);
-
-			cdbs->prev_cpu_nice =
-				kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-			idle_time += jiffies_to_usecs(cur_nice_jiffies);
-		}
-
-		if (unlikely(!wall_time || wall_time < idle_time))
-			continue;
-
-		cpu_load = 100 * (wall_time - idle_time) / wall_time;
-
-		if (cpu_load > load)
-			load = cpu_load;
-	}
+	load = lf_get_load(policy->cpus, lf_tuners->sampling_rate,
+		lf_tuners->ignore_nice_load, cdbs);
 
 	freq_shift = get_freq_target(lf_tuners, policy);
 	hispeed = policy->max * JUMP_HISPEED_FREQ_PERCENTAGE / 100;
