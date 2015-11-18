@@ -186,9 +186,6 @@ static VOS_STATUS WDA_ProcessReceiveFilterSetFilterReq (
                                    tWDA_CbContext *pWDA,
                                    tSirRcvPktFilterCfgType *pRcvPktFilterCfg
                                                        );
-// IKJB42MAIN-1244, Motorola, a19091 - BEGIN
-void WDA_ProcessReceiveFilterSetFilterMcReq(tSirInvokeV6Filter *invokeV6FilterConfig);
-// IKJB42MAIN-1244, Motorola, a19091 - END
 static VOS_STATUS WDA_ProcessPacketFilterMatchCountReq (
                                    tWDA_CbContext *pWDA,
                                    tpSirRcvFltPktMatchRsp pRcvFltPktMatchRsp
@@ -13296,13 +13293,6 @@ VOS_STATUS WDA_McProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
          WDA_ProcessReceiveFilterSetFilterReq(pWDA, (tSirRcvPktFilterCfgType *)pMsg->bodyptr);
          break;
       }
-      // IKJB42MAIN-1244, Motorola, a19091 - BEGIN
-      case WDA_RECEIVE_FILTER_SET_FILTER_MC_REQ:
-      {
-          WDA_ProcessReceiveFilterSetFilterMcReq((tSirInvokeV6Filter *)pMsg->bodyptr);
-          break;
-      }
-      // IKJB42MAIN-1244, Motorola, a19091 - END
       case WDA_PACKET_COALESCING_FILTER_MATCH_COUNT_REQ:
       {
          WDA_ProcessPacketFilterMatchCountReq(pWDA, (tpSirRcvFltPktMatchRsp)pMsg->bodyptr);
@@ -15957,21 +15947,6 @@ VOS_STATUS WDA_ProcessReceiveFilterSetFilterReq (tWDA_CbContext *pWDA,
    }
    return CONVERT_WDI2VOS_STATUS(status) ;
 }
-
-// IKJB42MAIN-1244, Motorola, a19091 - BEGIN
-/*
- * FUNCTION WDA_ProcessReceiveFilterSetFilterMcReq
- */
-void WDA_ProcessReceiveFilterSetFilterMcReq(tSirInvokeV6Filter *invokeV6FilterConfig)
-{
-    if(invokeV6FilterConfig != NULL)
-    {
-        invokeV6FilterConfig->configureFilterFn(invokeV6FilterConfig->pHddAdapter,
-                invokeV6FilterConfig->set, FALSE);
-        kfree(invokeV6FilterConfig);
-    }
-}
-// IKJB42MAIN-1244, Motorola, a19091 - END
 
 /*
  * FUNCTION: WDA_FilterMatchCountRespCallback

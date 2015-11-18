@@ -692,8 +692,6 @@ typedef struct sSirMbMsgP2p
 #endif
 #define SIR_HAL_SPOOF_MAC_ADDR_REQ            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 260)
 
-#define SIR_HAL_RECEIVE_FILTER_SET_FILTER_MC_REQ (SIR_HAL_ITC_MSG_TYPES_BEGIN + 261) // IKJB42MAIN-1244, Motorola, a19091
-
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 // CFG message types
 #define SIR_CFG_MSG_TYPES_BEGIN        (SIR_CFG_MODULE_ID << 8)
