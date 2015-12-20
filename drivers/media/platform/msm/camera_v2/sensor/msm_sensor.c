@@ -475,6 +475,7 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	if (s_ctrl->set_mclk_23880000)
 		msm_sensor_adjust_mclk(power_info);
 
+#ifdef CONFIG_MSM_CHECK_CAMERA_ACTUATOR
 	camera_info = s_ctrl->sensordata->cam_slave_info;
 	if (!camera_info)
 		pr_err("%s: camera slave info is null\n",
@@ -482,6 +483,9 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	else
 		actuator_info = &camera_info->sensor_init_params.
 				actuator_info;
+#else
+	actuator_info = NULL;
+#endif
 
 	for (retry = 0; retry < 7; retry++) {
 		rc = msm_camera_power_up(power_info, s_ctrl->sensor_device_type,

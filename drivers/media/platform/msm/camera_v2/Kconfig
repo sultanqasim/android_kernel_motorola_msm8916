@@ -275,6 +275,14 @@ config MSM_FD
 	 ---help---
 	    Enables support for the MSM FD face detection engine.
 
+config MSM_CHECK_CAMERA_ACTUATOR
+	bool "Read camera actuator state in power up"
+	default n
+	depends on MSM_CAMERA_SENSOR
+	---help---
+	   Older binaries didn't have struct msm_sensor_actuator_info_t in the
+	   camera API structs and will break with this enabled. New Motorola
+	   camera binaries from Marshmallow require this.
 
 config MSM_LEGACY_CAMERA_COMPATIBILITY
 	bool "Legacy camera compatibility"

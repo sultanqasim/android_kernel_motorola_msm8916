@@ -265,7 +265,9 @@ struct msm_sensor_init_params {
 	/* sensor mount angle */
 	uint32_t            sensor_mount_angle;
 	struct msm_sensor_otp_cal_info_t sensor_otp;
+#ifdef CONFIG_MSM_CHECK_CAMERA_ACTUATOR
 	struct msm_sensor_actuator_info_t actuator_info;
+#endif
 };
 
 struct msm_sensor_id_info_t {
@@ -289,7 +291,9 @@ struct msm_camera_sensor_slave_info {
 	struct msm_sensor_init_params sensor_init_params;
 	uint8_t is_flash_supported;
 	struct otp_info_t sensor_otp;
+#ifdef CONFIG_MSM_CHECK_CAMERA_ACTUATOR
 	struct msm_sensor_actuator_info_t actuator_info;
+#endif
 	enum msm_sensor_output_format_t output_format;
 };
 
