@@ -254,6 +254,10 @@ dtb-$(CONFIG_ARCH_MSM8916) += msm8916-osprey-p2b.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-osprey-p2bd.dtb
 endif
 
+# Harpia
+dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p0.dtb
+dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p0a.dtb
+
 ifeq ($(CONFIG_MMI_LUX_DTB),y)
 # Motorola 8939 Devices
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p0.dtb
