@@ -1070,6 +1070,19 @@ config MMI_LUX_DTB
 
 	  If unsure, say 'n'.
 
+config MMI_MERLIN_DTB
+	depends on ARCH_MSM8916
+	default n
+	bool "Motorola Merlin Device DTBs"
+	help
+	  Only include Motorola Merlin specific DTBs to limit the number that
+	  get built during kernel compilation.
+
+	  Merlin is a Motorola device that uses MSM8939 chipset, which uses the
+	  MSM8916 defconfig.
+
+	  If unsure, say 'n'.
+
 config MMI_OSPREY_DTB
 	depends on ARCH_MSM8916
 	default n

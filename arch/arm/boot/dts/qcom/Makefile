@@ -264,10 +264,12 @@ dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p2a.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8939-lux-p2c.dtb
 endif
 
+ifeq ($(CONFIG_MMI_MERLIN_DTB),y)
 # Merlin
-dtb-$(CONFIG_ARCH_MSM8916) += msm8939-merlin-p0.dtb
+#dtb-$(CONFIG_ARCH_MSM8916) += msm8939-merlin-p0.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8939-merlin-p1.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8939-merlin-p1v3.dtb
+endif
 
 ifeq ($(CONFIG_MMI_DEVICE_DTBS),y)
 # Add 1k of padding to the DTBs to allow for environment variables
