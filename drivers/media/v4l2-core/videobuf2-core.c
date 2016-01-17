@@ -168,7 +168,7 @@ static void __setup_offsets(struct vb2_queue *q, unsigned int n)
 		if (!vb)
 			continue;
 
-		for (plane = 0; plane < vb->num_planes && plane < VIDEO_MAX_PLANES; ++plane) {
+		for (plane = 0; plane < vb->num_planes; ++plane) {
 			vb->v4l2_planes[plane].length = q->plane_sizes[plane];
 			vb->v4l2_planes[plane].m.mem_offset = off;
 
@@ -1756,7 +1756,7 @@ static int __find_plane_by_offset(struct vb2_queue *q, unsigned long off,
 	for (buffer = 0; buffer < q->num_buffers; ++buffer) {
 		vb = q->bufs[buffer];
 
-		for (plane = 0; plane < vb->num_planes && plane < VIDEO_MAX_PLANES; ++plane) {
+		for (plane = 0; plane < vb->num_planes; ++plane) {
 			if (vb->v4l2_planes[plane].m.mem_offset == off) {
 				*_buffer = buffer;
 				*_plane = plane;

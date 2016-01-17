@@ -530,7 +530,7 @@ static void cluster_prepare(struct lpm_cluster *cluster,
 	cpumask_or(&cluster->num_childs_in_sync, cpu,
 			&cluster->num_childs_in_sync);
 
-	for (i = 0; i < cluster->nlevels && i < NR_LPM_LEVELS; i++) {
+	for (i = 0; i < cluster->nlevels; i++) {
 		struct lpm_cluster_level *lvl = &cluster->levels[i];
 
 		if (child_idx >= lvl->min_child_level)
@@ -584,7 +584,7 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 	cpumask_andnot(&cluster->num_childs_in_sync,
 			&cluster->num_childs_in_sync, cpu);
 
-	for (i = 0; i < cluster->nlevels && i < NR_LPM_LEVELS; i++) {
+	for (i = 0; i < cluster->nlevels; i++) {
 		struct lpm_cluster_level *lvl = &cluster->levels[i];
 
 		if (child_idx >= lvl->min_child_level)

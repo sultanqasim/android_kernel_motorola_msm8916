@@ -627,8 +627,7 @@ static tpSmeBtAclEventHist btcFindAclEventHist( tpAniSirGlobal pMac, v_U8_t *bdA
             //try to match handle
             if( pReplay->btcEventHist.btAclConnectionEvent[i].bNextEventIdx )
             {
-                for(j = 0; j < pReplay->btcEventHist.btAclConnectionEvent[i].bNextEventIdx &&
-			j < BT_MAX_ACL_SUPPORT; j++)
+                for(j = 0; j < pReplay->btcEventHist.btAclConnectionEvent[i].bNextEventIdx; j++)
                 {
                     if( pReplay->btcEventHist.btAclConnectionEvent[i].btAclConnection[j].connectionHandle ==
                         handle )
@@ -687,8 +686,7 @@ static tpSmeBtSyncEventHist btcFindSyncEventHist( tpAniSirGlobal pMac, v_U8_t *b
             //try to match handle
             if( pReplay->btcEventHist.btSyncConnectionEvent[i].bNextEventIdx )
             {
-                for(j = 0; j < pReplay->btcEventHist.btAclConnectionEvent[i].bNextEventIdx &&
-			j < BT_MAX_NUM_EVENT_SCO_DEFERRED; j++)
+                for(j = 0; j < pReplay->btcEventHist.btAclConnectionEvent[i].bNextEventIdx; j++)
                 {
                     if( pReplay->btcEventHist.btSyncConnectionEvent[i].btSyncConnection[j].connectionHandle ==
                         handle )

@@ -4875,8 +4875,7 @@ tANI_BOOLEAN csrValidateWep( tpAniSirGlobal pMac, eCsrEncryptionType ucEncryptio
         //If privacy bit is not set, consider no match
         if ( !csrIsPrivacy( pSirBssDesc ) ) break;
 
-        for( idx = 0; idx < pMCEncryptionList->numEntries &&
-		idx < eCSR_NUM_OF_ENCRYPT_TYPE; idx++ )
+        for( idx = 0; idx < pMCEncryptionList->numEntries; idx++ )
         {
             switch( pMCEncryptionList->encryptionType[idx] )
             {
@@ -4901,8 +4900,7 @@ tANI_BOOLEAN csrValidateWep( tpAniSirGlobal pMac, eCsrEncryptionType ucEncryptio
 
         if(!fMatch) break;
 
-        for( idx = 0; idx < pAuthList->numEntries &&
-		idx < eCSR_NUM_OF_SUPPORT_AUTH_TYPE; idx++ )
+        for( idx = 0; idx < pAuthList->numEntries; idx++ )
         {
             switch( pAuthList->authType[idx] )
             {

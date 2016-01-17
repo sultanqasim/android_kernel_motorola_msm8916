@@ -761,7 +761,7 @@ static int qcedev_sha_update(struct qcedev_async_req *qcedev_areq,
 				req.data[i].len = sreq->data[i].len;
 			} else {
 				total = 0;
-				for (j = i; j < req.entries && j < QCEDEV_MAX_BUFFERS; j++) {
+				for (j = i; j < req.entries; j++) {
 					num_entries++;
 					if ((total + sreq->data[j].len) >=
 							QCE_MAX_OPER_DATA) {
@@ -1351,7 +1351,7 @@ static int qcedev_vbuf_ablk_cipher(struct qcedev_async_req *areq,
 
 			} else {
 				total = areq->cipher_op_req.byteoffset;
-				for (j = i; j < req.entries && j < QCEDEV_MAX_BUFFERS; j++) {
+				for (j = i; j < req.entries; j++) {
 					num_entries++;
 					if ((total + creq->vbuf.src[j].len)
 							>= max_data_xfer) {

@@ -903,8 +903,7 @@ static inline void sysrq_register_handler(void)
 	int error;
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(sysrq_reset_seq) &&
-			i < ARRAY_SIZE(platform_sysrq_reset_seq); i++) {
+	for (i = 0; i < ARRAY_SIZE(sysrq_reset_seq); i++) {
 		key = platform_sysrq_reset_seq[i];
 		if (key == KEY_RESERVED || key > KEY_MAX)
 			break;

@@ -2671,12 +2671,12 @@ limTdlsPopulateMatchingRateSet(tpAniSirGlobal pMac,
          */
     tempRateSet2.numRates = 0;
 
-    for (i = 0; i < tempRateSet.numRates; i++)
+    for (i = 0;i < tempRateSet.numRates; i++)
     {
         min = 0;
         val = 0xff;
 
-        for(j = 0; j < tempRateSet.numRates && j < SIR_MAC_RATESET_EID_MAX; j++)
+        for(j = 0;j < tempRateSet.numRates; j++)
             if ((tANI_U32) (tempRateSet.rate[j] & 0x7f) < val)
             {
                 val = tempRateSet.rate[j] & 0x7f;
@@ -2711,9 +2711,9 @@ limTdlsPopulateMatchingRateSet(tpAniSirGlobal pMac,
         tANI_U8 bRateIndex = 0;
         vos_mem_set( (tANI_U8 *) rates, sizeof(tSirSupportedRates), 0);
 
-        for (i = 0; i < tempRateSet2.numRates; i++)
+        for (i = 0;i < tempRateSet2.numRates; i++)
         {
-            for (j = 0; j < tempRateSet.numRates && j < SIR_MAC_RATESET_EID_MAX; j++)
+            for (j = 0;j < tempRateSet.numRates; j++)
             {
                 if ((tempRateSet2.rate[i] & 0x7F) ==
                     (tempRateSet.rate[j] & 0x7F))

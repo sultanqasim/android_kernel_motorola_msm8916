@@ -745,10 +745,6 @@ static void snd_usbmidi_akai_output(struct snd_usb_midi_out_endpoint *ep,
 			ep->ports[0].active = 0;
 			return;
 		}
-
-		if (count > MAX_AKAI_SYSEX_LEN)
-			count = MAX_AKAI_SYSEX_LEN;
-
 		/* try to skip non-SysEx data */
 		for (pos = 0; pos < count && tmp[pos] != 0xF0; pos++)
 			;

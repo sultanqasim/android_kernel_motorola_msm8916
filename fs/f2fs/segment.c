@@ -8,10 +8,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
-// something really wierd is happening with Linaro 5.1 snapshot
-#pragma GCC diagnostic ignored "-Warray-bounds"
-
 #include <linux/fs.h>
 #include <linux/f2fs_fs.h>
 #include <linux/bio.h>

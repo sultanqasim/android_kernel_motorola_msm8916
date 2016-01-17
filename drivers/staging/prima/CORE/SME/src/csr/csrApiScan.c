@@ -3467,8 +3467,7 @@ void csrApplyChannelPowerCountryInfo( tpAniSirGlobal pMac, tCsrChannel *pChannel
             {
                 if( countryIndex != -1 )
                 {
-                    for(j=0; j < countryIgnoreList[countryIndex].channelCount &&
-                        j < MAX_CHANNELS_IGNORE; j++)
+                    for(j=0; j < countryIgnoreList[countryIndex].channelCount; j++)
                     {
                         if( pChannelList->channelList[i] ==
                                 countryIgnoreList[countryIndex].channelList[j] )
