@@ -485,7 +485,7 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 void wcd9xxx_mbhc_deinit(struct wcd9xxx_mbhc *mbhc);
 void *wcd9xxx_mbhc_cal_btn_det_mp(
 			    struct wcd9xxx_mbhc_btn_detect_cfg *btn_det,
-			    enum wcd9xxx_mbhc_btn_det_mem mem);
+			    const enum wcd9xxx_mbhc_btn_det_mem mem);
 int wcd9xxx_mbhc_get_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 			       uint32_t *zr);
 #endif /* __WCD9XXX_MBHC_H__ */
