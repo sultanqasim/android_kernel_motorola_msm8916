@@ -10,7 +10,6 @@ obj-$(CONFIG_ARCH_MSM_KRAIT) += msm-krait-l2-accessors.o perf_event_msm_krait_l2
 obj-$(CONFIG_ARCH_MSM_KRAIT) += krait-scm.o
 obj-$(CONFIG_DEBUG_FS) += perf_debug.o
 
-obj-$(CONFIG_FORCE_FAST_CHARGE) += fastchg.o
 obj-$(CONFIG_SMP) += headsmp.o platsmp.o
 obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
 
