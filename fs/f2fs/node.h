@@ -14,8 +14,10 @@
 /* node block offset on the NAT area dedicated to the given start node id */
 #define	NAT_BLOCK_OFFSET(start_nid) (start_nid / NAT_ENTRY_PER_BLOCK)
 
-/* # of pages to perform readahead before building free nids */
+/* # of pages to perform synchronous readahead before building free nids */
 #define FREE_NID_PAGES 4
+
+#define DEF_RA_NID_PAGES	4	/* # of nid pages to be readaheaded */
 
 /* maximum readahead size for node during getting data blocks */
 #define MAX_RA_NODE		128
@@ -181,7 +183,7 @@ static inline pgoff_t current_nat_addr(struct f2fs_sb_info *sbi, nid_t start)
 
 	block_addr = (pgoff_t)(nm_i->nat_blkaddr +
 		(seg_off << sbi->log_blocks_per_seg << 1) +
-		(block_off & ((1 << sbi->log_blocks_per_seg) - 1)));
+		(block_off & (sbi->blocks_per_seg - 1)));
 
 	if (f2fs_test_bit(block_off, nm_i->nat_bitmap))
 		block_addr += sbi->blocks_per_seg;
@@ -315,7 +317,7 @@ static inline bool IS_DNODE(struct page *node_page)
 	return true;
 }
 
-static inline void set_nid(struct page *p, int off, nid_t nid, bool i)
+static inline int set_nid(struct page *p, int off, nid_t nid, bool i)
 {
 	struct f2fs_node *rn = F2FS_NODE(p);
 
@@ -325,7 +327,7 @@ static inline void set_nid(struct page *p, int off, nid_t nid, bool i)
 		rn->i.i_nid[off - NODE_DIR1_BLOCK] = cpu_to_le32(nid);
 	else
 		rn->in.nid[off] = cpu_to_le32(nid);
-	set_page_dirty(p);
+	return set_page_dirty(p);
 }
 
 static inline nid_t get_nid(struct page *p, int off, bool i)
