@@ -61,6 +61,9 @@ module_param(touch_boost_active, uint, 0664);
 static unsigned int nr_run_profile_sel = 0;
 module_param(nr_run_profile_sel, uint, 0664);
 
+static unsigned int min_online_cpus = 2;
+module_param(min_online_cpus, uint, 0664);
+
 //default to something sane rather than zero
 static unsigned int sampling_time = DEF_SAMPLING_MS;
 
@@ -266,7 +269,11 @@ static void __ref intelli_plug_work_fn(struct work_struct *work)
 #ifdef DEBUG_INTELLI_PLUG
 		pr_info("nr_run_stat: %u\n", nr_run_stat);
 #endif
-		cpu_count = nr_run_stat;
+
+		if (unlikely(min_online_cpus > 4))
+			min_online_cpus = 4;
+
+		cpu_count = nr_run_stat < min_online_cpus ? min_online_cpus : nr_run_stat;
 		nr_cpus = num_online_cpus();
 
 		if (!suspended) {
