@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1926,7 +1926,6 @@ vos_fetch_tl_cfg_parms
   pTLConfig->ucAcWeights[1] = pConfig->WfqBeWeight;
   pTLConfig->ucAcWeights[2] = pConfig->WfqViWeight;
   pTLConfig->ucAcWeights[3] = pConfig->WfqVoWeight;
-  pTLConfig->ucAcWeights[4] = pConfig->WfqVoWeight;
   pTLConfig->ucReorderAgingTime[0] = pConfig->BkReorderAgingTime;/*WLANTL_AC_BK*/
   pTLConfig->ucReorderAgingTime[1] = pConfig->BeReorderAgingTime;/*WLANTL_AC_BE*/
   pTLConfig->ucReorderAgingTime[2] = pConfig->ViReorderAgingTime;/*WLANTL_AC_VI*/
@@ -2190,19 +2189,18 @@ VOS_STATUS vos_wlanRestart(void)
   This function is called to issue dump commands to Firmware
 
   @param
-       cmd     -  Command No. to execute
-       arg1    -  argument 1 to cmd
-       arg2    -  argument 2 to cmd
-       arg3    -  argument 3 to cmd
-       arg4    -  argument 4 to cmd
-       async   -  asynchronous event. Don't wait for completion.
+       cmd - Command No. to execute
+       arg1 - argument 1 to cmd
+       arg2 - argument 2 to cmd
+       arg3 - argument 3 to cmd
+       arg4 - argument 4 to cmd
   @return
        NONE
 */
 v_VOID_t vos_fwDumpReq(tANI_U32 cmd, tANI_U32 arg1, tANI_U32 arg2,
-                        tANI_U32 arg3, tANI_U32 arg4, tANI_U8 async)
+                        tANI_U32 arg3, tANI_U32 arg4)
 {
-   WDA_HALDumpCmdReq(NULL, cmd, arg1, arg2, arg3, arg4, NULL, async);
+   WDA_HALDumpCmdReq(NULL, cmd, arg1, arg2, arg3, arg4, NULL);
 }
 
 v_U64_t vos_get_monotonic_boottime(void)
@@ -2258,31 +2256,3 @@ v_BOOL_t vos_is_wlan_in_badState(VOS_MODULE_ID moduleId,
     }
     return pVosWDCtx->isFatalError;
 }
-
-/**
- * vos_isLoadUnloadInProgress()
- *
- * Return TRUE if load/unload is in progress.
- *
- */
-v_BOOL_t vos_isLoadUnloadInProgress(void)
-{
-    hdd_context_t *pHddCtx = NULL;
-    v_CONTEXT_t pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
-
-    if(!pVosContext)
-    {
-       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Global VOS context is Null", __func__);
-       return FALSE;
-    }
-
-    pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext );
-    if(!pHddCtx) {
-       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-                "%s: HDD context is Null", __func__);
-       return FALSE;
-    }
-
-    return ( 0 != pHddCtx->isLoadUnloadInProgress);
-}
-

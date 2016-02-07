@@ -83,6 +83,9 @@ void vos_trace_display(void);
 
 void vos_trace_setValue( VOS_MODULE_ID module, VOS_TRACE_LEVEL level, v_U8_t on );
 
+//Begin Motorola dcw476 4/17/13 IKJBXLINE-5577:changing wlan driver log level dynamically
+void vos_trace_setValue_till_level( VOS_MODULE_ID module, VOS_TRACE_LEVEL level, v_U8_t on) ;
+//END IKJBXLINE-5577
 
 // VOS_TRACE is the macro invoked to add trace messages to code.  See the 
 // documenation for vos_trace_msg() for the parameters etc. for this function.

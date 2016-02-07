@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -530,7 +530,7 @@ typedef enum
 
 #define CFG_AP_KEEP_ALIVE_PERIOD_NAME          "gApKeepAlivePeriod"
 #define CFG_AP_KEEP_ALIVE_PERIOD_MIN           ( 3 )
-#define CFG_AP_KEEP_ALIVE_PERIOD_MAX           ( 255 )
+#define CFG_AP_KEEP_ALIVE_PERIOD_MAX           ( 20 )
 #define CFG_AP_KEEP_ALIVE_PERIOD_DEFAULT       ( 5 )
 
 #define CFG_GO_KEEP_ALIVE_PERIOD_NAME          "gGoKeepAlivePeriod"
@@ -2165,20 +2165,20 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
  */
 #define CFG_ASD_PROBE_INTERVAL_NAME                     "gAsdProbeInterval"
 #define CFG_ASD_PROBE_INTERVAL_DEFAULT                  (50)
-#define CFG_ASD_PROBE_INTERVAL_MIN                      (1)
-#define CFG_ASD_PROBE_INTERVAL_MAX                      (500)
+#define CFG_ASD_PROBE_INTERVAL_MIN                      (10)
+#define CFG_ASD_PROBE_INTERVAL_MAX                      (100)
 
 /* RSSI Threshold used to trigger probing activity/selection process*/
 #define CFG_ASD_TRIGGER_THRESHOLD_NAME                  "gAsdTriggerThreshold"
-#define CFG_ASD_TRIGGER_THRESHOLD_DEFAULT               (-60)
-#define CFG_ASD_TRIGGER_THRESHOLD_MIN                   (-100)
-#define CFG_ASD_TRIGGER_THRESHOLD_MAX                   (-10)
+#define CFG_ASD_TRIGGER_THRESHOLD_DEFAULT               (-75)
+#define CFG_ASD_TRIGGER_THRESHOLD_MIN                   (-120)
+#define CFG_ASD_TRIGGER_THRESHOLD_MAX                   (0)
 
 /*RSSI Hysteresis Threshold for RSSI-RTT*/
 #define CFG_ASD_RTT_RSSI_HYST_THRESHOLD_NAME             "gAsdRTTRssiHystThreshold"
-#define CFG_ASD_RTT_RSSI_HYST_THRESHOLD_DEFAULT          (3)
+#define CFG_ASD_RTT_RSSI_HYST_THRESHOLD_DEFAULT          (50)
 #define CFG_ASD_RTT_RSSI_HYST_THRESHOLD_MIN              (0)
-#define CFG_ASD_RTT_RSSI_HYST_THRESHOLD_MAX              (5)
+#define CFG_ASD_RTT_RSSI_HYST_THRESHOLD_MAX              (100)
 
 //Enable debug for remain on channel issues
 #define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_NAME    "gDebugP2pRemainOnChannel"
@@ -2231,7 +2231,7 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ROAMING_DFS_CHANNEL_NAME                "gAllowDFSChannelRoam"
 #define CFG_ROAMING_DFS_CHANNEL_MIN                 (0)
 #define CFG_ROAMING_DFS_CHANNEL_MAX                 (1)
-#define CFG_ROAMING_DFS_CHANNEL_DEFAULT             (1)
+#define CFG_ROAMING_DFS_CHANNEL_DEFAULT             (0)
 
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
@@ -2417,10 +2417,6 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_BTC_ENABLE_IND_TIMER_VALUE_MAX     ( 60 )
 #define CFG_BTC_ENABLE_IND_TIMER_VALUE_DEFAULT ( 60 )
 
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_NAME     "gP2PListenDeferInterval"
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_MIN      ( 100 )
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_MAX      ( 200 )
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_DEFAULT  ( 100 )
 /*--------------------------------------------------------------------------- 
   Type declarations
   -------------------------------------------------------------------------*/ 
@@ -2858,7 +2854,7 @@ typedef struct
 #endif
    char                        overrideCountryCode[4];
    v_U32_t                     gAsdProbeInterval;
-   v_S7_t                      gAsdTriggerThreshold;
+   v_U32_t                     gAsdTriggerThreshold;
    v_U32_t                     gAsdRTTRssiHystThreshold;
    v_BOOL_t                    debugP2pRemainOnChannel;
    v_U32_t                     cfgBtcCTS2SduringSCO;
@@ -2913,7 +2909,6 @@ typedef struct
    v_U32_t                     enableRtsCtsHtVht;
    v_U8_t                      btcEnableIndTimerVal;
    v_BOOL_t                    btcFastWlanConnPref;
-   v_U16_t                     gP2PListenDeferInterval;
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation

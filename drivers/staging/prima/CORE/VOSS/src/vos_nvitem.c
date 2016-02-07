@@ -58,7 +58,6 @@
 #include <net/cfg80211.h>
 #include <linux/firmware.h>
 #include <linux/vmalloc.h>
-
 //Moto, read MACs from boot params
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -98,7 +97,6 @@ static v_BOOL_t crda_regulatory_run_time_entry_valid = VOS_FALSE;
 #define MAGIC_NUMBER            0xCAFEBABE
 
 #define MIN(a, b) (a > b ? b : a)
-#define MAX(a, b) (a > b ? a : b)
 
 #ifdef MOTO_UTAGS_MAC
 #define WIFI_MAC_BOOTARG "androidboot.wifimacaddr="
@@ -3325,82 +3323,6 @@ v_BOOL_t vos_is_nv_country_non_zero()
 
 #ifdef CONFIG_ENABLE_LINUX_REG
 
-static int bw20_ch_index_to_bw40_plus_minus_ch_index(int k,
-                                    eChannnelBondingTypes cbflag )
-{
-   int m = INVALID_RF_CHANNEL;
-   if (k >= RF_CHAN_1 && k <= RF_CHAN_14)
-   {
-      if(RF_CHAN_BOND_HT40_PLUS == cbflag)
-         m = k - RF_CHAN_1 + RF_CHAN_BOND_3 ;
-      else
-         m = k - RF_CHAN_1 + RF_CHAN_BOND_3 - HT_40MINUS_INDEX ;
-
-      if (m > RF_CHAN_BOND_11)
-         m = INVALID_RF_CHANNEL;
-      if (m < RF_CHAN_BOND_3)
-         m = INVALID_RF_CHANNEL;
-   }
-   else if (k >= RF_CHAN_240 && k <= RF_CHAN_216)
-   {
-      if(RF_CHAN_BOND_HT40_PLUS == cbflag)
-         m = k - RF_CHAN_240 + RF_CHAN_BOND_242 ;
-      else
-         m = k - RF_CHAN_240 + RF_CHAN_BOND_242 - HT_40MINUS_INDEX;
-
-      if (m > RF_CHAN_BOND_214)
-         m = INVALID_RF_CHANNEL;
-      if (m < RF_CHAN_BOND_242)
-         m = INVALID_RF_CHANNEL;
-   }
-   else if (k >= RF_CHAN_36 && k <= RF_CHAN_64)
-   {
-      if(RF_CHAN_BOND_HT40_PLUS == cbflag)
-         m = k - RF_CHAN_36 + RF_CHAN_BOND_38;
-      else
-         m = k - RF_CHAN_36 + RF_CHAN_BOND_38 - HT_40MINUS_INDEX;
-
-      if (m > RF_CHAN_BOND_62)
-         m = INVALID_RF_CHANNEL;
-      if (m < RF_CHAN_BOND_38)
-         m = INVALID_RF_CHANNEL;
-   }
-#ifdef FEATURE_WLAN_CH144
-   else if (k >= RF_CHAN_100 && k <= RF_CHAN_144)
-#else
-   else if (k >= RF_CHAN_100 && k <= RF_CHAN_140)
-#endif /* FEATURE_WLAN_CH144 */
-   {
-      if(RF_CHAN_BOND_HT40_PLUS == cbflag)
-         m = k - RF_CHAN_100 + RF_CHAN_BOND_102;
-      else
-         m = k - RF_CHAN_100 + RF_CHAN_BOND_102 -  HT_40MINUS_INDEX;
-#ifdef FEATURE_WLAN_CH144
-      if (m > RF_CHAN_BOND_142)
-         m = INVALID_RF_CHANNEL;
-      if (m < RF_CHAN_BOND_102)
-         m = INVALID_RF_CHANNEL;
-#else
-      if (m > RF_CHAN_BOND_138)
-         m = INVALID_RF_CHANNEL;
-      if (m < RF_CHAN_BOND_102)
-         m = INVALID_RF_CHANNEL;
-#endif /* FEATURE_WLAN_CH144 */
-   }
-   else if (k >= RF_CHAN_149 && k <= RF_CHAN_165)
-   {
-      if(RF_CHAN_BOND_HT40_PLUS == cbflag)
-         m = k - RF_CHAN_149 + RF_CHAN_BOND_151;
-      else
-         m = k - RF_CHAN_149 + RF_CHAN_BOND_151 - HT_40MINUS_INDEX;
-
-      if (m > RF_CHAN_BOND_163)
-         m = INVALID_RF_CHANNEL;
-      if (m < RF_CHAN_BOND_151)
-         m = INVALID_RF_CHANNEL;
-   }
-   return m;
-}
 /**------------------------------------------------------------------------
   \brief vos_nv_setRegDomain -
   \param clientCtxt  - Client Context, Not used for PRIMA
@@ -3652,7 +3574,12 @@ int vos_update_nv_table_from_wiphy_band(void *hdd_ctx,
         for (j = 0; j < wiphy->bands[i]->n_channels; j++)
         {
              if (IEEE80211_BAND_2GHZ == i && eCSR_BAND_5G == nBandCapability)
-                  wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
+             {
+                 if (WLAN_HDD_IS_SOCIAL_CHANNEL(wiphy->bands[i]->channels[j].center_freq) )
+                     wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_DISABLED;
+                 else
+                     wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
+             }
              else if (IEEE80211_BAND_5GHZ == i && eCSR_BAND_24 == nBandCapability)
                   wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
 
@@ -3660,6 +3587,10 @@ int vos_update_nv_table_from_wiphy_band(void *hdd_ctx,
               n is internal channel index for corresponding 40MHz channel */
 
             k = m + j;
+            n = bw20_ch_index_to_bw40_ch_index(k);
+
+            if (n == -1)
+                return -1;
 
             /* If the regulatory rules for a country do not explicilty
              * require a passive scan on a frequency, lift the passive
@@ -3711,18 +3642,8 @@ int vos_update_nv_table_from_wiphy_band(void *hdd_ctx,
                 }
                 pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].enabled =
                     NV_CHANNEL_DISABLE;
-                if (INVALID_RF_CHANNEL !=
-                    (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k , RF_CHAN_BOND_HT40_MINUS)))
-                {
-                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                       NV_CHANNEL_DISABLE;
-                }
-                if (INVALID_RF_CHANNEL !=
-                    (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k , RF_CHAN_BOND_HT40_PLUS)))
-                {
-                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                       NV_CHANNEL_DISABLE;
-                }
+                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                    NV_CHANNEL_DISABLE;
             }
             /* nv cannot distinguish between DFS and passive channels */
             else if (wiphy->bands[i]->channels[j].flags &
@@ -3756,55 +3677,22 @@ int vos_update_nv_table_from_wiphy_band(void *hdd_ctx,
                 if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40) ==
                                                              IEEE80211_CHAN_NO_HT40 )
                 {
-                   if ( INVALID_RF_CHANNEL !=
-                       (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_MINUS)))
-                   {
-                       pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                   pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
                         NV_CHANNEL_DISABLE;
-                   }
-                   if ( INVALID_RF_CHANNEL !=
-                      (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_PLUS)))
-                   {
-                       pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                         NV_CHANNEL_DISABLE;
-                   }
                 }
                 else
                 {
-                    if (!(wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40PLUS))
-                    {
-                      if (INVALID_RF_CHANNEL !=
-                          (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_PLUS)))
-                      {
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                            NV_CHANNEL_DFS;
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                        NV_CHANNEL_DFS;
 
-                          /* 40MHz channel power is half of 20MHz (-3dB), so subtract 3dB from
-                           * wiphy limits, since wiphy has same limits for 20MHz and 40MHz
-                           * channels
-                           */
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
-                           MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit,
+                    /* 40MHz channel power is half of 20MHz (-3dB), so subtract 3dB from
+                     * wiphy limits, since wiphy has same limits for 20MHz and 40MHz
+                     * channels
+                     */
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
+                        MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit,
                             (tANI_S8) ((wiphy->bands[i]->channels[j].max_power-3)));
-                      }
-                    }
-                    if (!(wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40MINUS))
-                    {
-                       if (INVALID_RF_CHANNEL !=
-                          (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_MINUS)))
-                       {
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                            NV_CHANNEL_DFS;
 
-                          /* 40MHz channel power is half of 20MHz (-3dB), so subtract 3dB from
-                           * wiphy limits, since wiphy has same limits for 20MHz and 40MHz
-                           * channels
-                           */
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
-                           MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit,
-                             (tANI_S8) ((wiphy->bands[i]->channels[j].max_power-3)));
-                       }
-                    }
                 }
                 if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_80MHZ) == 0)
                 {
@@ -3850,55 +3738,21 @@ int vos_update_nv_table_from_wiphy_band(void *hdd_ctx,
                 if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40) ==
                                                              IEEE80211_CHAN_NO_HT40 )
                 {
-                   if ( INVALID_RF_CHANNEL !=
-                       (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_MINUS)))
-                   {
-                       pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                   pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
                         NV_CHANNEL_DISABLE;
-                   }
-                   if ( INVALID_RF_CHANNEL !=
-                      (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_PLUS)))
-                   {
-                       pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                         NV_CHANNEL_DISABLE;
-                   }
                 }
                 else
                 {
-                    if (!(wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40PLUS))
-                    {
-                      if (INVALID_RF_CHANNEL !=
-                          (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_PLUS)))
-                      {
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                            NV_CHANNEL_ENABLE;
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                        NV_CHANNEL_ENABLE;
 
-                          /* 40MHz channel power is half of 20MHz (-3dB), so subtract 3dB from
-                           * wiphy limits, since wiphy has same limits for 20MHz and 40MHz
-                           * channels
-                           */
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
-                           MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit,
+                    /* 40MHz channel power is half of 20MHz (-3dB), so subtract 3dB from
+                     * wiphy limits, since wiphy has same limits for 20MHz and 40MHz
+                     * channels
+                     */
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
+                        MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit,
                             (tANI_S8) ((wiphy->bands[i]->channels[j].max_power-3)));
-                      }
-                    }
-                    if (!(wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40MINUS))
-                    {
-                       if (INVALID_RF_CHANNEL !=
-                            (n = bw20_ch_index_to_bw40_plus_minus_ch_index( k, RF_CHAN_BOND_HT40_MINUS)))
-                       {
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
-                            NV_CHANNEL_ENABLE;
-
-                          /* 40MHz channel power is half of 20MHz (-3dB), so subtract 3dB from
-                           * wiphy limits, since wiphy has same limits for 20MHz and 40MHz
-                           * channels
-                           */
-                          pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
-                           MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit,
-                             (tANI_S8) ((wiphy->bands[i]->channels[j].max_power-3)));
-                       }
-                    }
                 }
                 if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_80MHZ) == 0)
                 {
@@ -3971,10 +3825,10 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
  * regulatory setting table.
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-void __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
+void wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
                 struct regulatory_request *request)
 #else
-int __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
+int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
                 struct regulatory_request *request)
 #endif
 {
@@ -3987,9 +3841,9 @@ int __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                "cfg80211 reg notifier callback for country for initiator %d", request->initiator);
 
-    if (vos_is_logp_in_progress(VOS_MODULE_ID_VOSS, NULL))
+    if (TRUE == isWDresetInProgress())
     {
-       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                    ("SSR is in progress") );
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
        return;
@@ -4152,26 +4006,6 @@ int __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
 #endif
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-void wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
-                struct regulatory_request *request)
-{
-    vos_ssr_protect(__func__);
-    __wlan_hdd_linux_reg_notifier(wiphy, request);
-    vos_ssr_unprotect(__func__);
-    return;
-}
-#else
-int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
-                struct regulatory_request *request)
-{
-    int ret;
-    vos_ssr_protect(__func__);
-    ret = __wlan_hdd_linux_reg_notifier(wiphy, request);
-    vos_ssr_unprotect(__func__);
-    return ret;
-}
-#endif
 
 /* initialize wiphy from NV.bin */
 VOS_STATUS vos_init_wiphy_from_nv_bin(void)
@@ -4476,10 +4310,10 @@ void* vos_nv_change_country_code_cb(void *pAdapter)
  * regulatory setting table.
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-void __wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
+void wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
                 struct regulatory_request *request)
 #else
-int __wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
+int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
                 struct regulatory_request *request)
 #endif
 {
@@ -4781,26 +4615,5 @@ int __wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
     return 0;
 #endif
 }
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-void wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
-                struct regulatory_request *request)
-{
-    vos_ssr_protect(__func__);
-    __wlan_hdd_crda_reg_notifier(wiphy, request);
-    vos_ssr_unprotect(__func__);
-    return;
-}
-#else
-int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
-                struct regulatory_request *request)
-{
-    int ret;
-    vos_ssr_protect(__func__);
-    ret = __wlan_hdd_crda_reg_notifier(wiphy, request);
-    vos_ssr_unprotect(__func__);
-    return ret;
-}
-#endif
 
 #endif

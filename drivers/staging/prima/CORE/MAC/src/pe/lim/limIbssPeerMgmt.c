@@ -1460,7 +1460,7 @@ limIbssCoalesce(
     tSirMacAddr         currentBssId;
     tLimIbssPeerNode    *pPeerNode;
     tpDphHashNode       pStaDs;
-    tUpdateBeaconParams beaconParams;
+    tUpdateBeaconParams beaconParams; 
 
     vos_mem_set((tANI_U8 *)&beaconParams, sizeof(tUpdateBeaconParams), 0);
 
@@ -1533,12 +1533,8 @@ limIbssCoalesce(
          * pMac->lim.gLimIbssStaLimit
          */
         if ((pMac->lim.gLimNumIbssPeers+1) >= pMac->lim.gLimIbssStaLimit)
-        {   /*Print every 100th time */
-            if (pMac->lim.gLimIbssRetryCnt % 100 == 0)
-            {
-               limLog(pMac, LOG1, FL("**** MAX STA LIMIT HAS REACHED ****"));
-            }
-            pMac->lim.gLimIbssRetryCnt++;
+        {
+            PELOGE(limLog(pMac, LOGE, FL("**** MAX STA LIMIT HAS REACHED ****"));)
             return eSIR_LIM_MAX_STA_REACHED_ERROR;
         }
         PELOGW(limLog(pMac, LOGW, FL("IBSS Peer node does not exist, adding it***"));)

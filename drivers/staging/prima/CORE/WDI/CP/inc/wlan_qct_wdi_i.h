@@ -465,11 +465,6 @@ typedef enum
 
   WDI_SPOOF_MAC_ADDR_REQ                         = 101,
 
-  WDI_GET_FW_STATS_REQ                           = 102,
-
-  /* Send command to encrypt the given message */
-  WDI_ENCRYPT_MSG_REQ                            = 103,
-
   WDI_MAX_REQ,
 
   /*Send a suspend Indication down to HAL*/
@@ -508,6 +503,7 @@ typedef enum
   /* csa channel switch req*/
   WDI_CH_SWITCH_REQ_V1,
   WDI_TDLS_CHAN_SWITCH_REQ,
+  WDI_SET_RTS_CTS_HTVHT_IND,
 
   /*Keep adding the indications to the max request
     such that we keep them sepparate */
@@ -795,10 +791,6 @@ typedef enum
   WDI_EXTSCAN_RESET_SIGNF_RSSI_CHANGE_RSP        = 100,
 #endif
   WDI_SPOOF_MAC_ADDR_RSP                         = 101,
-  WDI_GET_FW_STATS_RSP                           = 102,
-
-  /* Send command to encrypt the given message */
-  WDI_ENCRYPT_MSG_RSP                            = 103,
   /*-------------------------------------------------------------------------
     Indications
      !! Keep these last in the enum if possible
@@ -4997,7 +4989,7 @@ WDI_RXMsgCTSCB
  @see
  @return Result of the function call
 */
-WDI_Status
+WPT_INLINE WDI_Status   // Motorola IKJB42MAIN-4103, are002, match instantiation
 WDI_ProcessResponse
 (
   WDI_ControlBlockType*  pWDICtx,
@@ -5834,20 +5826,6 @@ WDI_ProcessBatchScanResultInd
 
 #endif /* FEATURE_WLAN_BATCH_SCAN */
 
-WDI_Status
-WDI_ProcessGetFwStatsReq
-(
-  WDI_ControlBlockType*  pWDICtx,
-  WDI_EventInfoType*     pEventData
-);
-
-WDI_Status
-WDI_ProcessGetFwStatsRsp
-(
-  WDI_ControlBlockType*  pWDICtx,
-  WDI_EventInfoType*     pEventData
-);
-
 #ifdef FEATURE_WLAN_CH_AVOID
 /**
  @brief v -
@@ -6100,18 +6078,24 @@ WDI_ProcessSpoofMacAddrRsp
   WDI_EventInfoType*     pEventData
 );
 
+/**
+ @brief WDI_ProcessSetRtsCtsHtvhtInd
+        Set RTS/CTS indication for diff modes.
+
+ @param  pWDICtx:         pointer to the WLAN DAL context
+         pEventData:      pointer to the event information structure
+
+ @return Result of the function call
+*/
+
+
 WDI_Status
-WDI_ProcessEncryptMsgReq
+WDI_ProcessSetRtsCtsHtvhtInd
 (
   WDI_ControlBlockType*  pWDICtx,
   WDI_EventInfoType*     pEventData
 );
 
-WDI_Status
-WDI_ProcessEncryptMsgRsp
-(
-  WDI_ControlBlockType*  pWDICtx,
-  WDI_EventInfoType*     pEventData
-);
+
 #endif /*WLAN_QCT_WDI_I_H*/
 

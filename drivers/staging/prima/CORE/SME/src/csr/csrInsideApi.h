@@ -273,9 +273,8 @@ void csrScanStopTimers(tpAniSirGlobal pMac);
 tANI_BOOLEAN csrScanRemoveNotRoamingScanCommand(tpAniSirGlobal pMac);
 //To remove fresh scan commands from the pending queue
 tANI_BOOLEAN csrScanRemoveFreshScanCommand(tpAniSirGlobal pMac, tANI_U8 sessionId);
-tSirAbortScanStatus csrScanAbortMacScan(tpAniSirGlobal pMac,
-                                        tANI_U8 sessionId,
-                                        eCsrAbortReason reason);
+eHalStatus csrScanAbortMacScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
+                               eCsrAbortReason reason);
 void csrRemoveCmdFromPendingList(tpAniSirGlobal pMac, tDblLinkList *pList, 
                                               eSmeCommandType commandType );
 void csrRemoveCmdWithSessionIdFromPendingList(tpAniSirGlobal pMac,
@@ -294,8 +293,6 @@ void csrRemoveScanForSSIDFromPendingList(tpAniSirGlobal pMac, tDblLinkList *pLis
 //a value. This function deduct the age count if channelId matches the BSS' channelId
 //The BSS is remove if the count reaches 0.
 eHalStatus csrScanAgeResults(tpAniSirGlobal pMac, tSmeGetScanChnRsp *pScanChnInfo);
-
-eHalStatus csrIbssAgeBss(tpAniSirGlobal pMac);
 
 //If fForce is TRUE we will save the new String that is learn't.
 //Typically it will be true in case of Join or user initiated ioctl
@@ -475,15 +472,6 @@ eHalStatus csrScanBGScanAbort(tpAniSirGlobal);
   -------------------------------------------------------------------------------*/
 eHalStatus csrScanGetResult(tpAniSirGlobal, tCsrScanResultFilter *pFilter, tScanResultHandle *phResult);
 
-#ifdef FEATURE_WLAN_LFR
-/* ---------------------------------------------------------------------------
-    \fn csrAddChannelToOccupiedChannelList
-    \brief Add channel no given by fast reassoc cmd into occ chn list
-    \param channel - channel no passed by fast reassoc cmd
-    \return void
-  -------------------------------------------------------------------------------*/
-void csrAddChannelToOccupiedChannelList(tpAniSirGlobal pMac, tANI_U8 channel);
-#endif
 /* ---------------------------------------------------------------------------
     \fn csrScanFlushResult
     \brief Clear scan results.

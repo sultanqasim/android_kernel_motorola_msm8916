@@ -2272,11 +2272,12 @@ tANI_U8 sme_GetConcurrentOperationChannel( tHalHandle hHal );
     \brief  API to cancel MAC scan.
     \param  hHal - The handle returned by macOpen.
     \param  sessionId - sessionId for interface
-    \return tSirAbortScanStatus return status abort scan
-
+    \return VOS_STATUS
+            VOS_STATUS_E_FAILURE - failure
+            VOS_STATUS_SUCCESS  success
   ---------------------------------------------------------------------------*/
-tSirAbortScanStatus sme_AbortMacScan(tHalHandle hHal, tANI_U8 sessionId,
-                                     eCsrAbortReason reason);
+eHalStatus sme_AbortMacScan(tHalHandle hHal, tANI_U8 sessionId,
+                            eCsrAbortReason reason);
 
 /* ---------------------------------------------------------------------------
     \fn sme_GetCfgValidChannels
@@ -3303,17 +3304,6 @@ eHalStatus sme_HandoffRequest(tHalHandle hHal, tCsrHandoffRequest *pHandoffInfo)
   --------------------------------------------------------------------------*/
 VOS_STATUS sme_isSta_p2p_clientConnected(tHalHandle hHal);
 
-/*--------------------------------------------------------------------------
-  \brief hdd_is_any_session_connected() - a wrapper function to check if there
-                                           is any connected session .
-  This is a synchronous call
-  \param hHal - The handle returned by macOpen
-  \return VOS_STATUS - SME passed the request to CSR successfully.
-          Other status means SME is failed to send the request.
-  \sa
-  --------------------------------------------------------------------------*/
-VOS_STATUS sme_is_any_session_connected(tHalHandle hHal);
-
 #ifdef FEATURE_WLAN_LPHB
 /* ---------------------------------------------------------------------------
     \fn sme_LPHBConfigReq
@@ -3375,8 +3365,7 @@ eHalStatus sme_SendRateUpdateInd(tHalHandle hHal, tSirRateUpdateInd *rateUpdateP
 */
 eHalStatus smeIssueFastRoamNeighborAPEvent (tHalHandle hHal,
                                             tANI_U8 *bssid,
-                                            tSmeFastRoamTrigger fastRoamTrig,
-                                            tANI_U8 channel);
+                                            tSmeFastRoamTrigger fastRoamTrig);
 
 eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId,
                                       tANI_U8 *pBSSId,
@@ -3479,8 +3468,7 @@ VOS_STATUS sme_SendTdlsChanSwitchReq(tHalHandle hHal,
                                      tANI_S32 tdlsOffCh,
                                      tANI_S32 tdlsOffChBwOffset,
                                      tANI_U8 tdlsSwMode);
-eHalStatus sme_GetFwStats(tHalHandle hHal, tANI_U32 stats, void *data,
-                                                void *callback);
+
 void sme_SetMiracastMode (tHalHandle hHal,tANI_U8 mode);
 
 void sme_resetCoexEevent(tHalHandle hHal);
@@ -3489,14 +3477,6 @@ tANI_U32 sme_GetChannelBondingMode5G(tHalHandle hHal);
 tANI_U32 sme_GetChannelBondingMode24G(tHalHandle hHal);
 
 void sme_disable_dfs_channel(tHalHandle hHal, bool disable_dfs);
-
-/* HDD Callback function */
-typedef void(*pEncryptMsgRSPCb)(void *pUserData, void *infoParam);
-
-eHalStatus sme_Encryptmsgsend (tHalHandle hHal,
-                               u8 *pCmd,
-                               int length,
-                               pEncryptMsgRSPCb encCB);
 
 /* ---------------------------------------------------------------------------
      \fn sme_RegisterBtCoexTDLSCallback
@@ -3514,32 +3494,25 @@ eHalStatus sme_RegisterBtCoexTDLSCallback
 );
 
 /* ---------------------------------------------------------------------------
-    \fn smeNeighborMiddleOfRoaming
+    \fn smeNeighborRoamIsHandoffInProgress
 
-    \brief This function is a wrapper to call csrNeighborMiddleOfRoaming
+    \brief This function is a wrapper to call csrNeighborRoamIsHandoffInProgress
 
     \param hHal - The handle returned by macOpen.
 
     \return eANI_BOOLEAN_TRUE if reassoc in progress,
             eANI_BOOLEAN_FALSE otherwise
 ---------------------------------------------------------------------------*/
-tANI_BOOLEAN smeNeighborMiddleOfRoaming(tHalHandle hHal);
+tANI_BOOLEAN smeNeighborRoamIsHandoffInProgress(tHalHandle hHal);
 
-/* --------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
+    \fn sme_SetRtsCtsHtVht
+    \brief  API to to enable/disable RTS/CTS for different modes.
 
-    \fn sme_IsCoexScoIndicationSet
-    \brief To check if the BTC module in fwr has sent the SCO
-           indication to host or not
+    \param  set_value - Bit mask value to enable RTS/CTS for different modes.
+    \- return VOS_STATUS_SUCCES if INdication is posted to
+       WDA else return eHAL_STATUS_FAILURE
+    -------------------------------------------------------------------------*/
+eHalStatus sme_SetRtsCtsHtVht(tHalHandle hHal, tANI_U32 set_value);
 
-    \param hHal - The handle returned by macOpen.
-    \return TRUE - Sco call in progress FALSE- No SCO call in progress
-
-  --------------------------------------------------------------------------*/
-tANI_BOOLEAN sme_IsCoexScoIndicationSet(tHalHandle hHal);
-
-eHalStatus sme_SetMiracastVendorConfig(tHalHandle hHal,
-                               tANI_U32 iniNumBuffAdvert,
-                                      tANI_U32 set_value);
-
-void sme_SetDefDot11Mode(tHalHandle hHal);
 #endif //#if !defined( __SME_API_H )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -141,6 +141,9 @@ int wlan_hdd_ftm_start(hdd_context_t *pAdapter);
 #define MEMORY_DEBUG_STR ""
 #endif
 #define MAX_WAIT_FOR_ROC_COMPLETION 3
+
+#define MAX_RESTART_DRIVER_EVENT_LENGTH 30
+
 /* the Android framework expects this param even though we don't use it */
 #define BUF_LEN 20
 static char fwpath_buffer[BUF_LEN];
@@ -201,6 +204,7 @@ static struct wake_lock wlan_wake_lock;
 #endif
 /* set when SSR is needed after unload */
 static e_hdd_ssr_required isSsrRequired = HDD_SSR_NOT_REQUIRED;
+static struct wake_lock wlan_wake_lock_scan; //Mot IKHSS7-28961: Incorrect empty scan results
 
 //internal function declaration
 static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx);
@@ -462,17 +466,18 @@ static void hdd_wdi_trace_enable(wpt_moduleid moduleId, v_U32_t bitmask)
  */
 int wlan_hdd_validate_context(hdd_context_t *pHddCtx)
 {
+    ENTER();
 
     if (NULL == pHddCtx || NULL == pHddCtx->cfg_ini)
     {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                 "%s: HDD context is Null", __func__);
         return -ENODEV;
     }
 
     if (pHddCtx->isLogpInProgress)
     {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: LOGP %s. Ignore!!", __func__,
                     vos_is_wlan_in_badState(VOS_MODULE_ID_HDD, NULL)
                     ?"failed":"in Progress");
@@ -481,7 +486,7 @@ int wlan_hdd_validate_context(hdd_context_t *pHddCtx)
 
     if (WLAN_HDD_IS_LOAD_UNLOAD_IN_PROGRESS(pHddCtx))
     {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Unloading/Loading in Progress. Ignore!!!", __func__);
         return -EAGAIN;
     }
@@ -1962,68 +1967,6 @@ static void getBcnMissRateCB(VOS_STATUS status, int bcnMissRate, void *data)
     return;
 }
 
-void hdd_FWStatisCB( VOS_STATUS status, void *fwStats, void *data )
-{
-    fwStatsContext_t *fwStatsCtx;
-    fwStatsResult_t  *fwStatsResult;
-    hdd_adapter_t *pAdapter;
-
-    hddLog(VOS_TRACE_LEVEL_INFO, FL(" with status = %d"),status);
-
-    if (NULL == data)
-    {
-        hddLog(VOS_TRACE_LEVEL_ERROR, FL("argument data is NULL"));
-        return;
-    }
-    /* there is a race condition that exists between this callback
-       function and the caller since the caller could time out either
-       before or while this code is executing.  we use a spinlock to
-       serialize these actions */
-    spin_lock(&hdd_context_lock);
-    fwStatsCtx = (fwStatsContext_t *) data;
-    if (fwStatsCtx->magic != FW_STATS_CONTEXT_MAGIC)
-    {
-        hddLog(VOS_TRACE_LEVEL_ERROR,
-               FL("invalid context magic: %08x"), fwStatsCtx->magic);
-        spin_unlock(&hdd_context_lock);
-        return;
-    }
-    pAdapter = fwStatsCtx->pAdapter;
-    if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic))
-    {
-        hddLog(VOS_TRACE_LEVEL_ERROR,
-              FL("pAdapter returned is NULL or invalid"));
-        spin_unlock(&hdd_context_lock);
-        return;
-    }
-    pAdapter->fwStatsRsp.type = 0;
-    if ((VOS_STATUS_SUCCESS == status) && (NULL != fwStats))
-    {
-        fwStatsResult = (fwStatsResult_t *)fwStats;
-        switch( fwStatsResult->type )
-        {
-            case FW_UBSP_STATS:
-            {
-                 memcpy(&pAdapter->fwStatsRsp,fwStatsResult,sizeof(fwStatsResult_t));
-
-                 hddLog(VOS_TRACE_LEVEL_INFO,
-                  FL("ubsp_enter_cnt = %d ubsp_jump_ddr_cnt = %d"),
-                  pAdapter->fwStatsRsp.hddFwStatsData.ubspStats.ubsp_enter_cnt,
-                  pAdapter->fwStatsRsp.hddFwStatsData.ubspStats.ubsp_jump_ddr_cnt);
-            }
-            break;
-            default:
-            {
-                   hddLog(VOS_TRACE_LEVEL_ERROR,
-                    FL(" No handling for stats type %d"),fwStatsResult->type);
-            }
-         }
-    }
-    complete(&(fwStatsCtx->completion));
-    spin_unlock(&hdd_context_lock);
-    return;
-}
-
 static int hdd_get_dwell_time(hdd_config_t *pCfg, tANI_U8 *command, char *extra, tANI_U8 n, tANI_U8 *len)
 {
     int ret = 0;
@@ -2606,7 +2549,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            sme_UpdateIsFastRoamIniFeatureEnabled((tHalHandle)(pHddCtx->hHal), roamMode);
        }
        /* GETROAMMODE */
-       else if (strncmp(command, "GETROAMMODE", SIZE_OF_GETROAMMODE) == 0)
+       else if (strncmp(priv_data.buf, "GETROAMMODE", SIZE_OF_GETROAMMODE) == 0)
        {
 	   tANI_BOOLEAN roamMode = sme_getIsLfrFeatureEnabled((tHalHandle)(pHddCtx->hHal));
 	   char extra[32];
@@ -2671,7 +2614,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            pHddCtx->cfg_ini->RoamRssiDiff = roamRssiDiff;
            sme_UpdateRoamRssiDiff((tHalHandle)(pHddCtx->hHal), roamRssiDiff);
        }
-       else if (strncmp(command, "GETROAMDELTA", 12) == 0)
+       else if (strncmp(priv_data.buf, "GETROAMDELTA", 12) == 0)
        {
            tANI_U8 roamRssiDiff = sme_getRoamRssiDiff((tHalHandle)(pHddCtx->hHal));
            char extra[32];
@@ -3253,7 +3196,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            pHddCtx->cfg_ini->nProbes = nProbes;
            sme_UpdateRoamScanNProbes((tHalHandle)(pHddCtx->hHal), nProbes);
        }
-       else if (strncmp(command, "GETSCANNPROBES", 14) == 0)
+       else if (strncmp(priv_data.buf, "GETSCANNPROBES", 14) == 0)
        {
            tANI_U8 val = sme_getRoamScanNProbes((tHalHandle)(pHddCtx->hHal));
            char extra[32];
@@ -3310,7 +3253,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                sme_UpdateRoamScanHomeAwayTime((tHalHandle)(pHddCtx->hHal), homeAwayTime, eANI_BOOLEAN_TRUE);
            }
        }
-       else if (strncmp(command, "GETSCANHOMEAWAYTIME", 19) == 0)
+       else if (strncmp(priv_data.buf, "GETSCANHOMEAWAYTIME", 19) == 0)
        {
            tANI_U16 val = sme_getRoamScanHomeAwayTime((tHalHandle)(pHddCtx->hHal));
            char extra[32];
@@ -3418,7 +3361,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            pHddCtx->cfg_ini->isWESModeEnabled = wesMode;
            sme_UpdateWESMode((tHalHandle)(pHddCtx->hHal), wesMode);
        }
-       else if (strncmp(command, "GETWESMODE", 10) == 0)
+       else if (strncmp(priv_data.buf, "GETWESMODE", 10) == 0)
        {
            tANI_BOOLEAN wesMode = sme_GetWESMode((tHalHandle)(pHddCtx->hHal));
            char extra[32];
@@ -3576,8 +3519,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            /* Proceed with scan/roam */
            smeIssueFastRoamNeighborAPEvent(WLAN_HDD_GET_HAL_CTX(pAdapter),
                                            &targetApBssid[0],
-                                           (tSmeFastRoamTrigger)(trigger),
-                                           channel);
+                                           (tSmeFastRoamTrigger)(trigger));
        }
 #endif
 #ifdef FEATURE_WLAN_ESE
@@ -3717,7 +3659,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            pHddCtx->cfg_ini->isOkcIniFeatureEnabled = okcMode;
        }
 #endif  /* FEATURE_WLAN_OKC */
-       else if (strncmp(command, "GETROAMSCANCONTROL", 18) == 0)
+       else if (strncmp(priv_data.buf, "GETROAMSCANCONTROL", 18) == 0)
        {
            tANI_BOOLEAN roamScanControl = sme_GetRoamScanControl((tHalHandle)(pHddCtx->hHal));
            char extra[32];
@@ -4231,114 +4173,12 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            }
        }
 #endif
-       else if (strncmp(command, "GETFWSTATS", 10) == 0)
-       {
-           eHalStatus status;
-           char *buf = NULL;
-           char len;
-           long waitRet;
-           fwStatsContext_t fwStatsCtx;
-           fwStatsResult_t *fwStatsRsp = &(pAdapter->fwStatsRsp);
-           tANI_U8 *ptr = command;
-           int stats = *(ptr + 11) - '0';
-
-           hddLog(VOS_TRACE_LEVEL_INFO, FL("stats = %d "),stats);
-           if (!IS_FEATURE_FW_STATS_ENABLE)
-           {
-               hddLog(VOS_TRACE_LEVEL_INFO,
-                     FL("Get Firmware stats feature not supported"));
-               ret = -EINVAL;
-               goto exit;
-           }
-
-           if (FW_STATS_MAX <= stats || 0 >= stats)
-           {
-               hddLog(VOS_TRACE_LEVEL_INFO,
-                        FL(" stats %d not supported"),stats);
-               ret = -EINVAL;
-               goto exit;
-           }
-
-           init_completion(&(fwStatsCtx.completion));
-           fwStatsCtx.magic = FW_STATS_CONTEXT_MAGIC;
-           fwStatsCtx.pAdapter = pAdapter;
-           fwStatsRsp->type = 0;
-           status = sme_GetFwStats( (tHalHandle)pHddCtx->hHal, stats,
-                                   (&fwStatsCtx), hdd_FWStatisCB);
-           if (eHAL_STATUS_SUCCESS != status)
-           {
-               hddLog(VOS_TRACE_LEVEL_ERROR,
-                       FL(" fail to post WDA cmd status = %d"), status);
-               ret = -EINVAL;
-               goto exit;
-           }
-           waitRet = wait_for_completion_timeout
-                             (&(fwStatsCtx.completion), FW_STATE_WAIT_TIME);
-           if (waitRet <= 0)
-           {
-               hddLog(VOS_TRACE_LEVEL_ERROR,
-                        FL("failed to wait on GwtFwstats"));
-               //Make magic number to zero so that callback is not executed.
-               spin_lock(&hdd_context_lock);
-               fwStatsCtx.magic = 0x0;
-               spin_unlock(&hdd_context_lock);
-               ret = -EINVAL;
-               goto exit;
-           }
-           if (fwStatsRsp->type)
-           {
-               buf = kmalloc(FW_STATE_RSP_LEN, GFP_KERNEL);
-               if (!buf)
-               {
-                 hddLog(VOS_TRACE_LEVEL_ERROR,
-                       FL(" failed to allocate memory"));
-                 ret = -ENOMEM;
-                 goto exit;
-               }
-               switch( fwStatsRsp->type )
-               {
-                   case FW_UBSP_STATS:
-                   {
-                        len = snprintf(buf, FW_STATE_RSP_LEN,
-                              "GETFWSTATS: ubsp_enter_cnt %d ubsp_jump_ddr_cnt %d",
-                              fwStatsRsp->hddFwStatsData.ubspStats.ubsp_enter_cnt,
-                              fwStatsRsp->hddFwStatsData.ubspStats.ubsp_jump_ddr_cnt);
-                   }
-                   break;
-                   default:
-                   {
-                        hddLog(VOS_TRACE_LEVEL_ERROR, FL( "No handling for stats type %d"),fwStatsRsp->type);
-                        ret = -EFAULT;
-                        kfree(buf);
-                        goto exit;
-                   }
-               }
-               if (copy_to_user(priv_data.buf, buf, len + 1))
-               {
-                   hddLog(VOS_TRACE_LEVEL_ERROR,
-                      FL(" failed to copy data to user buffer"));
-                   ret = -EFAULT;
-                   kfree(buf);
-                   goto exit;
-               }
-               ret = len;
-               kfree(buf);
-           }
-           else
-           {
-               hddLog(VOS_TRACE_LEVEL_ERROR,
-                   FL("failed to fetch the stats"));
-               ret = -EFAULT;
-               goto exit;
-           }
-
-       }
        else {
            MTRACE(vos_trace(VOS_MODULE_ID_HDD,
                             TRACE_CODE_HDD_UNSUPPORTED_IOCTL,
                             pAdapter->sessionId, 0));
-           hddLog( VOS_TRACE_LEVEL_WARN, FL("Unsupported GUI command %s"),
-                   command);
+           hddLog( VOS_TRACE_LEVEL_WARN, "%s: Unsupported GUI command %s",
+                   __func__, command);
        }
    }
 exit:
@@ -4429,6 +4269,8 @@ int __hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    ret = wlan_hdd_validate_context(pHddCtx);
    if (ret) {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                "%s: invalid context", __func__);
       ret = -EBUSY;
       goto exit;
    }
@@ -5379,7 +5221,7 @@ int hdd_open(struct net_device *dev)
    return ret;
 }
 
-int __hdd_mon_open (struct net_device *dev)
+int hdd_mon_open (struct net_device *dev)
 {
    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
@@ -5393,18 +5235,6 @@ int __hdd_mon_open (struct net_device *dev)
 
    return 0;
 }
-
-int hdd_mon_open (struct net_device *dev)
-{
-    int ret;
-
-    vos_ssr_protect(__func__);
-    ret = __hdd_mon_open(dev);
-    vos_ssr_unprotect(__func__);
-
-    return ret;
-}
-
 /**---------------------------------------------------------------------------
 
   \brief __hdd_stop() - HDD stop function
@@ -5477,7 +5307,7 @@ int __hdd_stop (struct net_device *dev)
    mutex_lock(&pHddCtx->tdls_lock);
 #endif
    /* DeInit the adapter. This ensures datapath cleanup as well */
-   hdd_deinit_adapter(pHddCtx, pAdapter, TRUE);
+   hdd_deinit_adapter(pHddCtx, pAdapter);
 #ifdef FEATURE_WLAN_TDLS
    mutex_unlock(&pHddCtx->tdls_lock);
 #endif
@@ -5598,7 +5428,7 @@ static void __hdd_uninit (struct net_device *dev)
 #ifdef FEATURE_WLAN_TDLS
       mutex_lock(&pHddCtx->tdls_lock);
 #endif
-      hdd_deinit_adapter(pHddCtx, pAdapter, TRUE);
+      hdd_deinit_adapter(pHddCtx, pAdapter);
 #ifdef FEATURE_WLAN_TDLS
       mutex_unlock(&pHddCtx->tdls_lock);
 #endif
@@ -5892,28 +5722,11 @@ VOS_STATUS hdd_read_cfg_file(v_VOID_t *pCtx, char *pFileName,
 
 static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 {
-   hdd_adapter_t *pAdapter;
-   hdd_context_t *pHddCtx;
+   hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
    struct sockaddr *psta_mac_addr = addr;
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
-   int ret = 0;
 
    ENTER();
-   pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-   if (NULL == pAdapter)
-   {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                 "%s: Adapter is NULL",__func__);
-       return -EINVAL;
-   }
-   pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-   ret = wlan_hdd_validate_context(pHddCtx);
-   if (0 != ret)
-   {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                 "%s: HDD context is not valid",__func__);
-       return ret;
-   }
 
    memcpy(&pAdapter->macAddressCurrent, psta_mac_addr->sa_data, ETH_ALEN);
    memcpy(dev->dev_addr, psta_mac_addr->sa_data, ETH_ALEN);
@@ -6003,7 +5816,18 @@ void wlan_hdd_release_intf_addr(hdd_context_t* pHddCtx, tANI_U8* releaseAddr)
       .ndo_do_ioctl = hdd_ioctl,
       .ndo_set_mac_address = hdd_set_mac_address,
  };
-
+ static struct net_device_ops nullify_netdev_ops = {
+      .ndo_open = NULL,
+      .ndo_stop = NULL,
+      .ndo_uninit = NULL,
+      .ndo_start_xmit = NULL,
+      .ndo_tx_timeout = NULL,
+      .ndo_get_stats = NULL,
+      .ndo_set_mac_address = NULL,
+      .ndo_do_ioctl = NULL,
+      .ndo_change_mtu = NULL,
+      .ndo_select_queue = NULL,
+ };
 #endif
 
 void hdd_set_station_ops( struct net_device *pWlanDev )
@@ -6319,7 +6143,7 @@ void hdd_cleanup_actionframe( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
    return;
 }
 
-void hdd_deinit_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter, tANI_U8 rtnl_held )
+void hdd_deinit_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
 {
    ENTER();
    switch ( pAdapter->device_mode )
@@ -6356,7 +6180,7 @@ void hdd_deinit_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter, tANI_U
 
          hdd_cleanup_actionframe(pHddCtx, pAdapter);
 
-         hdd_unregister_hostapd(pAdapter, rtnl_held);
+         hdd_unregister_hostapd(pAdapter);
          hdd_set_conparam( 0 );
          wlan_hdd_set_monitor_tx_adapter( WLAN_HDD_GET_CTX(pAdapter), NULL );
          break;
@@ -6734,7 +6558,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
 #ifdef FEATURE_WLAN_TDLS
             mutex_lock(&pHddCtx->tdls_lock);
 #endif
-            hdd_deinit_adapter(pHddCtx, pAdapter, rtnl_held);
+            hdd_deinit_adapter(pHddCtx, pAdapter);
 #ifdef FEATURE_WLAN_TDLS
             mutex_unlock(&pHddCtx->tdls_lock);
 #endif
@@ -6752,15 +6576,6 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          netif_tx_disable(pAdapter->dev);
          //netif_tx_disable(pWlanDev);
          netif_carrier_off(pAdapter->dev);
-
-         if (WLAN_HDD_P2P_CLIENT == session_type ||
-                 WLAN_HDD_P2P_DEVICE == session_type)
-         {
-             /* Initialize the work queue to defer the
-              * back to back RoC request */
-             INIT_DELAYED_WORK(&pAdapter->roc_work,
-                     hdd_p2p_roc_work_queue);
-         }
 
          break;
       }
@@ -6788,7 +6603,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          status = hdd_register_hostapd( pAdapter, rtnl_held );
          if( VOS_STATUS_SUCCESS != status )
          {
-            hdd_deinit_adapter(pHddCtx, pAdapter, rtnl_held);
+            hdd_deinit_adapter(pHddCtx, pAdapter);
             goto err_free_netdev;
          }
 
@@ -6796,14 +6611,6 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          netif_carrier_off(pAdapter->dev);
 
          hdd_set_conparam( 1 );
-
-         if (WLAN_HDD_P2P_GO == session_type)
-         {
-             /* Initialize the work queue to
-              * defer the back to back RoC request */
-             INIT_DELAYED_WORK(&pAdapter->roc_work,
-                     hdd_p2p_roc_work_queue);
-         }
          break;
       }
       case WLAN_HDD_MONITOR:
@@ -7084,11 +6891,6 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
          if( hdd_connIsConnected(pstation) ||
              (pstation->conn_info.connState == eConnectionState_Connecting) )
          {
-#ifdef FEATURE_WLAN_TDLS
-              mutex_lock(&pHddCtx->tdls_lock);
-              wlan_hdd_tdls_exit(pAdapter, TRUE);
-              mutex_unlock(&pHddCtx->tdls_lock);
-#endif
             if (pWextState->roamProfile.BSSType == eCSR_BSS_TYPE_START_IBSS)
                 halStatus = sme_RoamDisconnect(pHddCtx->hHal,
                                              pAdapter->sessionId,
@@ -7160,9 +6962,6 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
                   break;
                }
             }
-#ifdef WLAN_OPEN_SOURCE
-          cancel_delayed_work_sync(&pAdapter->roc_work);
-#endif
        }
 #ifdef WLAN_NS_OFFLOAD
 #ifdef WLAN_OPEN_SOURCE
@@ -7221,10 +7020,6 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
                   break;
                }
             }
-
-#ifdef WLAN_OPEN_SOURCE
-            cancel_delayed_work_sync(&pAdapter->roc_work);
-#endif
          }
          mutex_lock(&pHddCtx->sap_lock);
          if (test_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags)) 
@@ -7388,11 +7183,6 @@ VOS_STATUS hdd_reset_all_adapters( hdd_context_t *pHddCtx )
           clear_bit(WMM_INIT_DONE, &pAdapter->event_flags);
       }
 
-      if (test_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags))
-      {
-          clear_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags);
-      }
-
 #ifdef FEATURE_WLAN_BATCH_SCAN
       if (eHDD_BATCH_SCAN_STATE_STARTED == pAdapter->batchScanState)
       {
@@ -7400,11 +7190,6 @@ VOS_STATUS hdd_reset_all_adapters( hdd_context_t *pHddCtx )
       }
 #endif
 
-#ifdef FEATURE_WLAN_TDLS
-      mutex_lock(&pHddCtx->tdls_lock);
-      wlan_hdd_tdls_exit(pAdapter, TRUE);
-      mutex_unlock(&pHddCtx->tdls_lock);
-#endif
       status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
       pAdapterNode = pNext;
    }
@@ -7893,45 +7678,36 @@ v_U8_t hdd_get_operating_channel( hdd_context_t *pHddCtx, device_mode_t mode )
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 /**---------------------------------------------------------------------------
 
-  \brief __hdd_set_multicast_list() -
+  \brief hdd_set_multicast_list() - 
 
   This used to set the multicast address list.
 
   \param  - dev - Pointer to the WLAN device.
   - skb - Pointer to OS packet (sk_buff).
-  \return - success/fail
+  \return - success/fail 
 
   --------------------------------------------------------------------------*/
-static void __hdd_set_multicast_list(struct net_device *dev)
+static void hdd_set_multicast_list(struct net_device *dev)
 {
-   hdd_adapter_t *pAdapter;
-   hdd_context_t *pHddCtx;
+   hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
    int mc_count;
-   int i = 0, ret = 0;
+   int i = 0;
    struct netdev_hw_addr *ha;
 
-   pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
    if (NULL == pAdapter)
    {
       hddLog(VOS_TRACE_LEVEL_ERROR,
             "%s: Adapter context is Null", __func__);
       return;
    }
-   pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-   ret = wlan_hdd_validate_context(pHddCtx);
-   if (0 != ret)
-   {
-      hddLog(VOS_TRACE_LEVEL_ERROR,
-                 "%s: HDD context is not valid",__func__);
-       return;
-   }
+
    if (dev->flags & IFF_ALLMULTI)
    {
       hddLog(VOS_TRACE_LEVEL_INFO,
             "%s: allow all multicast frames", __func__);
       pAdapter->mc_addr_list.mc_cnt = 0;
    }
-   else
+   else 
    {
       mc_count = netdev_mc_count(dev);
       hddLog(VOS_TRACE_LEVEL_INFO,
@@ -7952,19 +7728,13 @@ static void __hdd_set_multicast_list(struct net_device *dev)
          memset(&(pAdapter->mc_addr_list.addr[i][0]), 0, ETH_ALEN);
          memcpy(&(pAdapter->mc_addr_list.addr[i][0]), ha->addr, ETH_ALEN);
          hddLog(VOS_TRACE_LEVEL_INFO, "%s: mlist[%d] = "MAC_ADDRESS_STR,
-               __func__, i,
+               __func__, i, 
                MAC_ADDR_ARRAY(pAdapter->mc_addr_list.addr[i]));
          i++;
       }
+
    }
    return;
-}
-
-static void hdd_set_multicast_list(struct net_device *dev)
-{
-   vos_ssr_protect(__func__);
-   __hdd_set_multicast_list(dev);
-   vos_ssr_unprotect(__func__);
 }
 #endif
 
@@ -8141,25 +7911,8 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 
    if (VOS_FTM_MODE != hdd_get_conparam())
    {
-      /* This will issue a dump command which will clean up
-         BTQM queues and unblock MC thread */
-      vos_fwDumpReq(274, 0, 0, 0, 0, 1);
       // Unloading, restart logic is no more required.
       wlan_hdd_restart_deinit(pHddCtx);
-
-#ifdef FEATURE_WLAN_TDLS
-      /* At the time of driver unloading; if tdls connection is present;
-       * hdd_rx_packet_cbk calls wlan_hdd_tdls_find_peer.
-       * wlan_hdd_tdls_find_peer always checks for valid context;
-       * as load/unload in progress there can be a race condition.
-       * hdd_rx_packet_cbk calls wlan_hdd_tdls_find_peer only
-       * when tdls state is enabled.
-       * As soon as driver set load/unload flag; tdls flag also needs
-       * to be disabled so that hdd_rx_packet_cbk won't call
-       * wlan_hdd_tdls_find_peer.
-       */
-      wlan_hdd_tdls_set_mode(pHddCtx, eTDLS_SUPPORT_DISABLED, FALSE);
-#endif
 
       vosStatus = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
       while (NULL != pAdapterNode && VOS_STATUS_E_EMPTY != vosStatus)
@@ -8167,22 +7920,13 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
          pAdapter = pAdapterNode->pAdapter;
          if (NULL != pAdapter)
          {
-            /* Disable TX on the interface, after this hard_start_xmit() will
-             * not be called on that interface
-             */
-            hddLog(VOS_TRACE_LEVEL_INFO, FL("Disabling queues"));
-            netif_tx_disable(pAdapter->dev);
-
-            /* Mark the interface status as "down" for outside world */
-            netif_carrier_off(pAdapter->dev);
-
             /* DeInit the adapter. This ensures that all data packets
              * are freed.
              */
 #ifdef FEATURE_WLAN_TDLS
             mutex_lock(&pHddCtx->tdls_lock);
 #endif
-            hdd_deinit_adapter(pHddCtx, pAdapter, FALSE);
+            hdd_deinit_adapter(pHddCtx, pAdapter);
 #ifdef FEATURE_WLAN_TDLS
             mutex_unlock(&pHddCtx->tdls_lock);
 #endif
@@ -8213,16 +7957,13 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
       // Power has completed all scans will be cancelled.
       if (pHddCtx->scan_info.mScanPending)
       {
-          if(NULL != pAdapter)
-          {
-             hddLog(VOS_TRACE_LEVEL_INFO,
-                    FL("abort scan mode: %d sessionId: %d"),
-                       pAdapter->device_mode,
-                       pAdapter->sessionId);
-          }
-          hdd_abort_mac_scan(pHddCtx,
-                             pHddCtx->scan_info.sessionId,
-                             eCSR_SCAN_ABORT_DEFAULT);
+          hddLog(VOS_TRACE_LEVEL_INFO,
+                 FL("abort scan mode: %d sessionId: %d"),
+                     pAdapter->device_mode,
+                     pAdapter->sessionId);
+           hdd_abort_mac_scan(pHddCtx,
+                              pHddCtx->scan_info.sessionId,
+                              eCSR_SCAN_ABORT_DEFAULT);
       }
    }
    else
@@ -8571,6 +8312,15 @@ void hdd_allow_suspend(void)
     wcnss_allow_suspend();
 #endif
 }
+
+//Begin Mot IKHSS7-28961 : Incorrect emtpty scan results because of againg out
+void hdd_prevent_suspend_after_scan(long hz)
+{
+  wake_lock_timeout(&wlan_wake_lock_scan, hz);
+}
+//END IKHSS7-28961
+
+
 
 void hdd_prevent_suspend_timeout(v_U32_t timeout)
 {
@@ -8971,8 +8721,6 @@ int hdd_wlan_startup(struct device *dev )
     */
    mutex_init(&pHddCtx->tdls_lock);
 #endif
-   mutex_init(&pHddCtx->wmmLock);
-
    /* By default Strict Regulatory For FCC should be false */
 
    pHddCtx->nEnableStrictRegulatoryForFCC = FALSE;
@@ -9091,7 +8839,7 @@ int hdd_wlan_startup(struct device *dev )
           goto err_free_hdd_context;
       }
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: FTM driver loaded success fully",__func__);
-      pHddCtx->isLoadUnloadInProgress = WLAN_HDD_NO_LOAD_UNLOAD_IN_PROGRESS;
+
       vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
       return VOS_STATUS_SUCCESS;
    }
@@ -9638,10 +9386,6 @@ int hdd_wlan_startup(struct device *dev )
 #endif
    /* Send the update default channel list to the FW*/
    sme_UpdateChannelList(pHddCtx->hHal);
-
-   /* Fwr capabilities received, Set the Dot11 mode */
-   sme_SetDefDot11Mode(pHddCtx->hHal);
-
 #ifndef CONFIG_ENABLE_LINUX_REG
    /*updating wiphy so that regulatory user hints can be processed*/
    if (wiphy)
@@ -9799,9 +9543,6 @@ static int hdd_driver_init( void)
 #ifdef HAVE_WCNSS_CAL_DOWNLOAD
    int max_retries = 0;
 #endif
-#ifdef HAVE_CBC_DONE
-   int max_cbc_retries = 0;
-#endif
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
    wlan_logging_sock_init_svc();
@@ -9811,6 +9552,7 @@ static int hdd_driver_init( void)
 
 #ifdef WLAN_OPEN_SOURCE
    wake_lock_init(&wlan_wake_lock, WAKE_LOCK_SUSPEND, "wlan");
+   wake_lock_init(&wlan_wake_lock_scan, WAKE_LOCK_SUSPEND, "wlan_scan"); //Mot IKHSS7-28961: Incorrect empty scan
 #endif
 
    hddTraceInit();
@@ -9830,11 +9572,11 @@ static int hdd_driver_init( void)
    while (!wcnss_device_ready() && 5 >= ++max_retries) {
        msleep(1000);
    }
-
    if (max_retries >= 5) {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: WCNSS driver not ready", __func__);
 #ifdef WLAN_OPEN_SOURCE
       wake_lock_destroy(&wlan_wake_lock);
+      wake_lock_destroy(&wlan_wake_lock_scan);
 #endif
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
@@ -9842,15 +9584,6 @@ static int hdd_driver_init( void)
 #endif
 
       return -ENODEV;
-   }
-#endif
-
-#ifdef HAVE_CBC_DONE
-   while (!wcnss_cbc_complete() && 10 >= ++max_cbc_retries) {
-       msleep(1000);
-   }
-   if (max_cbc_retries >= 10) {
-      hddLog(VOS_TRACE_LEVEL_FATAL, "%s:CBC not completed", __func__);
    }
 #endif
 
@@ -9908,6 +9641,7 @@ static int hdd_driver_init( void)
 
 #ifdef WLAN_OPEN_SOURCE
       wake_lock_destroy(&wlan_wake_lock);
+      wake_lock_destroy(&wlan_wake_lock_scan); //Mot IKHSS7-28961: Incorrect empty scan results
 #endif
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
@@ -9987,9 +9721,9 @@ static void hdd_driver_exit(void)
    //Get the HDD context.
    pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext );
 
-   if(!pHddCtx)
+   if (!pHddCtx)
    {
-      hddLog(VOS_TRACE_LEVEL_FATAL,"%s: module exit called before probe",__func__);
+       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: module exit called before probe",__func__);
    }
    else
    {
@@ -9997,6 +9731,7 @@ static void hdd_driver_exit(void)
        * by waiting until rtnl_lock is available.
        */
       rtnl_lock();
+      hdd_nullify_netdev_ops(pHddCtx);
       rtnl_unlock();
 
       INIT_COMPLETION(pHddCtx->ssr_comp_var);
@@ -10062,6 +9797,7 @@ static void hdd_driver_exit(void)
 done:
 #ifdef WLAN_OPEN_SOURCE
    wake_lock_destroy(&wlan_wake_lock);
+   wake_lock_destroy(&wlan_wake_lock_scan); //Mot IKHSS7-28961: Incorrect empty scan results
 #endif
 
    pr_info("%s: driver unloaded\n", WLAN_MODULE_NAME);
@@ -10374,6 +10110,27 @@ wlan_hdd_is_GO_power_collapse_allowed (hdd_context_t* pHddCtx)
           return FALSE;
 
 }
+
+// BEGIN MOTOROLA IKJB42MAIN-274, dpn473, 01/02/2013, Add flag to disable/enable MCC mode
+v_U8_t hdd_get_mcc_mode( void )
+{
+    v_CONTEXT_t pVosContext = vos_get_global_context( VOS_MODULE_ID_HDD, NULL );
+    hdd_context_t *pHddCtx;
+
+    if (NULL != pVosContext)
+    {
+        pHddCtx = vos_get_context( VOS_MODULE_ID_HDD, pVosContext);
+        if (NULL != pHddCtx)
+        {
+            return (v_U8_t)pHddCtx->cfg_ini->enableMCC;
+        }
+    }
+    /* we are in an invalid state :( */
+    hddLog(LOGE, "%s: Invalid context", __func__);
+    return (v_U8_t)0;
+}
+// END IKJB42MAIN-274
+
 /* Decide whether to allow/not the apps power collapse. 
  * Allow apps power collapse if we are in connected state.
  * if not, allow only if we are in IMPS  */
@@ -10414,24 +10171,10 @@ v_BOOL_t hdd_is_apps_power_collapse_allowed(hdd_context_t* pHddCtx)
         {
             if (((pConfig->fIsImpsEnabled || pConfig->fIsBmpsEnabled)
                  && (pmcState != IMPS && pmcState != BMPS && pmcState != UAPSD
-                  &&  pmcState != STOPPED && pmcState != STANDBY &&
-                      pmcState != WOWL)) ||
+                  &&  pmcState != STOPPED && pmcState != STANDBY)) ||
                  (eANI_BOOLEAN_TRUE == scanRspPending) ||
                  (eANI_BOOLEAN_TRUE == inMiddleOfRoaming))
             {
-                if(pmcState == FULL_POWER &&
-                   sme_IsCoexScoIndicationSet(pHddCtx->hHal))
-                {
-                    /*
-                     * When SCO indication comes from Coex module , host will
-                     * enter in to full power mode, but this should not prevent
-                     * apps processor power collapse.
-                     */
-                    hddLog(LOG1,
-                       FL("Allow apps power collapse"
-                          "even when sco indication is set"));
-                    return TRUE;
-                }
                 hddLog( LOGE, "%s: do not allow APPS power collapse-"
                     "pmcState = %d scanRspPending = %d inMiddleOfRoaming = %d",
                     __func__, pmcState, scanRspPending, inMiddleOfRoaming );
@@ -10641,18 +10384,8 @@ static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx)
 {
    VOS_STATUS status = VOS_STATUS_SUCCESS;
    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
-   int len = (sizeof (struct ieee80211_mgmt));
-   struct ieee80211_mgmt *mgmt = NULL; 
-   
-   /* Prepare the DEAUTH managment frame with reason code */
-   mgmt =  kzalloc(len, GFP_KERNEL);
-   if(mgmt == NULL) 
-   {
-      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL, 
-            "%s: memory allocation failed (%d bytes)", __func__, len);
-      return VOS_STATUS_E_NOMEM;
-   }
-   mgmt->u.deauth.reason_code = WLAN_REASON_DISASSOC_LOW_ACK;
+   unsigned char restart_notification[MAX_RESTART_DRIVER_EVENT_LENGTH + 1];
+   union iwreq_data wrqu;
 
    /* Iterate over all adapters/devices */
    status =  hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
@@ -10667,27 +10400,21 @@ static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx)
                pAdapterNode->pAdapter->dev->name,
                pAdapterNode->pAdapter->device_mode,
                pHddCtx->hdd_restart_retries + 1);
-         /* 
-          * CFG80211 event to restart the driver
-          * 
-          * 'cfg80211_send_unprot_deauth' sends a 
-          * NL80211_CMD_UNPROT_DEAUTHENTICATE event to supplicant at any state 
-          * of SME(Linux Kernel) state machine.
-          *
-          * Reason code WLAN_REASON_DISASSOC_LOW_ACK is currently used to restart
-          * the driver.
-          *
-          */
-         
-         cfg80211_send_unprot_deauth(pAdapterNode->pAdapter->dev, (u_int8_t*)mgmt, len );  
+
+          /* Notify the wpa supplicant of wcnss restart by sending the custom event */
+          memset(&wrqu, 0 , sizeof(wrqu));
+          memset(restart_notification, 0, sizeof(restart_notification));
+
+          strlcpy(restart_notification, "QCOM: RESTART_DRIVER_DXE", sizeof(restart_notification));
+
+          wrqu.data.pointer = restart_notification;
+          wrqu.data.length = strlen(restart_notification);
+
+          wireless_send_event(pAdapterNode->pAdapter->dev, IWEVCUSTOM, &wrqu, restart_notification);
       }
       status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
       pAdapterNode = pNext;
    } while((NULL != pAdapterNode) && (VOS_STATUS_SUCCESS == status));
-
-
-   /* Free the allocated management frame */
-   kfree(mgmt);
 
    /* Retry until we unload or reach max count */
    if(++pHddCtx->hdd_restart_retries < WLAN_HDD_RESTART_RETRY_MAX_CNT) 
@@ -10809,53 +10536,28 @@ VOS_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx)
     return sme_isSta_p2p_clientConnected(pHddCtx->hHal);
 }
 
-/*
- * API to find if there is any session connected
- */
-VOS_STATUS hdd_is_any_session_connected(hdd_context_t *pHddCtx)
-{
-    return sme_is_any_session_connected(pHddCtx->hHal);
-}
-
-
 int wlan_hdd_scan_abort(hdd_adapter_t *pAdapter)
 {
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     hdd_scaninfo_t *pScanInfo = NULL;
     long status = 0;
-    tSirAbortScanStatus abortScanStatus;
 
     pScanInfo = &pHddCtx->scan_info;
     if (pScanInfo->mScanPending)
     {
-        abortScanStatus = hdd_abort_mac_scan(pHddCtx, pScanInfo->sessionId,
-                                             eCSR_SCAN_ABORT_DEFAULT);
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                  FL("abortScanStatus: %d"), abortScanStatus);
+        INIT_COMPLETION(pScanInfo->abortscan_event_var);
+        hdd_abort_mac_scan(pHddCtx, pScanInfo->sessionId,
+                                    eCSR_SCAN_ABORT_DEFAULT);
 
-        /* If there is active scan command lets wait for the completion else
-         * there is no need to wait as scan command might be in the SME pending
-         * command list.
-         */
-        if (abortScanStatus == eSIR_ABORT_ACTIVE_SCAN_LIST_NOT_EMPTY)
-        {
-            INIT_COMPLETION(pScanInfo->abortscan_event_var);
-            status = wait_for_completion_interruptible_timeout(
+        status = wait_for_completion_interruptible_timeout(
                            &pScanInfo->abortscan_event_var,
                            msecs_to_jiffies(5000));
-            if (0 >= status)
-            {
-               VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+        if (0 >= status)
+        {
+           VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Timeout or Interrupt occurred while waiting for abort"
                   "scan, status- %ld", __func__, status);
-                return -ETIMEDOUT;
-            }
-        }
-        else if (abortScanStatus == eSIR_ABORT_SCAN_FAILURE)
-        {
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                      FL("hdd_abort_mac_scan failed"));
-            return -VOS_STATUS_E_FAILURE;
+            return -ETIMEDOUT;
         }
     }
     return 0;
@@ -10892,30 +10594,30 @@ VOS_STATUS wlan_hdd_cancel_remain_on_channel(hdd_context_t *pHddCtx)
     }
     return VOS_STATUS_SUCCESS;
 }
-
-hdd_remain_on_chan_ctx_t *hdd_get_remain_on_channel_ctx(hdd_context_t *pHddCtx)
+void hdd_nullify_netdev_ops(hdd_context_t *pHddCtx)
 {
-    hdd_adapter_t *pAdapter;
-    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
-    hdd_cfg80211_state_t *cfgState;
-    hdd_remain_on_chan_ctx_t *pRemainChanCtx = NULL;
-    VOS_STATUS vosStatus;
+   VOS_STATUS status;
+   hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
+   hdd_adapter_t      *pAdapter;
 
-    vosStatus = hdd_get_front_adapter (pHddCtx, &pAdapterNode);
-    while (NULL != pAdapterNode && VOS_STATUS_E_EMPTY != vosStatus)
-    {
-        pAdapter = pAdapterNode->pAdapter;
-        if (NULL != pAdapter)
-        {
-            cfgState = WLAN_HDD_GET_CFG_STATE_PTR(pAdapter);
-            pRemainChanCtx = cfgState->remain_on_chan_ctx;
-            if (pRemainChanCtx)
-                break;
-        }
-        vosStatus = hdd_get_next_adapter (pHddCtx, pAdapterNode, &pNext);
-        pAdapterNode = pNext;
-    }
-    return pRemainChanCtx;
+   status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
+   while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
+   {
+      pAdapter = pAdapterNode->pAdapter;
+      if (NULL != pAdapter)
+      {
+          /* Disable TX on the interface, after this hard_start_xmit() will
+           * not be called on that interface
+           */
+          hddLog(VOS_TRACE_LEVEL_INFO, FL("Disabling queues"));
+          netif_tx_disable(pAdapter->dev);
+          /* Mark the interface status as "down" for outside world */
+          netif_carrier_off(pAdapter->dev);
+          pAdapter->dev->netdev_ops = &nullify_netdev_ops;
+      }
+      status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
+      pAdapterNode = pNext;
+   }
 }
 
 //Register the module init/exit functions

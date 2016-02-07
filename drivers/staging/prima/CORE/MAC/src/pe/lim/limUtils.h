@@ -61,8 +61,6 @@ typedef enum
 #define LIM_MAX_REASSOC_RETRY_LIMIT            2
 #endif
 
-#define LIM_MAX_BANDS ( 48 )
-
 // classifier ID is coded as 0-3: tsid, 4-5:direction
 #define LIM_MAKE_CLSID(tsid, dir) (((tsid) & 0x0F) | (((dir) & 0x03) << 4))
 
@@ -552,5 +550,4 @@ tANI_U8 limGetOPClassFromChannel(tANI_U8 *country,
 void limParseBeaconForTim(tpAniSirGlobal pMac, tANI_U8* pRxPacketInfo,
                           tpPESession psessionEntry);
 
-void limDecrementPendingMgmtCount (tpAniSirGlobal pMac);
 #endif /* __LIM_UTILS_H */

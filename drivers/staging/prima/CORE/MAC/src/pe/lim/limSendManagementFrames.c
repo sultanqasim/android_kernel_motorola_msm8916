@@ -2242,17 +2242,6 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
         {
             extractedExtCap.qosMap = 1;
         }
-        /* No need to merge the EXT Cap from Supplicant
-         * if interworkingService is not set, as currently
-         * driver is only interested in interworkingService
-         * capability from supplicant. if in
-         * future any other EXT Cap info is required from
-         * supplicant it needs to be handled here.
-         */
-        else
-        {
-            extractedExtCapFlag = eANI_BOOLEAN_FALSE;
-        }
     }
 
     caps = pMlmAssocReq->capabilityInfo;
@@ -3061,15 +3050,6 @@ void limSendRetryReassocReqFrame(tpAniSirGlobal     pMac,
 {
     tLimMlmReassocCnf       mlmReassocCnf; // keep sme
     tLimMlmReassocReq       *pTmpMlmReassocReq = NULL;
-#ifdef FEATURE_WLAN_ESE
-    tANI_U32                val=0;
-#endif
-    if (pMlmReassocReq == NULL)
-    {
-        limLog(pMac, LOGE,
-           FL("Invalid pMlmReassocReq"));
-        goto end;
-    }
     if(NULL == pTmpMlmReassocReq)
     {
         pTmpMlmReassocReq = vos_mem_malloc(sizeof(tLimMlmReassocReq));
@@ -3080,31 +3060,6 @@ void limSendRetryReassocReqFrame(tpAniSirGlobal     pMac,
 
     // Prepare and send Reassociation request frame
     // start reassoc timer.
-#ifdef FEATURE_WLAN_ESE
-    /*
-     * In case of Ese Reassociation, change the reassoc timer
-     * value.
-     */
-    val = pMlmReassocReq->reassocFailureTimeout;
-    if (psessionEntry->isESEconnection)
-    {
-        val = val/LIM_MAX_REASSOC_RETRY_LIMIT;
-    }
-    if (tx_timer_deactivate(&pMac->lim.limTimers.gLimReassocFailureTimer) !=
-                                                TX_SUCCESS)
-    {
-        limLog(pMac, LOGP,
-           FL("unable to deactivate Reassoc failure timer"));
-    }
-    val = SYS_MS_TO_TICKS(val);
-    if (tx_timer_change(&pMac->lim.limTimers.gLimReassocFailureTimer,
-                                val, 0) != TX_SUCCESS)
-    {
-        limLog(pMac, LOGP,
-          FL("unable to change Reassociation failure timer"));
-    }
-#endif
-
     pMac->lim.limTimers.gLimReassocFailureTimer.sessionId = psessionEntry->peSessionId;
     // Start reassociation failure timer
     MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, psessionEntry->peSessionId, eLIM_REASSOC_FAIL_TIMER));
@@ -3461,21 +3416,6 @@ end:
 
 } // limSendReassocReqMgmtFrame
 
-eHalStatus limAuthTxCompleteCnf(tpAniSirGlobal pMac, tANI_U32 txCompleteSuccess)
-{
-    limLog(pMac, LOG1,
-                   FL("txCompleteSuccess= %d"), txCompleteSuccess);
-    if(txCompleteSuccess)
-    {
-       pMac->authAckStatus = LIM_AUTH_ACK_RCD_SUCCESS;
-       // 'Change' timer for future activations
-       limDeactivateAndChangeTimer(pMac, eLIM_AUTH_RETRY_TIMER);
-    }
-    else
-       pMac->authAckStatus = LIM_AUTH_ACK_RCD_FAILURE;
-    return eHAL_STATUS_SUCCESS;
-}
-
 /**
  * \brief Send an Authentication frame
  *
@@ -3503,8 +3443,7 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
                      tpSirMacAuthFrameBody pAuthFrameBody,
                      tSirMacAddr           peerMacAddr,
                      tANI_U8               wepBit,
-                     tpPESession           psessionEntry,
-                     tAniBool              waitForAck
+                     tpPESession           psessionEntry 
                                                        )
 {
     tANI_U8            *pFrame, *pBody;
@@ -3774,9 +3713,8 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
 
-    limLog( pMac, LOG1,
-         FL("Sending Auth Frame over WQ5 with waitForAck %d to "MAC_ADDRESS_STR
-            " From " MAC_ADDRESS_STR), waitForAck, MAC_ADDR_ARRAY(pMacHdr->da),
+    limLog( pMac, LOG1, FL("Sending Auth Frame over WQ5 to "MAC_ADDRESS_STR
+                   " From " MAC_ADDRESS_STR),MAC_ADDR_ARRAY(pMacHdr->da),
               MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
 
     txFlag |= HAL_USE_FW_IN_TX_PATH;
@@ -3784,47 +3722,22 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
     MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
            psessionEntry->peSessionId,
            pMacHdr->fc.subType));
-    if(eSIR_TRUE == waitForAck)
-    {
-        pMac->authAckStatus = LIM_AUTH_ACK_NOT_RCD;
-
-        halstatus = halTxFrameWithTxComplete( pMac, pPacket,
-                    ( tANI_U16 ) frameLen,
-                    HAL_TXRX_FRM_802_11_MGMT,
-                    ANI_TXDIR_TODS,
-                    7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
-                    limTxComplete, pFrame, limAuthTxCompleteCnf, txFlag );
-        MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
-               psessionEntry->peSessionId,
-               halstatus));
-        if (!HAL_STATUS_SUCCESS(halstatus))
-        {
-            limLog( pMac, LOGE,
-             FL("Could not send Auth frame, retCode=%X "),
-                    halstatus );
-            pMac->authAckStatus = LIM_AUTH_ACK_RCD_FAILURE;
-            //Pkt will be freed up by the callback
-        }
-    }
-    else
-    {
-      /// Queue Authentication frame in high priority WQ
-      halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) frameLen,
+    /// Queue Authentication frame in high priority WQ
+    halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) frameLen,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
-      MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
            psessionEntry->peSessionId,
            halstatus));
-      if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
-      {
+    if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
+    {
         limLog(pMac, LOGE,
                FL("*** Could not send Auth frame, retCode=%X ***"),
                halstatus);
 
         //Pkt will be freed up by the callback
-      }
     }
 
     return;

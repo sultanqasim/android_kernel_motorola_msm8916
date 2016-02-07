@@ -1197,22 +1197,21 @@ static VOS_STATUS btcDeferDisconnectEventForACL( tpAniSirGlobal pMac, tpSmeBtEve
             if( BT_EVENT_ACL_CONNECTION_COMPLETE == pAclEventHist->btEventType[i] )
             {
                 //make sure we can cancel the link
-                if ((i > 0) && (i < BT_MAX_NUM_EVENT_ACL_DEFERRED)) {
-			if (BT_EVENT_CREATE_ACL_CONNECTION == pAclEventHist->btEventType[i - 1]) {
-	                    fDone = VOS_TRUE;
-	                    if(i == 1)
-	                    {
-	                        //All events can be wiped off
-	                        btcReleaseAclEventHist(pMac, pAclEventHist);
-	                        break;
-	                    }
-	                    //we have both ACL creation and completion, wipe out all of them
-	                    pAclEventHist->bNextEventIdx = (tANI_U8)(i - 1);
-	                    vos_mem_zero(&pAclEventHist->btAclConnection[i-1], sizeof(tSmeBtAclConnectionParam));
-	                    vos_mem_zero(&pAclEventHist->btAclConnection[i], sizeof(tSmeBtAclConnectionParam));
-	                    break;
-	                }
-		}
+                if( (i > 0) && (BT_EVENT_CREATE_ACL_CONNECTION == pAclEventHist->btEventType[i - 1]) )
+                {
+                    fDone = VOS_TRUE;
+                    if(i == 1)
+                    {
+                        //All events can be wiped off
+                        btcReleaseAclEventHist(pMac, pAclEventHist);
+                        break;
+                    }
+                    //we have both ACL creation and completion, wipe out all of them
+                    pAclEventHist->bNextEventIdx = (tANI_U8)(i - 1);
+                    vos_mem_zero(&pAclEventHist->btAclConnection[i-1], sizeof(tSmeBtAclConnectionParam));
+                    vos_mem_zero(&pAclEventHist->btAclConnection[i], sizeof(tSmeBtAclConnectionParam));
+                    break;
+                }
             }
         }//for loop
         if(!fDone)
@@ -1283,22 +1282,21 @@ static VOS_STATUS btcDeferDisconnectEventForSync( tpAniSirGlobal pMac, tpSmeBtEv
             if( BT_EVENT_SYNC_CONNECTION_COMPLETE == pSyncEventHist->btEventType[i] )
             {
                 //make sure we can cancel the link
-                if ((i > 0) && (i < BT_MAX_NUM_EVENT_ACL_DEFERRED)) {
-			if (BT_EVENT_CREATE_SYNC_CONNECTION == pSyncEventHist->btEventType[i - 1]) {
-		            fDone = VOS_TRUE;
-		            if(i == 1)
-		            {
-		                //All events can be wiped off
-		                btcReleaseSyncEventHist(pMac, pSyncEventHist);
-		                break;
-		            }
-		            //we have both ACL creation and completion, wipe out all of them
-		            pSyncEventHist->bNextEventIdx = (tANI_U8)(i - 1);
-		            vos_mem_zero(&pSyncEventHist->btSyncConnection[i-1], sizeof(tSmeBtSyncConnectionParam));
-		            vos_mem_zero(&pSyncEventHist->btSyncConnection[i], sizeof(tSmeBtSyncConnectionParam));
-		            break;
-		        }
-		}
+                if( (i > 0) && (BT_EVENT_CREATE_SYNC_CONNECTION == pSyncEventHist->btEventType[i - 1]) )
+                {
+                    fDone = VOS_TRUE;
+                    if(i == 1)
+                    {
+                        //All events can be wiped off
+                        btcReleaseSyncEventHist(pMac, pSyncEventHist);
+                        break;
+                    }
+                    //we have both ACL creation and completion, wipe out all of them
+                    pSyncEventHist->bNextEventIdx = (tANI_U8)(i - 1);
+                    vos_mem_zero(&pSyncEventHist->btSyncConnection[i-1], sizeof(tSmeBtSyncConnectionParam));
+                    vos_mem_zero(&pSyncEventHist->btSyncConnection[i], sizeof(tSmeBtSyncConnectionParam));
+                    break;
+                }
             }
         }//for loop
         if(!fDone)
