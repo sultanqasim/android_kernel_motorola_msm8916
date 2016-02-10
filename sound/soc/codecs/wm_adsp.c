@@ -1993,7 +1993,7 @@ static int wm_adsp2_ena(struct wm_adsp *dsp)
 		if (val & ADSP2_RAM_RDY)
 			break;
 
-		msleep(1);
+		usleep_range(1000, 1001);
 	}
 
 	if (!(val & ADSP2_RAM_RDY)) {
@@ -2125,7 +2125,7 @@ static void wm_adsp_edac_shutdown(struct wm_adsp *dsp)
 		if (!val)
 			break;
 
-		msleep(1);
+		usleep_range(1000, 1001);
 	}
 
 	if (val)
@@ -3088,6 +3088,7 @@ int wm_adsp_stream_start(struct wm_adsp *adsp)
 		if (adsp->host_buf_ptr)
 			break;
 
+		usleep_range(1000, 1001);
 	}
 	if (!adsp->host_buf_ptr)
 		return -EIO;
