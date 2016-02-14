@@ -28,7 +28,7 @@
 	qcom,msm-id = <239 0x30000>, <241 0x30000>, <263 0x30000>;
 
 	chosen {
-		bootargs = "boot_cpus=0,4,5,6,7 sched_enable_hmp=1";
+		bootargs = "boot_cpus=0,1,2,3,4,5,6,7 sched_enable_hmp=1";
 	};
 };
 
@@ -494,8 +494,8 @@
 		regulator-max-microvolt = <28>;
 
 		qcom,cpr-fuse-corners = <3>;
-		qcom,cpr-voltage-ceiling = <1050000 1150000 1350000>;
-		qcom,cpr-voltage-floor = <1050000 1050000 1100000>;
+		qcom,cpr-voltage-ceiling = <1050000 1150000 1300000>;
+		qcom,cpr-voltage-floor = <1000000 1000000 1100000>;
 		vdd-apc-supply = <&ncp6335d>;
 
 		qcom,vdd-mx-corner-map = <4 5 7>;
@@ -523,7 +523,7 @@
 		qcom,cpr-fuse-target-quot = <42 24 6>;
 		qcom,cpr-fuse-ro-sel = <54 54 54>;
 		qcom,cpr-quot-min-diff = <0>;
-		qcom,cpr-init-voltage-ref = <1050000 1150000 1350000>;
+		qcom,cpr-init-voltage-ref = <1030000 1100000 1280000>;
 		qcom,cpr-fuse-init-voltage =
 					<27 36 6 0>,
 					<27 18 6 0>,
@@ -547,7 +547,7 @@
 					<12 960000000>,
 					<13 1036800000>,
 					<14 1113600000>,
-					<15 1190400000>,
+					<15 1209600000>,
 					<16 1267200000>,
 					<17 1344000000>,
 					<18 1363200000>,
@@ -655,8 +655,8 @@
 			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 			 0>;
 		qcom,cpr-voltage-floor-override =
-			<0xffffffff 0xffffffff 1050000 1050000 1050000 1050000
-			1050000 1050000 1050000 1050000 1050000 1050000 1050000
+			<0xffffffff 0xffffffff 1000000 1000000 1000000 1000000
+			1020000 1020000 1020000 1020000 1050000 1050000 1050000
 			1050000 1050000 1100000 1100000 1100000 1100000 1100000
 			1100000 1100000 1100000 1100000 1100000 1100000 1100000
 			1100000 1100000 1100000>;
