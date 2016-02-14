@@ -157,8 +157,8 @@
 					<2 0 3 14 21>,
 					<2 2 3 14 20>,
 					<4 0 3 14 28>,
-					<5 0 3 14 26>,
-					<5 6 3 14 26>;
+					<5 0 3 14 28>,
+					<5 6 3 14 28>;
 		qcom,cpr-quot-adjust-scaling-factor-max = <900>;
 		qcom,fuse-remap-base-row = <1000>;
 		qcom,fuse-remap-source =
