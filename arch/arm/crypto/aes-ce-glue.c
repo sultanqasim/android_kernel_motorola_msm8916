@@ -429,7 +429,7 @@ static struct crypto_alg aes_algs[] = { {
 }, {
 	.cra_name		= "ecb(aes)",
 	.cra_driver_name	= "ecb-aes-ce",
-	.cra_priority		= 300,
+	.cra_priority		= 350,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
@@ -449,7 +449,7 @@ static struct crypto_alg aes_algs[] = { {
 }, {
 	.cra_name		= "cbc(aes)",
 	.cra_driver_name	= "cbc-aes-ce",
-	.cra_priority		= 300,
+	.cra_priority		= 350,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
@@ -469,7 +469,7 @@ static struct crypto_alg aes_algs[] = { {
 }, {
 	.cra_name		= "ctr(aes)",
 	.cra_driver_name	= "ctr-aes-ce",
-	.cra_priority		= 300,
+	.cra_priority		= 350,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= 1,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
@@ -489,7 +489,7 @@ static struct crypto_alg aes_algs[] = { {
 }, {
 	.cra_name		= "xts(aes)",
 	.cra_driver_name	= "xts-aes-ce",
-	.cra_priority		= 300,
+	.cra_priority		= 350,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
