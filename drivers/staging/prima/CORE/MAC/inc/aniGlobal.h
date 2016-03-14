@@ -231,12 +231,6 @@ typedef struct sLimTimers
 #ifdef FEATURE_WLAN_ESE
     TX_TIMER           gLimEseTsmTimer;
 #endif
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-    TX_TIMER           gLimTdlsDisRspWaitTimer;
-    TX_TIMER           gLimTdlsLinkSetupRspTimeouTimer;
-    TX_TIMER           gLimTdlsLinkSetupCnfTimeoutTimer;
-#endif
-
     TX_TIMER           gLimPeriodicJoinProbeReqTimer;
     TX_TIMER           gLimDisassocAckTimer;
     TX_TIMER           gLimDeauthAckTimer;
@@ -375,6 +369,8 @@ typedef struct sAniSirLim
 
     //////////////////////////////////////     SCAN/LEARN RELATED START ///////////////////////////////////////////
     tSirMacAddr         gSelfMacAddr;   //added for BT-AMP Support 
+    tSirMacAddr         spoofMacAddr;   //added for Mac Addr Spoofing support
+    tANI_U8             isSpoofingEnabled;
 
     //////////////////////////////////////////     BSS RELATED END ///////////////////////////////////////////
     // Place holder for StartBssReq message
@@ -862,22 +858,6 @@ typedef struct sAniSirLim
 
     ////////////////////////////////  HT RELATED           //////////////////////////////////////////
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-    ////////////////////////////////  TDLS RELATED         //////////////////////////////////////////
-    
-    tSirTdlsDisReq gLimTdlsDisReq ; 
-    //tLimDisResultList *gTdlsDisResultList ;
-    tLimDisResultList *gLimTdlsDisResultList ;
-    tANI_U8 gLimTdlsDisStaCount ;
-    tANI_U8 gAddStaDisRspWait ;
-
-    tLimTdlsLinkSetupInfo  gLimTdlsLinkSetupInfo;
-    
-    /* to track if direct link is b/g/n, this can be independent of AP link */
-#ifdef FEATURE_WLAN_TDLS_NEGATIVE
-    tANI_U32 gLimTdlsNegativeBehavior;  
-#endif
-#endif
 #ifdef FEATURE_WLAN_TDLS
     tANI_U8 gLimAddStaTdls ;
     tANI_U8 gLimTdlsLinkMode ;
@@ -924,6 +904,8 @@ tLimMlmOemDataRsp       *gpLimMlmOemDataRsp;
      * debug marker frame.
      */
     tANI_U32 remOnChnSeqNum;
+    tANI_U32 txBdToken;
+    tANI_U32 EnableTdls2040BSSCoexIE;
 } tAniSirLim, *tpAniSirLim;
 
 typedef struct sLimMgmtFrameRegistration
@@ -1038,9 +1020,6 @@ typedef struct sAniSirGlobal
 #ifdef FEATURE_OEM_DATA_SUPPORT
     tOemDataStruct oemData;
 #endif
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-    tCsrTdlsCtxStruct tdlsCtx ;
-#endif
     tPmcInfo     pmc;
     tSmeBtcInfo  btc;
 
@@ -1084,8 +1063,11 @@ typedef struct sAniSirGlobal
     v_BOOL_t isCoexScoIndSet;
     v_U8_t miracast_mode;
     v_U8_t fBtcEnableIndTimerVal;
+    v_U8_t roamDelayStatsEnabled;
     tANI_BOOLEAN miracastVendorConfig;
+    v_BOOL_t fActiveScanOnDFSChannels;
     tAuthAckStatus  authAckStatus;
+    sir_mgmt_frame_ind_callback mgmt_frame_ind_cb;
 } tAniSirGlobal;
 
 #ifdef FEATURE_WLAN_TDLS

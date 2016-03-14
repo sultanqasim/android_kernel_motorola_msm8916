@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,8 +31,6 @@
 *
 * Description: Routines that make up the BTC API.
 *
-* Copyright 2008 (c) Qualcomm, Incorporated. All Rights Reserved.
-* Qualcomm Confidential and Proprietary.
 *
 ******************************************************************************/
 #include "wlan_qct_wda.h"
@@ -43,6 +41,7 @@
 #include "cfgApi.h"
 #include "pmc.h"
 #include "smeQosInternal.h"
+#include "sme_Trace.h"
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 #include "vos_diag_core_event.h"
 #include "vos_diag_core_log.h"
@@ -275,6 +274,8 @@ static VOS_STATUS btcSendBTEvent(tpAniSirGlobal pMac, tpSmeBtEvent pBtEvent)
    msg.type = WDA_SIGNAL_BT_EVENT;
    msg.reserved = 0;
    msg.bodyptr = ptrSmeBtEvent;
+   MTRACE(vos_trace(VOS_MODULE_ID_SME,
+                 TRACE_CODE_SME_TX_WDA_MSG, NO_SESSION, msg.type));
    if(VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA, &msg))
    {
       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: "
@@ -557,6 +558,8 @@ VOS_STATUS btcSendCfgMsg(tHalHandle hHal, tpSmeBtcConfig pSmeBtcConfig)
    msg.type = WDA_BTC_SET_CFG;
    msg.reserved = 0;
    msg.bodyptr = ptrSmeBtcConfig;
+   MTRACE(vos_trace(VOS_MODULE_ID_SME,
+                 TRACE_CODE_SME_TX_WDA_MSG, NO_SESSION, msg.type));
    if(VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA, &msg))
    {
       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "btcSendCfgMsg: "
@@ -1197,22 +1200,21 @@ static VOS_STATUS btcDeferDisconnectEventForACL( tpAniSirGlobal pMac, tpSmeBtEve
             if( BT_EVENT_ACL_CONNECTION_COMPLETE == pAclEventHist->btEventType[i] )
             {
                 //make sure we can cancel the link
-                if ((i > 0) && (i < BT_MAX_NUM_EVENT_ACL_DEFERRED)) {
-			if (BT_EVENT_CREATE_ACL_CONNECTION == pAclEventHist->btEventType[i - 1]) {
-	                    fDone = VOS_TRUE;
-	                    if(i == 1)
-	                    {
-	                        //All events can be wiped off
-	                        btcReleaseAclEventHist(pMac, pAclEventHist);
-	                        break;
-	                    }
-	                    //we have both ACL creation and completion, wipe out all of them
-	                    pAclEventHist->bNextEventIdx = (tANI_U8)(i - 1);
-	                    vos_mem_zero(&pAclEventHist->btAclConnection[i-1], sizeof(tSmeBtAclConnectionParam));
-	                    vos_mem_zero(&pAclEventHist->btAclConnection[i], sizeof(tSmeBtAclConnectionParam));
-	                    break;
-	                }
-		}
+                if( (i > 0) && (BT_EVENT_CREATE_ACL_CONNECTION == pAclEventHist->btEventType[i - 1]) )
+                {
+                    fDone = VOS_TRUE;
+                    if(i == 1)
+                    {
+                        //All events can be wiped off
+                        btcReleaseAclEventHist(pMac, pAclEventHist);
+                        break;
+                    }
+                    //we have both ACL creation and completion, wipe out all of them
+                    pAclEventHist->bNextEventIdx = (tANI_U8)(i - 1);
+                    vos_mem_zero(&pAclEventHist->btAclConnection[i-1], sizeof(tSmeBtAclConnectionParam));
+                    vos_mem_zero(&pAclEventHist->btAclConnection[i], sizeof(tSmeBtAclConnectionParam));
+                    break;
+                }
             }
         }//for loop
         if(!fDone)
@@ -1283,22 +1285,21 @@ static VOS_STATUS btcDeferDisconnectEventForSync( tpAniSirGlobal pMac, tpSmeBtEv
             if( BT_EVENT_SYNC_CONNECTION_COMPLETE == pSyncEventHist->btEventType[i] )
             {
                 //make sure we can cancel the link
-                if ((i > 0) && (i < BT_MAX_NUM_EVENT_ACL_DEFERRED)) {
-			if (BT_EVENT_CREATE_SYNC_CONNECTION == pSyncEventHist->btEventType[i - 1]) {
-		            fDone = VOS_TRUE;
-		            if(i == 1)
-		            {
-		                //All events can be wiped off
-		                btcReleaseSyncEventHist(pMac, pSyncEventHist);
-		                break;
-		            }
-		            //we have both ACL creation and completion, wipe out all of them
-		            pSyncEventHist->bNextEventIdx = (tANI_U8)(i - 1);
-		            vos_mem_zero(&pSyncEventHist->btSyncConnection[i-1], sizeof(tSmeBtSyncConnectionParam));
-		            vos_mem_zero(&pSyncEventHist->btSyncConnection[i], sizeof(tSmeBtSyncConnectionParam));
-		            break;
-		        }
-		}
+                if( (i > 0) && (BT_EVENT_CREATE_SYNC_CONNECTION == pSyncEventHist->btEventType[i - 1]) )
+                {
+                    fDone = VOS_TRUE;
+                    if(i == 1)
+                    {
+                        //All events can be wiped off
+                        btcReleaseSyncEventHist(pMac, pSyncEventHist);
+                        break;
+                    }
+                    //we have both ACL creation and completion, wipe out all of them
+                    pSyncEventHist->bNextEventIdx = (tANI_U8)(i - 1);
+                    vos_mem_zero(&pSyncEventHist->btSyncConnection[i-1], sizeof(tSmeBtSyncConnectionParam));
+                    vos_mem_zero(&pSyncEventHist->btSyncConnection[i], sizeof(tSmeBtSyncConnectionParam));
+                    break;
+                }
             }
         }//for loop
         if(!fDone)

@@ -31,9 +31,6 @@
   @brief Virtual Operating System Services Memory API
 
   
-  Copyright (c) 2008 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*=========================================================================== 
@@ -58,12 +55,14 @@
  * ------------------------------------------------------------------------*/
 #include "vos_memory.h"
 #include "vos_trace.h"
+#include "vos_api.h"
 #include <vmalloc.h>
 
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 #include <linux/wcnss_wlan.h>
 #define WCNSS_PRE_ALLOC_GET_THRESHOLD (4*1024)
 #endif
+#define VOS_GET_MEMORY_TIME_THRESHOLD 3000
 
 #ifdef MEMORY_DEBUG
 #include "wlan_hdd_dp_utils.h"
@@ -192,16 +191,17 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
    v_SIZE_t new_size;
    int flags = GFP_KERNEL;
    unsigned long IrqFlags;
+   unsigned long  time_before_kmalloc;
 
 
-   if (size > (1024*1024))
+   if (size > (1024*1024) || size == 0)
    {
        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-               "%s: called with arg > 1024K; passed in %d !!!", __func__,size); 
+               "%s: called with invalid arg %u !!!", __func__, size);
        return NULL;
    }
 
-   if (in_interrupt())
+   if (in_interrupt() || irqs_disabled() || in_atomic())
    {
       flags = GFP_ATOMIC;
    }
@@ -217,12 +217,30 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
                return pmem;
       }
 #endif
-      return kmalloc(size, flags);
+      time_before_kmalloc = vos_timer_get_system_time();
+      memPtr = kmalloc(size, flags);
+
+      /* If time taken by kmalloc is greater than VOS_GET_MEMORY_TIME_THRESHOLD
+       * msec */
+      if (vos_timer_get_system_time() - time_before_kmalloc >=
+                                    VOS_GET_MEMORY_TIME_THRESHOLD)
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+               "%s: kmalloc took %lu msec", __func__,
+               vos_timer_get_system_time() - time_before_kmalloc);
+      return memPtr;
    }
 
    new_size = size + sizeof(struct s_vos_mem_struct) + 8; 
 
+   time_before_kmalloc = vos_timer_get_system_time();
    memStruct = (struct s_vos_mem_struct*)kmalloc(new_size, flags);
+   /* If time taken by kmalloc is greater than VOS_GET_MEMORY_TIME_THRESHOLD
+    * msec */
+   if (vos_timer_get_system_time() - time_before_kmalloc >=
+                              VOS_GET_MEMORY_TIME_THRESHOLD)
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+          "%s: kmalloc took %lu msec", __func__,
+          vos_timer_get_system_time() - time_before_kmalloc);
 
    if(memStruct != NULL)
    {
@@ -301,12 +319,16 @@ v_VOID_t vos_mem_free( v_VOID_t *ptr )
 v_VOID_t * vos_mem_malloc( v_SIZE_t size )
 {
    int flags = GFP_KERNEL;
+   v_VOID_t* memPtr = NULL;
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
     v_VOID_t* pmem;
 #endif    
-   if (size > (1024*1024))
+   unsigned long  time_before_kmalloc;
+
+   if (size > (1024*1024) || size == 0)
    {
-       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, "%s: called with arg > 1024K; passed in %d !!!", __func__,size); 
+       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+               "%s: called with invalid arg %u !!!", __func__, size);
        return NULL;
    }
    if (in_interrupt() || irqs_disabled() || in_atomic())
@@ -321,8 +343,19 @@ v_VOID_t * vos_mem_malloc( v_SIZE_t size )
            return pmem;
    }
 #endif
-   return kmalloc(size, flags);
-}   
+   time_before_kmalloc = vos_timer_get_system_time();
+   memPtr = kmalloc(size, flags);
+   /* If time taken by kmalloc is greater than VOS_GET_MEMORY_TIME_THRESHOLD
+    * msec */
+   if (vos_timer_get_system_time() - time_before_kmalloc >=
+                              VOS_GET_MEMORY_TIME_THRESHOLD)
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+          "%s: kmalloc took %lu msec", __func__,
+          vos_timer_get_system_time() - time_before_kmalloc);
+
+   return memPtr;
+
+}
 
 v_VOID_t vos_mem_free( v_VOID_t *ptr )
 {
@@ -428,7 +461,8 @@ v_VOID_t vos_mem_move( v_VOID_t *pDst, const v_VOID_t *pSrc, v_SIZE_t numBytes )
    memmove(pDst, pSrc, numBytes);
 }
 
-v_BOOL_t vos_mem_compare( const v_VOID_t *pMemory1, const v_VOID_t *pMemory2, v_U32_t numBytes )
+v_BOOL_t vos_mem_compare( const v_VOID_t *pMemory1, const v_VOID_t *pMemory2,
+                          v_U32_t numBytes )
 { 
    if (0 == numBytes)
    {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1076,7 +1076,7 @@ eHalStatus csrNeighborRoamPreauthRspHandler(tpAniSirGlobal pMac, tSirRetStatus l
     VOS_STATUS  vosStatus = VOS_STATUS_SUCCESS;
     eHalStatus  preauthProcessed = eHAL_STATUS_SUCCESS;
     tpCsrNeighborRoamBSSInfo pPreauthRspNode = NULL;
-
+    tCsrRoamSession *pSession;
 #ifdef FEATURE_WLAN_LFR_METRICS
     tCsrRoamInfo *roamInfo;
 #endif
@@ -1204,11 +1204,18 @@ eHalStatus csrNeighborRoamPreauthRspHandler(tpAniSirGlobal pMac, tSirRetStatus l
             csrNeighborRoamFreeNeighborRoamBSSNode(pMac, pNeighborBssNode);
             }
         }
+        pSession = CSR_GET_SESSION(pMac, pNeighborRoamInfo->csrSessionId);
+        if ((NULL != pSession) && pSession->abortConnection)
+        {
+           smsLog(pMac, LOGE, FL(" Deauth in progress Abort preauth"));
+           goto abort_preauth;
+        }
 
         /* Issue preauth request for the same/next entry */
         if (eHAL_STATUS_SUCCESS == csrNeighborRoamIssuePreauthReq(pMac))
         goto DEQ_PREAUTH; 
 
+abort_preauth:
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
         if (csrRoamIsRoamOffloadScanEnabled(pMac))
         {
@@ -1347,21 +1354,31 @@ eHalStatus csrNeighborRoamPrepareScanProfileFilter(tpAniSirGlobal pMac, tCsrScan
 
     pScanFilter->BSSType = pCurProfile->BSSType;
 
-    /* We are intrested only in the scan results on channels that we scanned  */
-    pScanFilter->ChannelInfo.numOfChannels = pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels;
-    pScanFilter->ChannelInfo.ChannelList = vos_mem_malloc(pScanFilter->ChannelInfo.numOfChannels * sizeof(tANI_U8));
-    if (NULL == pScanFilter->ChannelInfo.ChannelList)
+    if (pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels)
     {
-        smsLog(pMac, LOGE, FL("Scan Filter Channel list mem alloc failed"));
-        vos_mem_free(pScanFilter->SSIDs.SSIDList);
-        pScanFilter->SSIDs.SSIDList = NULL;
-        return eHAL_STATUS_FAILED_ALLOC;
+       /* We are intrested only in the scan results on channels that we scanned  */
+       pScanFilter->ChannelInfo.numOfChannels =
+        pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels;
+       pScanFilter->ChannelInfo.ChannelList =
+        vos_mem_malloc(pScanFilter->ChannelInfo.numOfChannels * sizeof(tANI_U8));
+       if (NULL == pScanFilter->ChannelInfo.ChannelList)
+       {
+          smsLog(pMac, LOGE, FL("Scan Filter Channel list mem alloc failed"));
+          vos_mem_free(pScanFilter->SSIDs.SSIDList);
+          pScanFilter->SSIDs.SSIDList = NULL;
+          return eHAL_STATUS_FAILED_ALLOC;
+       }
+       for (i = 0; i < pScanFilter->ChannelInfo.numOfChannels; i++)
+       {
+          pScanFilter->ChannelInfo.ChannelList[i] =
+            pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList[i];
+       }
     }
-    for (i = 0; i < pScanFilter->ChannelInfo.numOfChannels; i++)
+    else
     {
-        pScanFilter->ChannelInfo.ChannelList[i] = pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList[i];
+       pScanFilter->ChannelInfo.numOfChannels = 0;
+       pScanFilter->ChannelInfo.ChannelList = NULL;
     }
-
 #ifdef WLAN_FEATURE_VOWIFI_11R
     if (pNeighborRoamInfo->is11rAssoc)
     {
@@ -1369,6 +1386,12 @@ eHalStatus csrNeighborRoamPrepareScanProfileFilter(tpAniSirGlobal pMac, tCsrScan
         pScanFilter->MDID.mdiePresent = pCurProfile->MDID.mdiePresent;
         pScanFilter->MDID.mobilityDomain = pCurProfile->MDID.mobilityDomain;
     }
+#endif
+
+#ifdef WLAN_FEATURE_11W
+    pScanFilter->MFPEnabled = pCurProfile->MFPEnabled;
+    pScanFilter->MFPRequired = pCurProfile->MFPRequired;
+    pScanFilter->MFPCapable = pCurProfile->MFPCapable;
 #endif
 
     return eHAL_STATUS_SUCCESS;
@@ -4762,19 +4785,28 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
     pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels   =
                         pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.numChannels;
 
-    pNeighborRoamInfo->cfgParams.channelInfo.ChannelList =
+    if (pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels != 0)
+    {
+        pNeighborRoamInfo->cfgParams.channelInfo.ChannelList =
                 vos_mem_malloc(pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.numChannels);
 
-    if (NULL == pNeighborRoamInfo->cfgParams.channelInfo.ChannelList)
-    {
-        smsLog(pMac, LOGE, FL("Memory Allocation for CFG Channel List failed"));
-        return eHAL_STATUS_RESOURCES;
-    }
+        if (NULL == pNeighborRoamInfo->cfgParams.channelInfo.ChannelList)
+        {
+            smsLog(pMac, LOGE, FL("Memory Allocation for CFG Channel List failed"));
+            return eHAL_STATUS_RESOURCES;
+        }
 
-    /* Update the roam global structure from CFG */
-    vos_mem_copy(pNeighborRoamInfo->cfgParams.channelInfo.ChannelList,
+        /* Update the roam global structure from CFG */
+        vos_mem_copy(pNeighborRoamInfo->cfgParams.channelInfo.ChannelList,
                         pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.channelList,
                         pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.numChannels);
+    }
+    else
+    {
+         smsLog(pMac, LOGW,
+                FL("invalid neighbor roam channel list: %u"),
+                    pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels);
+    }
 
     vos_mem_set(pNeighborRoamInfo->currAPbssid, sizeof(tCsrBssid), 0);
     pNeighborRoamInfo->currentNeighborLookupThreshold = pMac->roam.neighborRoamInfo.cfgParams.neighborLookupThreshold;
@@ -4876,6 +4908,9 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
 
     CSR_NEIGHBOR_ROAM_STATE_TRANSITION(eCSR_NEIGHBOR_ROAM_STATE_INIT)
     pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
+
+    //Set the Last Sent Cmd as RSO_STOP
+    pNeighborRoamInfo->lastSentCmd = ROAM_SCAN_OFFLOAD_STOP;
     return eHAL_STATUS_SUCCESS;
 }
 

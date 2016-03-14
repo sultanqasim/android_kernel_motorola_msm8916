@@ -33,9 +33,6 @@
 
   \author Sunit Bhatia
   
-   Copyright 2008 (c) Qualcomm, Incorporated.  All Rights Reserved.
-   
-   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 
@@ -200,7 +197,7 @@ tpPESession peCreateSession(tpAniSirGlobal pMac, tANI_U8 *bssid , tANI_U8* sessi
             return(&pMac->lim.gpSession[i]);
         }
     }
-    limLog(pMac, LOGE, FL("Session can not be created.. Reached Max permitted sessions \n "));
+    limLog(pMac, LOGE, FL("Session can not be created.. Reached Max permitted sessions "));
     return NULL;
 }
 
@@ -233,7 +230,7 @@ tpPESession peFindSessionByBssid(tpAniSirGlobal pMac,  tANI_U8*  bssid,    tANI_
         }
     }
 
-    limLog(pMac, LOG4, FL("Session lookup fails for BSSID: \n "));
+    limLog(pMac, LOG4, FL("Session lookup fails for BSSID: "));
     limPrintMacAddr(pMac, bssid, LOG4);
     return(NULL);
 
@@ -282,14 +279,13 @@ tpPESession peFindSessionByBssIdx(tpAniSirGlobal pMac,  tANI_U8 bssIdx)
 {
     if(sessionId >=  pMac->lim.maxBssId)
     {
-        limLog(pMac, LOGE, FL("Invalid sessionId: %d \n "), sessionId);
+        limLog(pMac, LOGE, FL("Invalid sessionId: %d "), sessionId);
         return(NULL);
     }
     if((pMac->lim.gpSession[sessionId].valid == TRUE))
     {
         return(&pMac->lim.gpSession[sessionId]);
     }
-    limLog(pMac, LOG1, FL("Session %d  not active\n "), sessionId);
     return(NULL);
 
 }
@@ -350,6 +346,7 @@ void peDeleteSession(tpAniSirGlobal pMac, tpPESession psessionEntry)
     tANI_U16 i = 0;
     tANI_U16 n;
     TX_TIMER *timer_ptr;
+    eHalStatus lock_status = eHAL_STATUS_SUCCESS;
 
     limLog(pMac, LOGW, FL("Trying to delete a session %d Opmode %d BssIdx %d"
            " BSSID: " MAC_ADDRESS_STR), psessionEntry->peSessionId,
@@ -404,11 +401,16 @@ void peDeleteSession(tpAniSirGlobal pMac, tpPESession psessionEntry)
         psessionEntry->pLimMlmJoinReq = NULL;
     }
 
-    if(psessionEntry->dph.dphHashTable.pHashTable != NULL)
+    lock_status =  pe_AcquireGlobalLock(&pMac->lim);
+    if (eHAL_STATUS_SUCCESS == lock_status)
     {
-        vos_mem_vfree(psessionEntry->dph.dphHashTable.pHashTable);
-        psessionEntry->dph.dphHashTable.pHashTable = NULL;
+         if (psessionEntry->dph.dphHashTable.pHashTable != NULL)
+         {
+             vos_mem_vfree(psessionEntry->dph.dphHashTable.pHashTable);
+             psessionEntry->dph.dphHashTable.pHashTable = NULL;
+         }
     }
+    pe_ReleaseGlobalLock(&pMac->lim);
 
     if(psessionEntry->dph.dphHashTable.pDphNodeArray != NULL)
     {
@@ -527,7 +529,7 @@ tpPESession peFindSessionByPeerSta(tpAniSirGlobal pMac,  tANI_U8*  sa,    tANI_U
       }
    }   
 
-   limLog(pMac, LOG1, FL("Session lookup fails for Peer StaId: \n "));
+   limLog(pMac, LOG1, FL("Session lookup fails for Peer StaId: "));
    limPrintMacAddr(pMac, sa, LOG1);
    return NULL;
 }

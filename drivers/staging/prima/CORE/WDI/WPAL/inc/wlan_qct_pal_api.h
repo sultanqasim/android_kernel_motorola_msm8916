@@ -36,9 +36,6 @@
                
    Definitions for platform independent
   
-   Copyright 2010 (c) Qualcomm, Incorporated.  All Rights Reserved.
-   
-   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 
@@ -385,4 +382,11 @@ int  wpalIslogPInProgress(void);
        STATUS
 --------------------------------------------------------------------------*/
 int  wpalIsSsrPanicOnFailure(void);
+
+int  wpalGetDxeReplenishRXTimerVal(void);
+int  wpalIsDxeSSREnable(void);
+
+wpt_uint8 wpalIsFwLoggingEnabled(void);
+wpt_uint8 wpalIsFwLoggingSupported(void);
+wpt_uint8 wpalIsFwEvLoggingEnabled(void);
 #endif // __WLAN_QCT_PAL_API_H

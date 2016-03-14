@@ -170,6 +170,12 @@ typedef enum
   WLANTL_AC_HIGH_PRIO = 4
 }WLANTL_ACEnumType; 
 
+typedef struct
+{
+   v_MACADDR_t    selfMac;
+   v_MACADDR_t    spoofMac;
+}WLANTL_SpoofMacAddr;
+
 /*---------------------------------------------------------------------------
   STA Type
 ---------------------------------------------------------------------------*/
@@ -434,6 +440,7 @@ typedef struct
   v_BOOL_t  bMorePackets;
   /* notifying TL if this is an ARP frame or not */
   v_U8_t    ucIsArp;
+  v_U32_t   ucTxBdToken;
 }WLANTL_MetaInfoType;
 
 /*---------------------------------------------------------------------------
@@ -602,8 +609,8 @@ typedef tSap_SoftapStats WLANTL_TRANSFER_STA_TYPE;
 typedef enum
 {
   WLANTL_DEBUG_TX_SNAPSHOT = 1<<0,
-
   WLANTL_DEBUG_FW_CLEANUP = 1<<1,
+  WLANTL_DEBUG_KICKDXE = 1<<2
 }WLANTL_DebugFlags;
 
 /*----------------------------------------------------------------------------
@@ -684,6 +691,9 @@ typedef VOS_STATUS (*WLANTL_STAFetchPktCBType)(
                                             vos_pkt_t**           vosDataBuff,
                                             WLANTL_MetaInfoType*  tlMetaInfo);
 
+typedef VOS_STATUS (*WLANTL_MonRxCBType)( v_PVOID_t              pvosGCtx,
+                                          vos_pkt_t*             vosDataBuff,
+                                          int                    conversion);
 /*----------------------------------------------------------------------------
 
   DESCRIPTION   
@@ -1108,6 +1118,8 @@ WLANTL_ConfigureSwFrameTXXlationForAll
   v_BOOL_t enableFrameXlation
 );
 
+VOS_STATUS WLANTL_SetMonRxCbk(v_PVOID_t pvosGCtx, WLANTL_MonRxCBType pfnMonRx);
+void WLANTL_SetIsConversionReq(v_PVOID_t pvosGCtx, v_BOOL_t isConversionReq);
 /*===========================================================================
 
   FUNCTION    WLANTL_RegisterSTAClient
@@ -1824,6 +1836,42 @@ WLANTL_FlushStaTID
 
 /*==========================================================================
 
+  FUNCTION    WLANTL_updateSpoofMacAddr
+
+  DESCRIPTION
+    Called by HDD to update macaddr
+
+  DEPENDENCIES
+    TL must be initialized before this API can be called.
+
+  PARAMETERS
+
+    IN
+    pvosGCtx:           pointer to the global vos context; a handle to
+                        TL's control block can be extracted from its context
+    spoofMacAddr:     spoofed mac adderess
+    selfMacAddr:        self Mac Address
+
+  RETURN VALUE
+    The result code associated with performing the operation
+
+    VOS_STATUS_E_INVAL:  Input parameters are invalid
+    VOS_STATUS_E_FAULT:  pointer to TL cb is NULL ; access would cause a
+                         page fault
+    VOS_STATUS_SUCCESS:  Everything is good :)
+
+  SIDE EFFECTS
+
+============================================================================*/
+VOS_STATUS
+WLANTL_updateSpoofMacAddr
+(
+  v_PVOID_t               pvosGCtx,
+  v_MACADDR_t*            spoofMacAddr,
+  v_MACADDR_t*            selfMacAddr
+);
+/*==========================================================================
+
   FUNCTION    WLANTL_RegisterMgmtFrmClient
 
   DESCRIPTION 
@@ -1960,7 +2008,8 @@ WLANTL_TxMgmtFrm
   v_U8_t               tid,
   WLANTL_TxCompCBType  pfnCompTxFunc,
   v_PVOID_t            voosBDHeader,
-  v_U32_t              ucAckResponse
+  v_U32_t              ucAckResponse,
+  v_U32_t              ucTxBdToken
 );
 
 
@@ -2173,6 +2222,41 @@ WLANTL_GetRxPktCount
   v_U8_t         ucSTAId,
   v_U8_t         ucTid,
   v_U32_t*       puRxPktCount
+);
+
+/*==========================================================================
+
+  FUNCTION    WLANTL_IsEAPOLPending
+
+  DESCRIPTION
+
+    HDD calls this function when hdd_tx_timeout occurs. This checks whether
+    EAPOL is pending.
+
+  DEPENDENCIES
+
+    HDD must have registered with TL at least one STA before this function
+    can be called.
+
+  PARAMETERS
+
+    IN
+    pvosGCtx:       pointer to the global vos context
+
+  RETURN VALUE
+
+    The result code associated with performing the operation
+
+    Success : Indicates EAPOL frame is pending and sta is in connected state
+
+    Failure : EAPOL frame is not pending
+
+  SIDE EFFECTS
+============================================================================*/
+VOS_STATUS
+WLANTL_IsEAPOLPending
+(
+  v_PVOID_t     pvosGCtx
 );
 
 /*==========================================================================

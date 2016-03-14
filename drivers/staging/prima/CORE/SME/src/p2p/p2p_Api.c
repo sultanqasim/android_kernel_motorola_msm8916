@@ -188,9 +188,10 @@ eHalStatus p2pProcessRemainOnChannelCmd(tpAniSirGlobal pMac, tSmeCmd *p2pRemaino
 
 eHalStatus sme_remainOnChnRsp( tpAniSirGlobal pMac, tANI_U8 *pMsg)
 {
-    eHalStatus                         status = eHAL_STATUS_SUCCESS;
-    tListElem                          *pEntry = NULL;
-    tSmeCmd                            *pCommand = NULL;
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+    tListElem  *pEntry = NULL;
+    tSmeCmd    *pCommand = NULL;
+    tSirSmeRsp *pRsp = (tSirSmeRsp *)pMsg;
 
     pEntry = csrLLPeekHead(&pMac->sme.smeCmdActiveList, LL_ACCESS_LOCK);
     if( pEntry )
@@ -201,8 +202,9 @@ eHalStatus sme_remainOnChnRsp( tpAniSirGlobal pMac, tANI_U8 *pMsg)
             remainOnChanCallback callback = pCommand->u.remainChlCmd.callback;
             /* process the msg */
             if( callback )
-                callback(pMac, pCommand->u.remainChlCmd.callbackCtx, 0);
-             
+                callback(pMac, pCommand->u.remainChlCmd.callbackCtx,
+                                                        pRsp->statusCode);
+
             if( csrLLRemoveEntry( &pMac->sme.smeCmdActiveList, pEntry, LL_ACCESS_LOCK ) )
             {
                 //Now put this command back on the avilable command list
@@ -213,60 +215,6 @@ eHalStatus sme_remainOnChnRsp( tpAniSirGlobal pMac, tANI_U8 *pMsg)
     }
     return status;
 }
-
-
-/*------------------------------------------------------------------
- *
- * Handle the Mgmt frm ind from LIM and forward to HDD.
- *
- *------------------------------------------------------------------*/
-
-eHalStatus sme_mgmtFrmInd( tHalHandle hHal, tpSirSmeMgmtFrameInd pSmeMgmtFrm)
-{
-    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
-    eHalStatus  status = eHAL_STATUS_SUCCESS;
-    tCsrRoamInfo pRoamInfo = {0};
-#ifndef WLAN_FEATURE_P2P_INTERNAL
-    tANI_U32 SessionId = pSmeMgmtFrm->sessionId;
-#endif
-
-#ifdef WLAN_FEATURE_P2P_INTERNAL
-    tANI_U8 i;
-
-    //For now, only action frames are needed.
-    if(SIR_MAC_MGMT_ACTION == pSmeMgmtFrm->frameType)
-    {
-       pRoamInfo.nFrameLength = pSmeMgmtFrm->mesgLen - sizeof(tSirSmeMgmtFrameInd);
-       pRoamInfo.pbFrames = pSmeMgmtFrm->frameBuf;
-       pRoamInfo.frameType = pSmeMgmtFrm->frameType;
-       pRoamInfo.rxChan   = pSmeMgmtFrm->rxChan;
-       pRoamInfo.rxRssi   = pSmeMgmtFrm->rxRssi;
-
-       //Somehow we don't get the right sessionId.
-       for(i = 0; i < CSR_ROAM_SESSION_MAX; i++)
-       {
-          if( CSR_IS_SESSION_VALID( pMac, i ) )
-          {
-              status = eHAL_STATUS_SUCCESS;
-              /* forward the mgmt frame to all active sessions*/
-              csrRoamCallCallback(pMac, i, &pRoamInfo, 0, eCSR_ROAM_INDICATE_MGMT_FRAME, 0);
-          }
-       }
-    }
-#else
-    pRoamInfo.nFrameLength = pSmeMgmtFrm->mesgLen - sizeof(tSirSmeMgmtFrameInd);
-    pRoamInfo.pbFrames = pSmeMgmtFrm->frameBuf;
-    pRoamInfo.frameType = pSmeMgmtFrm->frameType;
-    pRoamInfo.rxChan   = pSmeMgmtFrm->rxChan;
-    pRoamInfo.rxRssi   = pSmeMgmtFrm->rxRssi;
-
-    /* forward the mgmt frame to HDD */
-    csrRoamCallCallback(pMac, SessionId, &pRoamInfo, 0, eCSR_ROAM_INDICATE_MGMT_FRAME, 0);
-#endif
-
-    return status;
-}
-
 
 /*------------------------------------------------------------------
  *
