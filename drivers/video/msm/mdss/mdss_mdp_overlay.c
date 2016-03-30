@@ -2495,6 +2495,8 @@ static ssize_t hbm_store(struct device *dev,
 	}
 
 	r = kstrtoint(buf, 0, &enable);
+	if (enable > 1)
+		enable = 1;
 	if ((r) || ((enable != 0) && (enable != 1))) {
 		pr_err("invalid HBM value = %d\n",
 			enable);
