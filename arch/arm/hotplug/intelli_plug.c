@@ -53,7 +53,6 @@ static struct workqueue_struct *intelliplug_wq;
 static struct workqueue_struct *intelliplug_boost_wq;
 
 static unsigned int intelli_plug_active = 0;
-module_param(intelli_plug_active, uint, 0664);
 
 static unsigned int touch_boost_active = 1;
 module_param(touch_boost_active, uint, 0664);
@@ -336,9 +335,9 @@ static void __ref intelli_plug_work_fn(struct work_struct *work)
 		else
 			pr_info("intelli_plug is suspened!\n");
 #endif
+		queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_work,
+			msecs_to_jiffies(sampling_time));
 	}
-	queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_work,
-		msecs_to_jiffies(sampling_time));
 }
 
 #if defined(CONFIG_POWERSUSPEND) || defined(CONFIG_HAS_EARLYSUSPEND)
@@ -595,6 +594,55 @@ static struct input_handler intelli_plug_input_handler = {
 	.name           = "intelliplug_handler",
 	.id_table       = intelli_plug_ids,
 };
+
+static int __ref active_show(char *buf,
+		       const struct kernel_param *kp __attribute__ ((unused)))
+{
+	return sprintf(buf, "%d", intelli_plug_active);
+}
+
+static int __ref active_store(const char *buf,
+			const struct kernel_param *kp __attribute__ ((unused)))
+{
+	int r, active;
+
+	r = kstrtoint(buf, 0, &active);
+	if (r)
+		return -EINVAL;
+	active = active ? 1 : 0;
+
+	if (active == intelli_plug_active)
+		return 0;
+
+	intelli_plug_active = active;
+
+	if (active) {
+		int cpu;
+#ifdef DEBUG_INTELLI_PLUG
+		pr_info("activating intelliplug\n");
+#endif
+		for_each_possible_cpu(cpu) {
+			cpu_up(cpu);
+		}
+		queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_boost,
+			msecs_to_jiffies(10));
+	} else {
+#ifdef DEBUG_INTELLI_PLUG
+		pr_info("disabling intelliplug\n");
+#endif
+		flush_workqueue(intelliplug_wq);
+	}
+
+	return 0;
+}
+
+static const struct kernel_param_ops param_ops_active = {
+	.set = active_store,
+	.get = active_show
+};
+
+module_param_cb(intelli_plug_active, &param_ops_active,
+		&intelli_plug_active, 0664);
 
 int __init intelli_plug_init(void)
 {
