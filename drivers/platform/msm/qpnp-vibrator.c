@@ -74,8 +74,6 @@ struct qpnp_vib {
 	struct mutex lock;
 };
 
-static struct qpnp_vib *vib_dev;
-
 static ssize_t qpnp_vib_level_show(struct device *dev,
                                         struct device_attribute *attr,
                                         char *buf)
@@ -448,8 +446,6 @@ static int qpnp_vibrator_probe(struct spmi_device *spmi)
 		return rc;
 
 	device_create_file(vib->timed_dev.dev, &dev_attr_vtg_level);
-
-	vib_dev = vib;
 
 	if (vib->boot_up_vibe)
 		qpnp_vib_enable(&vib->timed_dev, vib->boot_up_vibe);
