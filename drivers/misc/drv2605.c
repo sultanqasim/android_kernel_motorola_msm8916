@@ -153,9 +153,8 @@
 #define REAL_TIME_PLAYBACK_STRENGTH 0x7F
 #endif
 
-/* maximum strength of 31 to match range of qpnp-vibrator */
-#define MAX_VIBE_STRENGTH   (REAL_TIME_PLAYBACK_STRENGTH >> 2)
-#define MIN_VIBE_STRENGTH   0x8
+#define MAX_VIBE_STRENGTH   REAL_TIME_PLAYBACK_STRENGTH
+#define MIN_VIBE_STRENGTH   0x20
 #define DEF_VIBE_STRENGTH   MAX_VIBE_STRENGTH
 
 #define MAX_TIMEOUT 15000	/* 15s */
@@ -670,7 +669,7 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 		if (mode != MODE_REAL_TIME_PLAYBACK) {
 			if (audio_haptics_enabled && mode == MODE_AUDIOHAPTIC)
 				setAudioHapticsEnabled(NO);
-			drv260x_set_rtp_val(vibe_strength << 2);
+			drv260x_set_rtp_val(vibe_strength);
 			drv260x_change_mode(MODE_REAL_TIME_PLAYBACK);
 			vibrator_is_playing = YES;
 		}
@@ -1159,7 +1158,7 @@ static ssize_t drv260x_write(struct file *filp, const char *buff, size_t len,
 					    && mode == MODE_AUDIOHAPTIC)
 						setAudioHapticsEnabled(NO);
 					drv260x_set_rtp_val
-					    (vibe_strength << 2);
+					    (vibe_strength);
 					drv260x_change_mode
 					    (MODE_REAL_TIME_PLAYBACK);
 					vibrator_is_playing = YES;
