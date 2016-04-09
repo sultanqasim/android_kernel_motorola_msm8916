@@ -415,7 +415,7 @@ static int __ref active_show(char *buf,
 static int __ref active_store(const char *buf,
 			const struct kernel_param *kp __attribute__ ((unused)))
 {
-	int r, active;
+	int r, active, cpu;
 
 	r = kstrtoint(buf, 0, &active);
 	if (r)
@@ -427,20 +427,22 @@ static int __ref active_store(const char *buf,
 
 	intelli_plug_active = active;
 
+	for_each_possible_cpu(cpu) {
+		if (!cpu_online(cpu))
+			cpu_up(cpu);
+	}
+
 	if (active) {
-		int cpu;
 #ifdef DEBUG_INTELLI_PLUG
 		pr_info("activating intelliplug\n");
 #endif
-		for_each_possible_cpu(cpu) {
-			cpu_up(cpu);
-		}
-		queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_boost,
+		queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_work,
 			msecs_to_jiffies(10));
 	} else {
 #ifdef DEBUG_INTELLI_PLUG
 		pr_info("disabling intelliplug\n");
 #endif
+		cancel_delayed_work(&intelli_plug_work);
 		flush_workqueue(intelliplug_wq);
 	}
 
