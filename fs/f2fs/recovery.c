@@ -350,7 +350,8 @@ got_it:
 		inode = dn->inode;
 	}
 
-	bidx = start_bidx_of_node(offset, inode) + le16_to_cpu(sum.ofs_in_node);
+	bidx = start_bidx_of_node(offset, F2FS_I(inode)) +
+			le16_to_cpu(sum.ofs_in_node);
 
 	/*
 	 * if inode page is locked, unlock temporarily, but its reference
@@ -385,9 +386,10 @@ truncate_out:
 static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 					struct page *page, block_t blkaddr)
 {
+	struct f2fs_inode_info *fi = F2FS_I(inode);
+	unsigned int start, end;
 	struct dnode_of_data dn;
 	struct node_info ni;
-	unsigned int start, end;
 	int err = 0, recovered = 0;
 
 	/* step 1: recover xattr */
@@ -407,8 +409,8 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 		goto out;
 
 	/* step 3: recover data indices */
-	start = start_bidx_of_node(ofs_of_node(page), inode);
-	end = start + ADDRS_PER_PAGE(page, inode);
+	start = start_bidx_of_node(ofs_of_node(page), fi);
+	end = start + ADDRS_PER_PAGE(page, fi);
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
 
@@ -416,7 +418,7 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 	if (err)
 		goto out;
 
-	f2fs_wait_on_page_writeback(dn.node_page, NODE, true);
+	f2fs_wait_on_page_writeback(dn.node_page, NODE);
 
 	get_node_info(sbi, dn.nid, &ni);
 	f2fs_bug_on(sbi, ni.ino != ino_of_node(page));
@@ -465,7 +467,7 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 
 			/* write dummy data page */
 			f2fs_replace_block(sbi, &dn, src, dest,
-						ni.version, false, false);
+							ni.version, false);
 			recovered++;
 		}
 	}
