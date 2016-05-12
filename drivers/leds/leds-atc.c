@@ -35,6 +35,23 @@ struct atc_led_data {
 	u32			addr;
 };
 
+static ssize_t led_blink_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
+
+static ssize_t led_blink_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size);
+
+static DEVICE_ATTR(blink, 0644, led_blink_show, led_blink_store);
+
+static struct attribute *blink_dev_attrs[] = {
+	&dev_attr_blink.attr,
+	NULL,
+};
+
+static struct attribute_group blink_dev_attr_group = {
+	.attrs = blink_dev_attrs,
+};
+
 static int
 spmi_masked_write(struct atc_led_data *led, u16 addr, u8 mask, u8 val)
 {
@@ -129,6 +146,13 @@ static int atc_leds_probe(struct spmi_device *spmi)
 	}
 
 	dev_set_drvdata(&spmi->dev, led);
+
+	rc = sysfs_create_group(&led->cdev.dev->kobj, &blink_dev_attr_group);
+	if (rc < 0) {
+		dev_err(&spmi->dev,
+			"couldn't register LED blinking attribute sysfs file\n");
+	}
+
 	return 0;
 }
 
@@ -140,6 +164,37 @@ static int atc_leds_remove(struct spmi_device *spmi)
 		led_classdev_unregister(&led->cdev);
 
 	return 0;
+}
+
+static ssize_t led_blink_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	scnprintf(buf, PAGE_SIZE, "on=%lu,off=%lu\n",
+		led_cdev->blink_delay_on, led_cdev->blink_delay_off);
+
+	return strlen(buf);
+}
+
+static ssize_t led_blink_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	unsigned long ms_on = 0;
+	unsigned long ms_off = 0;
+
+	sscanf(buf, "%lu,%lu", &ms_on, &ms_off);
+
+	if(ms_on == 0 && ms_off == 0)
+	   led_set_brightness(led_cdev, LED_OFF);
+	else
+	   led_blink_set(led_cdev, &ms_on, &ms_off);
+
+	led_cdev->blink_delay_on = ms_on;
+	led_cdev->blink_delay_off = ms_off;
+
+	return size;
 }
 
 #ifdef CONFIG_OF
