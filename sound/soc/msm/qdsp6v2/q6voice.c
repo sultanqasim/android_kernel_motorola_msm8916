@@ -7427,7 +7427,7 @@ static int voice_alloc_source_tracking_shared_memory(void)
 	memset((void *)(common.source_tracking_sh_mem.sh_mem_block.data), 0,
 		   common.source_tracking_sh_mem.sh_mem_block.size);
 
-	pr_debug("%s: sh_mem_block: phys:[%pa], data:[0x%p], size:[%zd]\n",
+	pr_debug("%s: sh_mem_block: phys:[%pK], data:[0x%pK], size:[%zd]\n",
 		 __func__,
 		&(common.source_tracking_sh_mem.sh_mem_block.phys),
 		(void *)(common.source_tracking_sh_mem.sh_mem_block.data),
@@ -7458,7 +7458,7 @@ static int voice_alloc_source_tracking_shared_memory(void)
 	memset((void *)(common.source_tracking_sh_mem.sh_mem_table.data), 0,
 		common.source_tracking_sh_mem.sh_mem_table.size);
 
-	pr_debug("%s sh_mem_table: phys:[%pa], data:[0x%p], size:[%zd],\n",
+	pr_debug("%s sh_mem_table: phys:[%pK], data:[0x%pK], size:[%zd],\n",
 		 __func__,
 		&(common.source_tracking_sh_mem.sh_mem_table.phys),
 		(void *)(common.source_tracking_sh_mem.sh_mem_table.data),

@@ -977,7 +977,8 @@ int q6lsm_snd_model_buf_alloc(struct lsm_client *client, size_t len)
 		goto fail;
 
 	pr_debug("%s:Snd Model len = %zd cal size %zd phys addr %pK", __func__,
-	 len, cal_block->cal_data.size, &cal_block->cal_data.paddr);
+		len, cal_block->cal_data.size,
+		&cal_block->cal_data.paddr);
 	if (!cal_block->cal_data.paddr) {
 		pr_err("%s: No LSM calibration set for session", __func__);
 		rc = -EINVAL;

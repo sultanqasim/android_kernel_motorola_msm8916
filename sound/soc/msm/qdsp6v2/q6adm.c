@@ -3560,7 +3560,7 @@ static int adm_source_tracking_alloc_map_memory(void)
 			(uint32_t *)&this_adm.sourceTrackingData.memmap.size,
 			1);
 	if (ret < 0) {
-		pr_err("%s: failed to map memory, paddr = 0x%p, size = %d\n",
+		pr_err("%s: failed to map memory, paddr = 0x%pK, size = %d\n",
 			__func__,
 			(void *)this_adm.sourceTrackingData.memmap.paddr,
 			(uint32_t)this_adm.sourceTrackingData.memmap.size);
@@ -3580,7 +3580,7 @@ static int adm_source_tracking_alloc_map_memory(void)
 		goto done;
 	}
 	ret = 0;
-	pr_debug("%s: paddr = 0x%p, size = %d, mem_map_handle = 0x%x\n",
+	pr_debug("%s: paddr = 0x%pK, size = %d, mem_map_handle = 0x%x\n",
 		  __func__, (void *)this_adm.sourceTrackingData.memmap.paddr,
 		  (uint32_t)this_adm.sourceTrackingData.memmap.size,
 		  atomic_read(&this_adm.mem_map_handles

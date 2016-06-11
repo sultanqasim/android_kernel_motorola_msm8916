@@ -1458,7 +1458,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		return -EINVAL;
 	}
 	if (!q6asm_is_valid_audio_client(ac)) {
-		pr_err("%s: audio client pointer is invalid, ac = %p\n",
+		pr_err("%s: audio client pointer is invalid, ac = %pK\n",
 				__func__, ac);
 		return -EINVAL;
 	}
