@@ -161,7 +161,7 @@ static struct srcu_struct pmus_srcu;
  */
 #ifdef CONFIG_PERF_EVENTS_USERMODE
 int sysctl_perf_event_paranoid __read_mostly = -1;
-#elif CONFIG_SECURITY_PERF_EVENTS_RESTRICT
+#elif defined CONFIG_SECURITY_PERF_EVENTS_RESTRICT
 int sysctl_perf_event_paranoid __read_mostly = 3;
 #else
 int sysctl_perf_event_paranoid __read_mostly = 1;
