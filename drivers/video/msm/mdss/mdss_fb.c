@@ -1039,11 +1039,36 @@ static void mdss_fb_restore_param(struct msm_fb_data_type *mfd)
 	mutex_unlock(&mfd->param_lock);
 }
 
-__PARAM_SYSFS_DEFINITION(hbm, PARAM_HBM_ID)
+static ssize_t sre_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	const char *name;
+	ssize_t ret;
+
+	ret = mdss_fb_get_param(dev, PARAM_HBM_ID, &name);
+	if (ret < 0)
+		return ret;
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", name);
+}
+static ssize_t sre_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	ssize_t ret;
+
+	if (!strcmp(buf, "2")) {
+		buf = "1";
+	}
+
+	ret = mdss_fb_set_param(dev, PARAM_HBM_ID, buf);
+	return ret ? ret : count;
+}
+
 __PARAM_SYSFS_DEFINITION(cabc, PARAM_CABC_ID)
 
 static struct device_attribute param_attrs[PARAM_ID_NUM] = {
-	__ATTR(hbm, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP, hbm_show, hbm_store),
+	__ATTR(sre, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP, sre_show, sre_store),
 	__ATTR(cabc_mode, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP,
 		cabc_show, cabc_store),
 };
