@@ -241,8 +241,8 @@ dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p3.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-surnia-p3d.dtb
 endif
 
-ifeq ($(CONFIG_MMI_OSPREY_DTB),y)
 # Osprey
+ifeq ($(CONFIG_MMI_OSPREY_DTB),y)
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8916-osprey-p0.dtb
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8916-osprey-p1a.dtb
 #dtb-$(CONFIG_ARCH_MSM8916) += msm8916-osprey-p1ad.dtb
@@ -255,12 +255,14 @@ dtb-$(CONFIG_ARCH_MSM8916) += msm8916-osprey-p2bd.dtb
 endif
 
 # Harpia
+ifeq ($(CONFIG_MMI_HARPIA_DTB),y)
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p0.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p0a.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p1.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p1a.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p1ad.dtb
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-harpia-p1b.dtb
+endif
 
 ifeq ($(CONFIG_MMI_LUX_DTB),y)
 # Motorola 8939 Devices

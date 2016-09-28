@@ -1057,6 +1057,20 @@ config MMI_DEVICE_DTBS
 	  Only include Motorola device specific DTBs to limit the number that
 	  get built during kernel compilation.
 
+config MMI_HARPIA_DTB
+	depends on ARCH_MSM8916
+	default n
+	bool "Motorola Harpia Device DTBs"
+	help
+	  Only include Motorola Harpia specific DTBs to limit the number that
+	  get built during kernel compilation.
+
+	  Harpia is a Motorola device that uses MSM8916 chipset, which uses the
+	  MSM8916 defconfig.  Due to its many revisions, adding all of the device
+	  trees will consume at least 1MB of space.
+
+	  If unsure, say 'n'.
+
 config MMI_LUX_DTB
 	depends on ARCH_MSM8916
 	default n
