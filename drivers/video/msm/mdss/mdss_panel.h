@@ -66,6 +66,7 @@ enum cabc_mode {
 
 enum panel_param_id {
 	PARAM_HBM_ID = 0,
+	PARAM_SRE_ID,
 	PARAM_CABC_ID,
 	PARAM_ID_NUM
 };
