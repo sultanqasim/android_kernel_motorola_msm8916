@@ -2303,7 +2303,7 @@ static ssize_t bma25x_value_show(struct device *dev,
 {
 	struct input_dev *input = to_input_dev(dev);
 	struct bma25x_data *bma25x = input_get_drvdata(input);
-	struct bma25xacc acc_value;
+	struct bma25xacc acc_value = {0};
 
 	bma25x_read_accel_xyz(bma25x->bma25x_client,
 			bma25x->sensor_type, &acc_value);
