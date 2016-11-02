@@ -1181,7 +1181,7 @@ new_segment:
 
 				if (!skb_can_coalesce(skb, i, pfrag->page,
 						      pfrag->offset)) {
-					if (i == MAX_SKB_FRAGS || !sg) {
+					if (i >= MAX_SKB_FRAGS || !sg) {
 						tcp_mark_push(tp, skb);
 						goto new_segment;
 					}
