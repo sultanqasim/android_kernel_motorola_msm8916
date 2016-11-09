@@ -11,9 +11,10 @@ assert(getprop("ro.product.device") == "surnia" ||
        getprop("ro.product.device") == "osprey_uds" ||
        getprop("ro.product.device") == "osprey_cdma" ||
        getprop("ro.product.device") == "osprey_udstv" ||
+       getprop("ro.product.device") == "harpia" ||
        getprop("ro.product.device") == "merlin" ||
        getprop("ro.product.device") == "lux" ||
-       abort("This package is for device: surnia,osprey,merlin,lux; this device is " +
+       abort("This package is for device: surnia,osprey,harpia,merlin,lux; this device is " +
              getprop("ro.product.device") + "."););
 
 ui_print("Extracting flashing tools...");
