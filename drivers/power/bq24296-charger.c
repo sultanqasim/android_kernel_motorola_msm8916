@@ -937,7 +937,7 @@ static int bq24296_get_prop_batt_present(struct bq24296_chg *chip)
 static int bq24296_get_prop_charge_type(struct bq24296_chg *chip)
 {
 	int rc = 0;
-	u8 sys_status;
+	u8 sys_status = 0;
 	int chg_type = POWER_SUPPLY_CHARGE_TYPE_UNKNOWN;
 
 	rc = bq24296_read(chip, BQ08_SYSTEM_STATUS_REG, &sys_status);
@@ -1079,7 +1079,7 @@ static void bq24296_notify_vbat(enum qpnp_tm_state state, void *ctx)
 {
 	struct bq24296_chg *chip = ctx;
 	struct qpnp_vadc_result result;
-	int batt_volt;
+	int batt_volt = 0;
 	int rc;
 	int adc_volt = 0;
 
