@@ -39,6 +39,8 @@ void sdcardfs_destroy_dentry_cache(void)
 	kmem_cache_destroy(sdcardfs_dentry_cachep);
 }
 
+/* code duplicated in ESDFS */
+#ifndef CONFIG_ESD_FS
 void free_dentry_private_data(struct dentry *dentry)
 {
 	if (!dentry || !dentry->d_fsdata)
@@ -62,6 +64,7 @@ int new_dentry_private_data(struct dentry *dentry)
 
 	return 0;
 }
+#endif
 
 struct inode_data {
 	struct inode *lower_inode;
