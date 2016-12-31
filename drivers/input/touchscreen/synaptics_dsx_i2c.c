@@ -2051,7 +2051,7 @@ static void synaptics_dsx_sensor_state(struct synaptics_rmi4_data *rmi4_data,
 			synaptics_rmi4_irq_enable(rmi4_data, false);
 		if (!rmi4_data->in_bootloader)
 			synaptics_dsx_state_config(rmi4_data, SUSPEND_IDX);
-			break;
+		break;
 
 	case STATE_ACTIVE:
 		if (!rmi4_data->in_bootloader)

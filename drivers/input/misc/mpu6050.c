@@ -1157,11 +1157,12 @@ static int mpu6050_gyro_set_enable(struct mpu6050_sensor *sensor, bool enable)
 			goto exit;
 		}
 
-		if (sensor->use_poll)
+		if (sensor->use_poll) {
 			ktime = ktime_set(0,
 					sensor->gyro_poll_ms * NSEC_PER_MSEC);
 			hrtimer_start(&sensor->gyro_timer, ktime,
 					HRTIMER_MODE_REL);
+		}
 	} else {
 		ret = mpu6050_gyro_enable(sensor, false);
 		if (ret) {

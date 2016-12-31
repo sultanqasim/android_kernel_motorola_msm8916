@@ -2818,12 +2818,12 @@ static int msm_spi_pm_resume_runtime(struct device *device)
 	if (!dd->pdata->active_only)
 		msm_spi_clk_path_vote(dd);
 
-		if (!dd->pdata->is_shared && dd->use_dma) {
-			msm_spi_bam_pipe_connect(dd, &dd->bam.prod,
-				&dd->bam.prod.config);
-			msm_spi_bam_pipe_connect(dd, &dd->bam.cons,
-				&dd->bam.cons.config);
-		}
+	if (!dd->pdata->is_shared && dd->use_dma) {
+		msm_spi_bam_pipe_connect(dd, &dd->bam.prod,
+			&dd->bam.prod.config);
+		msm_spi_bam_pipe_connect(dd, &dd->bam.cons,
+			&dd->bam.cons.config);
+	}
 
 	dd->suspended = 0;
 

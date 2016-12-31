@@ -179,8 +179,8 @@ __limFreshScanReqd(tpAniSirGlobal pMac, tANI_U8 returnFreshResults)
     }
     limLog(pMac, LOG1, FL("FreshScanReqd: %d "), validState);
 
-   if( (validState) && (returnFreshResults & SIR_BG_SCAN_RETURN_FRESH_RESULTS))
-    return TRUE;
+    if( (validState) && (returnFreshResults & SIR_BG_SCAN_RETURN_FRESH_RESULTS))
+        return TRUE;
 
     return FALSE;
 }
@@ -2710,7 +2710,7 @@ __limProcessSmeDisassocReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     }
     else
         disassocTrigger = eLIM_HOST_DISASSOC;
-        reasonCode      = smeDisassocReq.reasonCode;
+    reasonCode = smeDisassocReq.reasonCode;
 
     if (smeDisassocReq.doNotSendOverTheAir)
     {

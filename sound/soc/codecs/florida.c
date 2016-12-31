@@ -2297,11 +2297,11 @@ static int florida_trigger(struct snd_compr_stream *stream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-	if (!strcmp(rtd->codec_dai->name, "florida-dsp3-txt"))
-		ret = wm_adsp_stream_start2(
-			florida->compr_info[compr_dev_index].adsp);
-	else
-		ret = wm_adsp_stream_start(florida->compr_info[compr_dev_index].adsp);
+		if (!strcmp(rtd->codec_dai->name, "florida-dsp3-txt"))
+			ret = wm_adsp_stream_start2(
+				florida->compr_info[compr_dev_index].adsp);
+		else
+			ret = wm_adsp_stream_start(florida->compr_info[compr_dev_index].adsp);
 
 		/**
 		 * If the stream has already triggered before the stream

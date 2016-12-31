@@ -1291,7 +1291,7 @@ static int chg_uv(struct smb358_charger *chip, u8 status)
 						POWER_SUPPLY_TYPE_USB);
 		power_supply_set_present(chip->usb_psy, chip->chg_present);
 
-		if (chip->bms_controlled_charging)
+		if (chip->bms_controlled_charging) {
 			/*
 			* Disable SOC based USB suspend to enable charging on
 			* USB insertion.
@@ -1301,6 +1301,7 @@ static int chg_uv(struct smb358_charger *chip, u8 status)
 				dev_err(chip->dev,
 					"Couldn't disable usb suspend rc = %d\n",
 									rc);
+		}
 	}
 
 	if (status != 0) {

@@ -711,8 +711,8 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		    jack_type == SND_JACK_LINEOUT) &&
 		    (mbhc->hph_status && mbhc->hph_status != jack_type)) {
 
-		if (mbhc->micbias_enable)
-			mbhc->micbias_enable = false;
+			if (mbhc->micbias_enable)
+				mbhc->micbias_enable = false;
 
 			mbhc->zl = mbhc->zr = 0;
 			pr_debug("%s: Reporting removal (%x)\n",
