@@ -1093,4 +1093,8 @@ config TOUCHSCREEN_TOUCHX
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called touchx.
+	  
+config TOUCHSCREEN_DOUBLETAP2WAKE
+	tristate "DoubleTap2Wake for touchscreens"
+	default n
 endif
