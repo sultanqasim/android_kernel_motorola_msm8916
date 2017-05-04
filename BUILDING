@@ -5,10 +5,14 @@ Build tools required:
 How to build:
 export ARCH=arm
 export SUBARCH=arm
-export CROSS_COMPILE=arm-linux-gnueabihf-
+export CROSS_COMPILE=`pwd`/toolchain/bin/arm-linux-gnueabihf-
+
 make mrproper
 make lux_defconfig
-./build_cwm_zip.sh
+./build_twrp_zip.sh
 
 You will now have a TWRP flashable zip at:
-arch/arm/boot/squid_kernel.zip
+arch/arm/boot/moon_kernel.zip
+
+Booting without isntalling:
+fastboot boot arch/arm/boot/zImage
