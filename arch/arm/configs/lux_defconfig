@@ -1670,6 +1670,7 @@ CONFIG_LEGACY_PTY_COUNT=256
 # CONFIG_TRACE_SINK is not set
 # CONFIG_DEVMEM is not set
 # CONFIG_DEVKMEM is not set
+CONFIG_FRANDOM=y
 
 #
 # Serial drivers
