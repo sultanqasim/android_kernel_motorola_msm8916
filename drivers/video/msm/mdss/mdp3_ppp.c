@@ -136,6 +136,11 @@ int mdp3_ppp_get_img(struct mdp_img *img, struct mdp_blit_req *req,
 		return -EINVAL;
 	}
 
+	if (img->width > MDP_PPP_MAX_WIDTH) {
+		pr_err("%s incorrect width %d\n", __func__, img->width);
+		return -EINVAL;
+	}
+
 	fb_data.flags = img->priv;
 	fb_data.memory_id = img->memory_id;
 	fb_data.offset = 0;
