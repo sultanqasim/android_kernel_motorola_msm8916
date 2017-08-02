@@ -44,7 +44,7 @@ struct sb_list {
 
 struct packagelist_data {
 	DECLARE_HASHTABLE(package_to_appid,8);
-	spinlock_t hashtable_lock;
+	struct mutex hashtable_lock;
 
 };
 
@@ -71,15 +71,15 @@ appid_t get_appid(void *pkgl_id, const char *app_name)
 	unsigned int hash = str_hash(app_name);
 	appid_t ret_id;
 
-	spin_lock(&pkgl_dat->hashtable_lock);
+	mutex_lock(&pkgl_dat->hashtable_lock);
 	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash) {
 		if (!strcasecmp(app_name, hash_cur->key)) {
 			ret_id = (appid_t)hash_cur->value;
-			spin_unlock(&pkgl_dat->hashtable_lock);
+			mutex_unlock(&pkgl_dat->hashtable_lock);
 			return ret_id;
 		}
 	}
-	spin_unlock(&pkgl_dat->hashtable_lock);
+	mutex_unlock(&pkgl_dat->hashtable_lock);
 	return 0;
 }
 
@@ -133,18 +133,20 @@ static int insert_str_to_int_lock(struct packagelist_data *pkgl_dat, char *key,
 			return 0;
 		}
 	}
-	new_entry = kmem_cache_alloc(hashtable_entry_cachep, GFP_ATOMIC);
+	new_entry = kmem_cache_alloc(hashtable_entry_cachep, GFP_KERNEL);
 	if (!new_entry)
 		return -ENOMEM;
-	new_entry->key = kstrdup(key, GFP_ATOMIC);
+	new_entry->key = kstrdup(key, GFP_KERNEL);
 	new_entry->value = value;
 	hash_add(pkgl_dat->package_to_appid, &new_entry->hlist, hash);
 	return 0;
 }
 
-static void fixup_perms(struct super_block *sb, const char *key) {
+static void fixup_perms(struct super_block *sb) {
 	if (sb && sb->s_magic == SDCARDFS_SUPER_MAGIC) {
-		fixup_perms_recursive(sb->s_root, key, strlen(key));
+		mutex_lock(&sb->s_root->d_inode->i_mutex);
+		get_derive_permissions_recursive(sb->s_root);
+		mutex_unlock(&sb->s_root->d_inode->i_mutex);
 	}
 }
 
@@ -153,13 +155,13 @@ static int insert_str_to_int(struct packagelist_data *pkgl_dat, char *key,
 	int ret;
 	struct sdcardfs_sb_info *sbinfo;
 	mutex_lock(&sdcardfs_super_list_lock);
-	spin_lock(&pkgl_dat->hashtable_lock);
+	mutex_lock(&pkgl_dat->hashtable_lock);
 	ret = insert_str_to_int_lock(pkgl_dat, key, value);
-	spin_unlock(&pkgl_dat->hashtable_lock);
+	mutex_unlock(&pkgl_dat->hashtable_lock);
 
 	list_for_each_entry(sbinfo, &sdcardfs_super_list, list) {
 		if (sbinfo) {
-			fixup_perms(sbinfo->sb, key);
+			fixup_perms(sbinfo->sb);
 		}
 	}
 	mutex_unlock(&sdcardfs_super_list_lock);
@@ -178,17 +180,17 @@ static void remove_str_to_int(struct packagelist_data *pkgl_dat, const char *key
 	struct hashtable_entry *hash_cur;
 	unsigned int hash = str_hash(key);
 	mutex_lock(&sdcardfs_super_list_lock);
-	spin_lock(&pkgl_data_all->hashtable_lock);
+	mutex_lock(&pkgl_dat->hashtable_lock);
 	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash) {
 		if (!strcasecmp(key, hash_cur->key)) {
 			remove_str_to_int_lock(hash_cur);
 			break;
 		}
 	}
-	spin_unlock(&pkgl_data_all->hashtable_lock);
+	mutex_unlock(&pkgl_dat->hashtable_lock);
 	list_for_each_entry(sbinfo, &sdcardfs_super_list, list) {
 		if (sbinfo) {
-			fixup_perms(sbinfo->sb, key);
+			fixup_perms(sbinfo->sb);
 		}
 	}
 	mutex_unlock(&sdcardfs_super_list_lock);
@@ -200,10 +202,10 @@ static void remove_all_hashentrys(struct packagelist_data *pkgl_dat)
 	struct hashtable_entry *hash_cur;
 	struct hlist_node *h_t;
 	int i;
-	spin_lock(&pkgl_data_all->hashtable_lock);
+	mutex_lock(&pkgl_dat->hashtable_lock);
 	hash_for_each_safe(pkgl_dat->package_to_appid, i, h_t, hash_cur, hlist)
 		remove_str_to_int_lock(hash_cur);
-	spin_unlock(&pkgl_data_all->hashtable_lock);
+	mutex_unlock(&pkgl_dat->hashtable_lock);
 	hash_init(pkgl_dat->package_to_appid);
 }
 
@@ -217,7 +219,7 @@ static struct packagelist_data * packagelist_create(void)
 		return ERR_PTR(-ENOMEM);
 	}
 
-	spin_lock_init(&pkgl_dat->hashtable_lock);
+	mutex_init(&pkgl_dat->hashtable_lock);
 	hash_init(pkgl_dat->package_to_appid);
 
 	return pkgl_dat;
@@ -350,7 +352,7 @@ static ssize_t packages_attr_show(struct config_item *item,
 	int count = 0, written = 0;
 	char errormsg[] = "<truncated>\n";
 
-	spin_lock(&pkgl_data_all->hashtable_lock);
+	mutex_lock(&pkgl_data_all->hashtable_lock);
 	hash_for_each_safe(pkgl_data_all->package_to_appid, i, h_t, hash_cur, hlist) {
 		written = scnprintf(page + count, PAGE_SIZE - sizeof(errormsg) - count, "%s %d\n", (char *)hash_cur->key, hash_cur->value);
 		if (count + written == PAGE_SIZE - sizeof(errormsg)) {
@@ -359,7 +361,7 @@ static ssize_t packages_attr_show(struct config_item *item,
 		}
 		count += written;
 	}
-	spin_unlock(&pkgl_data_all->hashtable_lock);
+	mutex_unlock(&pkgl_data_all->hashtable_lock);
 
 	return count;
 }
