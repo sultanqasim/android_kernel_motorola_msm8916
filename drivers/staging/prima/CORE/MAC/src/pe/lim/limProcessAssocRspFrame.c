@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -85,6 +85,8 @@ void limUpdateAssocStaDatas(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpSirAsso
     //tpSirBoardCapabilities pBoardCaps;
     tANI_BOOLEAN    qosMode; 
     tANI_U16        rxHighestRate = 0;
+    uint32_t        shortgi_20mhz_support;
+    uint32_t        shortgi_40mhz_support;
 
     limGetPhyMode(pMac, &phyMode, psessionEntry);
 
@@ -131,8 +133,6 @@ void limUpdateAssocStaDatas(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpSirAsso
                    pStaDs->htMaxAmsduLength = ( tANI_U8 ) pAssocRsp->HTCaps.maximalAMSDUsize;
                    pStaDs->htAMpduDensity =             pAssocRsp->HTCaps.mpduDensity;
                    pStaDs->htDsssCckRate40MHzSupport = (tANI_U8)pAssocRsp->HTCaps.dsssCckMode40MHz;
-                   pStaDs->htShortGI20Mhz = (tANI_U8)pAssocRsp->HTCaps.shortGI20MHz;
-                   pStaDs->htShortGI40Mhz = (tANI_U8)pAssocRsp->HTCaps.shortGI40MHz;
                    pStaDs->htMaxRxAMpduFactor = pAssocRsp->HTCaps.maxRxAMPDUFactor;
                    limFillRxHighestSupportedRate(pMac, &rxHighestRate, pAssocRsp->HTCaps.supportedMCSSet);
                    pStaDs->supportedRates.rxHighestDataRate = rxHighestRate;
@@ -143,6 +143,41 @@ void limUpdateAssocStaDatas(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpSirAsso
                    // In the future, may need to check for "assoc.HTCaps.delayedBA"
                    // For now, it is IMMEDIATE BA only on ALL TID's
                    pStaDs->baPolicyFlag = 0xFF;
+
+                   /*
+                    * Check if we have support for gShortGI20Mhz and
+                    * gShortGI40Mhz from ini file.
+                    */
+                   if (HAL_STATUS_SUCCESS(ccmCfgGetInt(pMac,
+                                   WNI_CFG_SHORT_GI_20MHZ,
+                                   &shortgi_20mhz_support))) {
+                       if (VOS_TRUE == shortgi_20mhz_support)
+                           pStaDs->htShortGI20Mhz =
+                               (tANI_U8)pAssocRsp->HTCaps.shortGI20MHz;
+                       else
+                           pStaDs->htShortGI20Mhz = VOS_FALSE;
+                   } else {
+                       limLog(pMac, LOGE,
+                          FL("could not retrieve shortGI 20Mhz CFG,"
+                             "setting value to default"));
+                       pStaDs->htShortGI20Mhz = WNI_CFG_SHORT_GI_20MHZ_STADEF;
+                   }
+
+                   if (HAL_STATUS_SUCCESS(ccmCfgGetInt(pMac,
+                                   WNI_CFG_SHORT_GI_40MHZ,
+                                   &shortgi_40mhz_support))) {
+                       if (VOS_TRUE == shortgi_40mhz_support)
+                           pStaDs->htShortGI40Mhz =
+                               (tANI_U8)pAssocRsp->HTCaps.shortGI40MHz;
+                       else
+                           pStaDs->htShortGI40Mhz = VOS_FALSE;
+                   } else {
+                       limLog(pMac, LOGE,
+                               FL("could not retrieve shortGI 40Mhz CFG,"
+                                   "setting value to default"));
+                       pStaDs->htShortGI40Mhz = WNI_CFG_SHORT_GI_40MHZ_STADEF;
+                   }
+
            }
        }
 
@@ -469,9 +504,12 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
     }
     if(pAssocRsp->ExtCap.present)
     {
-        limLog(pMac, LOGE, FL("Filling tdls prohibited in session entry"));
+        struct s_ext_cap *p_ext_cap = (struct s_ext_cap *)
+                                    pAssocRsp->ExtCap.bytes;
+        limLog(pMac, LOG1,
+            FL("Filling tdls prohibited in session entry"));
         psessionEntry->tdlsChanSwitProhibited =
-                       pAssocRsp->ExtCap.TDLSChanSwitProhibited ;
+                       p_ext_cap->TDLSChanSwitProhibited;
     }
     if(!pAssocRsp->suppRatesPresent)
     {
@@ -675,6 +713,10 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
     {
         // Log success
         limLog(pMac, LOG1, FL("Successfully Reassociated with BSS"));
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+        limDiagEventReport(pMac, WLAN_PE_DIAG_ROAM_ASSOC_COMP_EVENT,
+            psessionEntry, eSIR_SUCCESS, eSIR_SUCCESS);
+#endif
 #ifdef FEATURE_WLAN_ESE
         {
             tANI_U8 cnt = 0;
@@ -835,10 +877,10 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
     limUpdateAssocStaDatas(pMac, pStaDs, pAssocRsp,psessionEntry);
     // Extract the AP capabilities from the beacon that was received earlier
     // TODO - Watch out for an error response!
-    limExtractApCapabilities( pMac,
-                            (tANI_U8 *) psessionEntry->pLimJoinReq->bssDescription.ieFields,
-                            limGetIElenFromBssDescription( &psessionEntry->pLimJoinReq->bssDescription ),
-                            pBeaconStruct );
+    limExtractApCapabilities(pMac,
+      (tANI_U8 *) psessionEntry->pLimJoinReq->bssDescription.ieFields,
+      GET_IE_LEN_IN_BSS(psessionEntry->pLimJoinReq->bssDescription.length),
+      pBeaconStruct);
 
     if(pMac->lim.gLimProtectionControl != WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
         limDecideStaProtectionOnAssoc(pMac, pBeaconStruct, psessionEntry);
@@ -849,9 +891,12 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
         else
             psessionEntry->beaconParams.fShortPreamble = true;
     }
-#ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM //FEATURE_WLAN_DIAG_SUPPORT
-    limDiagEventReport(pMac, WLAN_PE_DIAG_CONNECTED, psessionEntry, 0, 0);
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+    limDiagEventReport(pMac, WLAN_PE_DIAG_CONNECTED, psessionEntry,
+                       eSIR_SUCCESS, eSIR_SUCCESS);
 #endif
+
     if(pAssocRsp->OBSSScanParameters.present)
     {
         limUpdateOBSSScanParams(psessionEntry , &pAssocRsp->OBSSScanParameters);

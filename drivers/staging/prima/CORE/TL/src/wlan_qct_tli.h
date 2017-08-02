@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -58,6 +58,7 @@ DESCRIPTION
 
 when        who    what, where, why
 --------    ---    ----------------------------------------------------------
+08/19/13    rajekuma Added RMC support in TL
 02/19/10    bad     Fixed 802.11 to 802.3 ft issues with WAPI
 01/14/10    rnair   Fixed the byte order for the WAI packet type.
 01/08/10    lti     Added TL Data Caching
@@ -184,6 +185,10 @@ when        who    what, where, why
 #define WLANTL_FRAME_TYPE_UCAST 0x00
 
 #define WLANTL_FRAME_TYPESUBTYPE_MASK 0x3F
+
+#ifdef WLAN_FEATURE_RMC
+#define WLANTL_RMC_HASH_TABLE_SIZE (32)
+#endif
 
 /*-------------------------------------------------------------------------
   BT-AMP related definition - !!! should probably be moved to BT-AMP header
@@ -479,6 +484,7 @@ typedef struct
   WLANTL_REORDER_BUFFER_T     *reorderBuffer;
 
   v_U16_t            LastSN;
+  bool               set_data_filter;
 }WLANTL_BAReorderType;
 
 
@@ -490,6 +496,18 @@ typedef struct
   /* flag set when a UAPSD session with triggers generated in fw is being set*/
   v_U8_t              ucSet;
 }WLANTL_UAPSDInfoType;
+
+#ifdef WLAN_FEATURE_RMC
+struct tTL_RMCList
+{
+  struct tTL_RMCList    *next;
+  v_MACADDR_t           rmcAddr;
+  v_U16_t               mcSeqCtl;
+  v_U32_t               rxMCDupcnt;
+};
+
+typedef struct tTL_RMCList WLANTL_RMC_SESSION;
+#endif
 
 /*---------------------------------------------------------------------------
   per-STA cache info
@@ -685,6 +703,11 @@ typedef struct
 
   v_U32_t       linkCapacity;
 
+#ifdef WLAN_FEATURE_RMC
+  WLANTL_RMC_SESSION *mcastSession[WLANTL_RMC_HASH_TABLE_SIZE];
+  vos_lock_t mcLock;
+#endif
+
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 
   /* Value of the averaged Data RSSI for this station */
@@ -701,6 +724,9 @@ typedef struct
   /* BD Rate for transmitting ARP packets */
   v_U8_t arpRate;
   v_BOOL_t arpOnWQ5;
+
+  /* Disassoc in progress */
+  v_BOOL_t disassoc_progress;
 }WLANTL_STAClientType;
 
 /*---------------------------------------------------------------------------
@@ -784,6 +810,37 @@ typedef struct
    v_PVOID_t                            macCtxt;
    vos_lock_t                           hosLock;
 } WLANTL_HO_SUPPORT_TYPE;
+
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+#define ROAM_MAX_INDEX_NUM              50
+#define ROAM_PER_INDEX_TIME             500 /* (msec) */
+#define MIN_PKTS_TO_START_MONTIOR       10
+
+typedef struct
+{
+  v_U64_t lowRateRxPacketsRcvd;
+  v_U64_t totalPktRcvd;
+  v_U64_t time;
+}WLANTL_RoamTrafficStatsType;
+
+typedef struct {
+   v_U8_t running;
+   v_U8_t staId;
+   v_S7_t index;
+   v_U8_t intialPktToStart;
+   v_U8_t minPercentage;
+   v_U16_t minRate;
+   v_U16_t maxRate;
+   v_U32_t minPktRequired;
+   v_U64_t totalPkt;
+   v_U64_t timeToWait;
+   v_U64_t lowRatePkt;
+   v_U64_t lastTriggerTime;
+   WLANTL_RoamTrafficStatsType rxRoamStats[ROAM_MAX_INDEX_NUM];
+   void (*triggerRoamScanfn) (void *, v_U8_t);
+   void *hHal;
+}WLANTL_RoamMonitorType;
+#endif
 
 /*---------------------------------------------------------------------------
   TL control block type
@@ -896,10 +953,24 @@ typedef struct
   v_BOOL_t                  isBMPS;
   /* Whether WDA_DS_TX_START_XMIT msg is pending or not */
   v_BOOL_t   isTxTranmitMsgPending;
+
+#ifdef WLAN_FEATURE_RMC
+  WLANTL_RMC_SESSION *rmcSession[WLANTL_RMC_HASH_TABLE_SIZE];
+  vos_lock_t rmcLock;
+  v_U8_t multicastDuplicateDetectionEnabled;
+  v_U8_t rmcDataPathEnabled;
+  v_U32_t mcastDupCnt;
+#endif
   WLANTL_MonRxCBType           pfnMonRx;
   v_BOOL_t              isConversionReq;
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+  WLANTL_RoamMonitorType gDsRxRoamStats;
+#endif
 
+  uint8_t track_arp;
+  uint32_t txbd_token;
 }WLANTL_CbType;
+
 
 /*==========================================================================
 
@@ -1753,5 +1824,100 @@ WLANTL_FwdPktToHDD
   vos_pkt_t*     pvosDataBuff,
   v_U8_t          ucSTAId
 );
+
+#ifdef WLAN_FEATURE_RMC
+VOS_STATUS WLANTL_RmcInit
+(
+     v_PVOID_t   pAdapter
+);
+
+VOS_STATUS WLANTL_RmcDeInit
+(
+    v_PVOID_t   pAdapter
+);
+
+
+tANI_U8 WLANTL_RmcHashRmcSession ( v_MACADDR_t   *pMcastAddr );
+
+
+WLANTL_RMC_SESSION *WLANTL_RmcLookUpRmcSession
+(
+    WLANTL_RMC_SESSION *rmcSession[],
+    v_MACADDR_t     *pMcastAddr
+);
+
+WLANTL_RMC_SESSION *WLANTL_RmcAddRmcSession
+(
+    WLANTL_RMC_SESSION *rmcSession[],
+    v_MACADDR_t   *pMcastAddr
+);
+
+tANI_U8
+WLANTL_RmcDeleteRmcSession
+(
+    WLANTL_RMC_SESSION *rmcSession[],
+    v_MACADDR_t   *pMcastAddr
+);
+
+VOS_STATUS
+WLANTL_ProcessRmcCommand
+(
+    WLANTL_CbType*  pTLCb,
+    v_MACADDR_t    *pMcastAddr,
+    tANI_U32        command
+);
+
+/*=============================================================================
+  FUNCTION    WLANTL_IsDuplicateMcastFrm
+
+  DESCRIPTION
+    This function checks for duplicast multicast frames and drops them.
+
+  DEPENDENCIES
+
+  PARAMETERS
+
+   IN
+
+   pClientSTA  : Pointer to WLANTL_STAClientType
+   aucBDHeader : Pointer to BD header
+
+  RETURN VALUE
+
+    VOS_FALSE:  This frame is not a duplicate
+
+    VOS_TRUE:   This frame is a duplicate
+
+==============================================================================*/
+v_U8_t
+WLANTL_IsDuplicateMcastFrm
+(
+    WLANTL_STAClientType *pClientSTA,
+    vos_pkt_t* vosDataBuff
+);
+
+/*=============================================================================
+  FUNCTION    WLANTL_McastDeleteAllEntries
+
+  DESCRIPTION
+    This function removes all multicast entries used for duplicate detection
+
+  DEPENDENCIES
+
+  PARAMETERS
+
+   IN
+
+   pClientSTA  : Pointer to WLANTL_STAClientType
+
+  RETURN VALUE
+
+    None
+
+==============================================================================*/
+void
+WLANTL_McastDeleteAllEntries(WLANTL_STAClientType * pClientSTA);
+
+#endif /*WLAN_FEATURE_RMC*/
 
 #endif /* #ifndef WLAN_QCT_TLI_H */

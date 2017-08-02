@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -125,14 +125,14 @@ limDeactivateMinChannelTimerDuringScan(tpAniSirGlobal pMac)
  * @return None
  */
 #if defined WLAN_FEATURE_VOWIFI
-eHalStatus
+void
 limCollectBssDescription(tpAniSirGlobal pMac,
                          tSirBssDescription *pBssDescr,
                          tpSirProbeRespBeacon pBPR,
                          tANI_U8  *pRxPacketInfo,
                          tANI_U8  fScanning)
 #else
-eHalStatus
+void
 limCollectBssDescription(tpAniSirGlobal pMac,
                          tSirBssDescription *pBssDescr,
                          tpSirProbeRespBeacon pBPR,
@@ -153,26 +153,15 @@ limCollectBssDescription(tpAniSirGlobal pMac,
     pBody = WDA_GET_RX_MPDU_DATA(pRxPacketInfo);
     rfBand = WDA_GET_RX_RFBAND(pRxPacketInfo);
 
-    /**
-     * Drop all the beacons and probe response without P2P IE during P2P search
-     */
-    if (NULL != pMac->lim.gpLimMlmScanReq && pMac->lim.gpLimMlmScanReq->p2pSearch)
-    {
-        if (NULL == limGetP2pIEPtr(pMac, (pBody + SIR_MAC_B_PR_SSID_OFFSET), ieLen))
-        {
-            limLog( pMac, LOG3, MAC_ADDRESS_STR, MAC_ADDR_ARRAY(pHdr->bssId));
-            return eHAL_STATUS_FAILURE;
-        }
-    }
 
     /**
      * Length of BSS desription is without length of
      * length itself and length of pointer
-     * that holds the next BSS description
+     * that holds ieFields
      */
     pBssDescr->length = (tANI_U16)(
-                    sizeof(tSirBssDescription) - sizeof(tANI_U16) -
-                    sizeof(tANI_U32) + ieLen);
+                    ((uintptr_t)OFFSET_OF(tSirBssDescription, ieFields)) -
+                    sizeof(pBssDescr->length) + ieLen);
 
     // Copy BSS Id
     vos_mem_copy((tANI_U8 *) &pBssDescr->bssId,
@@ -187,7 +176,32 @@ limCollectBssDescription(tpAniSirGlobal pMac,
     pBssDescr->beaconInterval = pBPR->beaconInterval;
     pBssDescr->capabilityInfo = limGetU16((tANI_U8 *) &pBPR->capabilityInfo);
 
-     if(!pBssDescr->beaconInterval )
+    pBssDescr->HTCapsPresent = 0;
+    pBssDescr->chanWidth = eHT_CHANNEL_WIDTH_20MHZ;
+    pBssDescr->wmeInfoPresent = 0;
+    pBssDescr->vhtCapsPresent = 0;
+    pBssDescr->beacomformingCapable = 0;
+    /* HT capability */
+    if (pBPR->HTCaps.present) {
+        pBssDescr->HTCapsPresent = 1;
+        if (pBPR->HTCaps.supportedChannelWidthSet)
+            pBssDescr->chanWidth = eHT_CHANNEL_WIDTH_40MHZ;
+    }
+    if (pBPR->wmeEdcaPresent)
+        pBssDescr->wmeInfoPresent = 1;
+
+#ifdef WLAN_FEATURE_11AC
+    /* VHT Parameters */
+    if (pBPR->VHTCaps.present) {
+        pBssDescr->vhtCapsPresent = 1;
+        if (pBPR->VHTCaps.muBeamformerCap)
+            pBssDescr->beacomformingCapable = 1;
+    }
+    if (pBPR->VHTOperation.present)
+        if (pBPR->VHTOperation.chanWidth == 1)
+            pBssDescr->chanWidth = eHT_CHANNEL_WIDTH_80MHZ;
+#endif
+    if(!pBssDescr->beaconInterval )
     {
 			        limLog(pMac, LOGW,
             FL("Beacon Interval is ZERO, making it to default 100 "
@@ -243,7 +257,7 @@ limCollectBssDescription(tpAniSirGlobal pMac,
     //SINR no longer reported by HW
     pBssDescr->sinr = 0;
 
-    pBssDescr->nReceivedTime = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
+    pBssDescr->nReceivedTime = vos_timer_get_system_time();
 
 #if defined WLAN_FEATURE_VOWIFI
     if( fScanning )
@@ -270,13 +284,14 @@ limCollectBssDescription(tpAniSirGlobal pMac,
     }
 #endif
 
-#ifdef FEATURE_WLAN_ESE
+#if defined(FEATURE_WLAN_ESE) || defined(WLAN_FEATURE_ROAM_SCAN_OFFLOAD)
     pBssDescr->QBSSLoad_present = FALSE;
     pBssDescr->QBSSLoad_avail = 0; 
     if( pBPR->QBSSLoad.present) 
     {
         pBssDescr->QBSSLoad_present = TRUE;
         pBssDescr->QBSSLoad_avail = pBPR->QBSSLoad.avail;
+        pBssDescr->QBSS_ChanLoad = pBPR->QBSSLoad.chautil;
     }
 #endif
     // Copy IE fields
@@ -292,7 +307,7 @@ limCollectBssDescription(tpAniSirGlobal pMac,
         pBssDescr->aniIndicator,
         ieLen );
 
-    return eHAL_STATUS_SUCCESS;
+    return;
 } /*** end limCollectBssDescription() ***/
 
 /**
@@ -522,19 +537,11 @@ limCheckAndAddBssDescription(tpAniSirGlobal pMac,
 
     // In scan state, store scan result.
 #if defined WLAN_FEATURE_VOWIFI
-    status = limCollectBssDescription(pMac, &pBssDescr->bssDescription,
+    limCollectBssDescription(pMac, &pBssDescr->bssDescription,
                              pBPR, pRxPacketInfo, fScanning);
-    if (eHAL_STATUS_SUCCESS != status)
-    {
-        goto last;
-    }
 #else
-    status = limCollectBssDescription(pMac, &pBssDescr->bssDescription,
+    limCollectBssDescription(pMac, &pBssDescr->bssDescription,
                              pBPR, pRxPacketInfo);
-    if (eHAL_STATUS_SUCCESS != status)
-    {
-        goto last;
-    }
 #endif
     pBssDescr->bssDescription.fProbeRsp = fProbeRsp;
 
@@ -609,12 +616,10 @@ limCheckAndAddBssDescription(tpAniSirGlobal pMac,
         }
     }//(eANI_BOOLEAN_TRUE == fScanning)
 
-last:
     if( eHAL_STATUS_SUCCESS != status )
     {
         vos_mem_free( pBssDescr );
     }
-    return;
 } /****** end limCheckAndAddBssDescription() ******/
 
 

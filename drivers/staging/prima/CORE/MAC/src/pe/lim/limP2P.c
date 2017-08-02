@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -342,7 +342,8 @@ tSirRetStatus limCreateSessionForRemainOnChn(tpAniSirGlobal pMac, tPESession **p
         }
         /* Store PE sessionId in session Table  */
         psessionEntry->peSessionId = sessionId;
-
+        /* Store SME session Id in sessionTable */
+        psessionEntry->smeSessionId = pMac->lim.gpLimRemainOnChanReq->sessionId;
         psessionEntry->limSystemRole = eLIM_P2P_DEVICE_ROLE;
         CFG_GET_STR( nSirStatus, pMac,  WNI_CFG_SUPPORTED_RATES_11A,
                psessionEntry->rateSet.rate, val , SIR_MAC_MAX_NUMBER_OF_RATES );
@@ -503,9 +504,9 @@ void limProcessInsertSingleShotNOATimeout(tpAniSirGlobal pMac)
  *------------------------------------------------------------------*/
 void limConvertActiveChannelToPassiveChannel(tpAniSirGlobal pMac )
 {
-    tANI_U32 currentTime;
-    tANI_U32 lastTime = 0;
-    tANI_U32 timeDiff;
+    v_TIME_t currentTime;
+    v_TIME_t lastTime = 0;
+    v_TIME_t timeDiff;
     tANI_U8 i;
     currentTime = vos_timer_get_system_time();
     for (i = 1; i < SIR_MAX_24G_5G_CHANNEL_RANGE ; i++)
@@ -1167,58 +1168,19 @@ void limSendP2PActionFrame(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 
 #ifdef WLAN_FEATURE_11W
     pActionHdr = (tpSirMacActionFrameHdr) (pFrame + sizeof(tSirMacMgmtHdr));
+    pMacHdr = (tpSirMacMgmtHdr)pFrame;
 
     /*
-     * Setting Protected bit for SA_QUERY Action Frame
+     * Setting Protected bit only for Robust Action Frames
      * This has to be based on the current Connection with the station
-     * limSetProtectedBit API will set the protected bit if connection if PMF
+     * limSetProtectedBit API will set the protected bit if connection is PMF
      */
-
     if ((SIR_MAC_MGMT_ACTION == pFc->subType) &&
-        (SIR_MAC_ACTION_SA_QUERY == pActionHdr->category))
-    {
-        pMacHdr    = (tpSirMacMgmtHdr ) pFrame;
-        psessionEntry = peFindSessionByBssid(pMac,
-                        (tANI_U8*)pMbMsg->data + BSSID_OFFSET, &sessionId);
+        psessionEntry->limRmfEnabled && (!limIsGroupAddr(pMacHdr->da)) &&
+        lim_is_robust_mgmt_action_frame(pActionHdr->category)) {
+        /* All psession checks are already done at start */
+        limSetProtectedBit(pMac, psessionEntry, pMacHdr->da, pMacHdr);
 
-        /* Check for session corresponding to ADDR2 ss supplicant is filling
-           ADDR2  with BSSID */
-        if(NULL == psessionEntry)
-        {
-            psessionEntry = peFindSessionByBssid(pMac,
-                       (tANI_U8*)pMbMsg->data + ADDR2_OFFSET, &sessionId);
-        }
-
-        if(NULL != psessionEntry)
-        {
-            limSetProtectedBit(pMac, psessionEntry, pMacHdr->da, pMacHdr);
-        }
-        else
-        {
-            limLog(pMac, LOGE,
-                FL("Dropping SA Query frame - Unable to find PE Session "));
-            limSendSmeRsp(pMac, eWNI_SME_ACTION_FRAME_SEND_CNF,
-                    eHAL_STATUS_FAILURE, pMbMsg->sessionId, 0);
-            palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
-                    ( void* ) pFrame, ( void* ) pPacket );
-            return;
-        }
-
-        /*
-         * If wep bit is not set in MAC header then we are trying to
-         * send SA Query via non PMF connection. Drop the packet.
-         */
-
-        if(0 ==  pMacHdr->fc.wep)
-        {
-            limLog(pMac, LOGE,
-                FL("Dropping SA Query frame due to non PMF connection\n"));
-            limSendSmeRsp(pMac, eWNI_SME_ACTION_FRAME_SEND_CNF,
-                    eHAL_STATUS_FAILURE, pMbMsg->sessionId, 0);
-            palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
-                    ( void* ) pFrame, ( void* ) pPacket );
-            return;
-        }
     }
 #endif
 

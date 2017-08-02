@@ -446,6 +446,52 @@ void wpalLogPktSerialize
 ---------------------------------------------------------------------------*/
 void wpalFwLogPktSerialize
 (
-   wpt_packet *pFrame
+   wpt_packet *pFrame, wpt_uint32 pktType
 );
+
+/*---------------------------------------------------------------------------
+    wpalPerPktSerialize - Serialize perpkt data to logger thread
+
+    Param:
+
+
+    Return:
+        NONE
+
+---------------------------------------------------------------------------*/
+void wpalPerPktSerialize
+(
+   void *perPktStat
+);
+
+/*---------------------------------------------------------------------------
+    wpalGetOSPktHead – Get the head of OS spacific socket buffer
+    Param:
+        pPacket – pointer to a wpt_packet
+
+    Return:
+        void* - success
+---------------------------------------------------------------------------*/
+void* wpalGetOSPktHead( wpt_packet *pPacket);
+
+/*---------------------------------------------------------------------------
+     wpalGetOSPktend – Get end pointer of OS spacific socket buffer
+    Param:
+        pPacket – pointer to a wpt_packet
+
+    Return:
+        void*  - success
+---------------------------------------------------------------------------*/
+void* wpalGetOSPktend( wpt_packet *pPacket);
+
+/*---------------------------------------------------------------------------
+    wpalRecoverTail – recover currupted skb tail.
+    Param:
+        pPacket – pointer to a wpt_packet
+
+    Return:
+        void  - success
+---------------------------------------------------------------------------*/
+void wpalRecoverTail( wpt_packet *pPacket);
+
 #endif // __WLAN_QCT_PAL_PACKET_H

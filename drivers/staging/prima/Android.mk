@@ -9,9 +9,8 @@ WLAN_CHIPSET := prima
 WLAN_SELECT := CONFIG_PRIMA_WLAN=m
 endif
 
-# Build/Package options for 8916, 8974, 8226, 8610, 8909, 8952 targets
-ifneq (,$(filter msm8916 msm8974 msm8226 msm8610 msm8909 msm8952,$(TARGET_BOARD_PLATFORM)))
-
+# Build/Package options for 8916, 8974, 8226, 8610, 8909, 8952, 8937, 8953 targets
+ifneq (,$(filter msm8916 msm8974 msm8226 msm8610 msm8909 msm8952 msm8937 msm8953 msm8953,$(TARGET_BOARD_PLATFORM)))
 WLAN_CHIPSET := pronto
 WLAN_SELECT := CONFIG_PRONTO_WLAN=m
 endif
@@ -79,11 +78,22 @@ include $(BUILD_PREBUILT)
 
 endif
 
+ifeq ($(TARGET_KERNEL_VERSION),)
+$(info "WLAN: TARGET_KERNEL_VERSION is not defined, assuming default")
+TARGET_KERNEL_SOURCE := kernel
+KERNEL_TO_BUILD_ROOT_OFFSET := ../
+endif
+
+ifeq ($(KERNEL_TO_BUILD_ROOT_OFFSET),)
+$(info "WLAN: KERNEL_TO_BUILD_ROOT_OFFSET is not defined, assuming default")
+KERNEL_TO_BUILD_ROOT_OFFSET := ../
+endif
+
 # Build wlan.ko as either prima_wlan.ko or pronto_wlan.ko
 ###########################################################
 
 # This is set once per LOCAL_PATH, not per (kernel) module
-KBUILD_OPTIONS := WLAN_ROOT=../$(WLAN_BLD_DIR)/prima
+KBUILD_OPTIONS := WLAN_ROOT=$(KERNEL_TO_BUILD_ROOT_OFFSET)$(WLAN_BLD_DIR)/prima
 # We are actually building wlan.ko here, as per the
 # requirement we are specifying <chipset>_wlan.ko as LOCAL_MODULE.
 # This means we need to rename the module to <chipset>_wlan.ko

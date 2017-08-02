@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -234,16 +234,16 @@ tANI_U32 limGetMaxRateFlags(tpDphHashNode pStaDs, tpPESession psessionEntry)
     }
     else
     {
-        if(IS_DOT11_MODE_HT(psessionEntry->dot11mode))
+        if (IS_DOT11_MODE_HT(psessionEntry->dot11mode)
+#ifdef WLAN_FEATURE_11AC
+        || IS_DOT11_MODE_VHT(psessionEntry->dot11mode)
+        )
+#endif
         {
-            if (pStaDs->htShortGI20Mhz || pStaDs->htShortGI40Mhz )
-                rate_flags |= eHAL_TX_RATE_SGI;
-
-            if (pStaDs->htSupportedChannelWidthSet)
-                rate_flags |=eHAL_TX_RATE_HT40;
-            else
-                rate_flags |=eHAL_TX_RATE_HT20;
+           if (pStaDs->htShortGI20Mhz || pStaDs->htShortGI40Mhz)
+               rate_flags |= eHAL_TX_RATE_SGI;
         }
+
 #ifdef WLAN_FEATURE_11AC
         if(IS_DOT11_MODE_VHT(psessionEntry->dot11mode))
         {
@@ -262,7 +262,15 @@ tANI_U32 limGetMaxRateFlags(tpDphHashNode pStaDs, tpPESession psessionEntry)
                     rate_flags |= eHAL_TX_RATE_VHT20;
            }
         }
+        else
 #endif
+        if(IS_DOT11_MODE_HT(psessionEntry->dot11mode))
+        {
+            if (pStaDs->htSupportedChannelWidthSet)
+                rate_flags |=eHAL_TX_RATE_HT40;
+            else
+                rate_flags |=eHAL_TX_RATE_HT20;
+        }
     }
 
      return rate_flags;
@@ -649,9 +657,9 @@ limSendSmeStartBssRsp(tpAniSirGlobal pMac,
 
 
                 //subtracting size of length indicator itself and size of pointer to ieFields
-                pSirSmeRsp->bssDescription.length = sizeof(tSirBssDescription) -
-                                                sizeof(tANI_U16) - sizeof(tANI_U32) +
-                                                ieLen;
+                pSirSmeRsp->bssDescription.length =
+                         ((uintptr_t)OFFSET_OF(tSirBssDescription, ieFields))
+                         - sizeof(pSirSmeRsp->bssDescription.length) + ieLen;
                 //This is the size of the message, subtracting the size of the pointer to ieFields
                 size += ieLen - sizeof(tANI_U32);
         }
@@ -823,6 +831,10 @@ limSendSmeScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
     }
     else
     {
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+        limDiagEventReport(pMac, WLAN_PE_DIAG_SCAN_RES_FOUND_EVENT, NULL,
+            eSIR_SUCCESS, eSIR_SUCCESS);
+#endif
         // send last message
         pSirSmeScanRsp->statusCode  = eSIR_SME_SUCCESS;
         pSirSmeScanRsp->messageType = eWNI_SME_SCAN_RSP;
@@ -1276,6 +1288,7 @@ limSendSmeDisassocNtf(tpAniSirGlobal pMac,
     tANI_U8                     *pBuf;
     tSirSmeDisassocRsp      *pSirSmeDisassocRsp;
     tSirSmeDisassocInd      *pSirSmeDisassocInd;
+    tSirSmeDisConDoneInd    *pSirSmeDisConDoneInd;
     tANI_U32 *pMsg;
     bool failure = FALSE;
 
@@ -1286,13 +1299,6 @@ limSendSmeDisassocNtf(tpAniSirGlobal pMac,
     
     switch (disassocTrigger)
     {
-        case eLIM_PEER_ENTITY_DISASSOC:
-            if (reasonCode != eSIR_SME_STA_NOT_ASSOCIATED)
-            {
-                failure = TRUE;
-                goto error;
-            }
-
         case eLIM_HOST_DISASSOC:
             /**
              * Disassociation response due to
@@ -1343,6 +1349,35 @@ limSendSmeDisassocNtf(tpAniSirGlobal pMac,
             pMsg = (tANI_U32*) pSirSmeDisassocRsp;
             break;
 
+        case eLIM_PEER_ENTITY_DISASSOC:
+        case eLIM_LINK_MONITORING_DISASSOC:
+            pSirSmeDisConDoneInd = vos_mem_malloc(sizeof(tSirSmeDisConDoneInd));
+            if ( NULL == pSirSmeDisConDoneInd )
+            {
+                // Log error
+                limLog(pMac, LOGP,
+                 FL("call to AllocateMemory failed for disconnect indication"));
+
+                return;
+            }
+            vos_mem_zero(pSirSmeDisConDoneInd, sizeof(tSirSmeDisConDoneInd));
+            limLog(pMac, LOG1,
+                   FL("send  eWNI_SME_DISCONNECT_DONE_IND withretCode: %d"),
+                       reasonCode);
+            pSirSmeDisConDoneInd->messageType = eWNI_SME_DISCONNECT_DONE_IND;
+            pSirSmeDisConDoneInd->length      = sizeof(tSirSmeDisConDoneInd);
+            vos_mem_copy(pSirSmeDisConDoneInd->peerMacAddr, peerMacAddr,
+                         sizeof(tSirMacAddr));
+            pSirSmeDisConDoneInd->sessionId   = smesessionId;
+
+            if (reasonCode == eSIR_SME_LOST_LINK_WITH_PEER_RESULT_CODE)
+                pSirSmeDisConDoneInd->reasonCode = 0;
+            else
+                pSirSmeDisConDoneInd->reasonCode = reasonCode;
+
+            pMsg = (tANI_U32 *)pSirSmeDisConDoneInd;
+            break;
+
         default:
             /**
              * Disassociation indication due to Disassociation
@@ -1369,6 +1404,7 @@ limSendSmeDisassocNtf(tpAniSirGlobal pMac,
             pSirSmeDisassocInd->sessionId = smesessionId;
             pSirSmeDisassocInd->transactionId = smetransactionId;
             pSirSmeDisassocInd->reasonCode = reasonCode;
+            pSirSmeDisassocInd->assocId = aid;
             pBuf = (tANI_U8 *) &pSirSmeDisassocInd->statusCode;
 
             limCopyU32(pBuf, reasonCode);
@@ -1432,8 +1468,9 @@ limSendSmeDisassocInd(tpAniSirGlobal pMac, tpDphHashNode pStaDs,tpPESession pses
 
     pSirSmeDisassocInd->sessionId     =  psessionEntry->smeSessionId;
     pSirSmeDisassocInd->transactionId =  psessionEntry->transactionId;
-    pSirSmeDisassocInd->statusCode    =  pStaDs->mlmStaContext.disassocReason;
+    pSirSmeDisassocInd->statusCode    =  eSIR_SME_DEAUTH_STATUS;
     pSirSmeDisassocInd->reasonCode    =  pStaDs->mlmStaContext.disassocReason;
+    pSirSmeDisassocInd->assocId       =  pStaDs->assocId;
 
     vos_mem_copy( pSirSmeDisassocInd->bssId, psessionEntry->bssId, sizeof(tSirMacAddr));
 
@@ -1474,6 +1511,8 @@ limSendSmeDeauthInd(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpPESession psess
     tSirMsgQ  mmhMsg;
     tSirSmeDeauthInd  *pSirSmeDeauthInd;
 
+    limSendTLPauseInd(pMac, pStaDs->staIndex);
+
     pSirSmeDeauthInd = vos_mem_malloc(sizeof(tSirSmeDeauthInd));
     if ( NULL == pSirSmeDeauthInd )
     {
@@ -1486,6 +1525,7 @@ limSendSmeDeauthInd(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpPESession psess
 
     pSirSmeDeauthInd->sessionId = psessionEntry->smeSessionId;
     pSirSmeDeauthInd->transactionId = psessionEntry->transactionId;
+    pSirSmeDeauthInd->assocId = pStaDs->assocId;
     if(eSIR_INFRA_AP_MODE == psessionEntry->bssType)
     {
         pSirSmeDeauthInd->statusCode = (tSirResultCodes)pStaDs->mlmStaContext.cleanupTrigger;
@@ -1710,6 +1750,7 @@ limSendSmeDeauthNtf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr, tSirResultCode
     tANI_U8             *pBuf;
     tSirSmeDeauthRsp    *pSirSmeDeauthRsp;
     tSirSmeDeauthInd    *pSirSmeDeauthInd;
+    tSirSmeDisConDoneInd *pSirSmeDisConDoneInd;
     tpPESession         psessionEntry;
     tANI_U8             sessionId;
     tANI_U32            *pMsg;
@@ -1717,9 +1758,6 @@ limSendSmeDeauthNtf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr, tSirResultCode
     psessionEntry = peFindSessionByBssid(pMac,peerMacAddr,&sessionId);  
     switch (deauthTrigger)
     {
-        case eLIM_PEER_ENTITY_DEAUTH:
-            return;
-            
         case eLIM_HOST_DEAUTH:
             /**
              * Deauthentication response to host triggered
@@ -1754,6 +1792,36 @@ limSendSmeDeauthNtf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr, tSirResultCode
 
             break;
 
+        case eLIM_PEER_ENTITY_DEAUTH:
+        case eLIM_LINK_MONITORING_DEAUTH:
+            pSirSmeDisConDoneInd = vos_mem_malloc(sizeof(tSirSmeDisConDoneInd));
+            if ( NULL == pSirSmeDisConDoneInd )
+            {
+                // Log error
+                limLog(pMac, LOGP,
+                 FL("call to AllocateMemory failed for disconnect indication"));
+
+                return;
+            }
+            vos_mem_zero(pSirSmeDisConDoneInd, sizeof(tSirSmeDisConDoneInd));
+            limLog(pMac, LOG1,
+                   FL("send  eWNI_SME_DISCONNECT_DONE_IND withretCode: %d"),
+                       reasonCode);
+
+            pSirSmeDisConDoneInd->messageType = eWNI_SME_DISCONNECT_DONE_IND;
+            pSirSmeDisConDoneInd->length      = sizeof(tSirSmeDisConDoneInd);
+            vos_mem_copy(pSirSmeDisConDoneInd->peerMacAddr, peerMacAddr,
+                    sizeof(tSirMacAddr));
+            pSirSmeDisConDoneInd->sessionId   = smesessionId;
+
+            if (reasonCode == eSIR_SME_LOST_LINK_WITH_PEER_RESULT_CODE)
+                pSirSmeDisConDoneInd->reasonCode = 0;
+            else
+                pSirSmeDisConDoneInd->reasonCode = reasonCode;
+
+            pMsg = (tANI_U32 *)pSirSmeDisConDoneInd;
+            break;
+
         default:
             /**
              * Deauthentication indication due to Deauthentication
@@ -1775,6 +1843,7 @@ limSendSmeDeauthNtf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr, tSirResultCode
             pSirSmeDeauthInd->messageType = eWNI_SME_DEAUTH_IND;
             pSirSmeDeauthInd->length      = sizeof(tSirSmeDeauthInd);
             pSirSmeDeauthInd->reasonCode = eSIR_MAC_UNSPEC_FAILURE_REASON;
+            pSirSmeDeauthInd->assocId    = aid;
 
             // sessionId
             pBuf = (tANI_U8*) &pSirSmeDeauthInd->sessionId;
@@ -2880,6 +2949,11 @@ limSendSmeCandidateFoundInd(tpAniSirGlobal pMac, tANI_U8  sessionId)
         limLog(pMac, LOGP, FL("AllocateMemory failed for eWNI_SME_CANDIDATE_FOUND_IND\n"));
         return;
     }
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+    limDiagEventReport(pMac, WLAN_PE_DIAG_ROAM_CANDIDATE_FOUND,
+                       NULL, eSIR_SUCCESS, eSIR_SUCCESS);
+#endif
 
     pSirSmeCandidateFoundInd->messageType = eWNI_SME_CANDIDATE_FOUND_IND;
     pSirSmeCandidateFoundInd->length = sizeof(tSirSmeCandidateFoundInd);

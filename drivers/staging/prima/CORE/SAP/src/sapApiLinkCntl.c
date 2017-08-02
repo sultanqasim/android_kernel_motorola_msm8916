@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -99,9 +99,6 @@
 /*----------------------------------------------------------------------------
  * Externalized Function Definitions
  * -------------------------------------------------------------------------*/
-#ifdef FEATURE_WLAN_CH_AVOID
-   extern safeChannelType safeChannels[];
-#endif /* FEATURE_WLAN_CH_AVOID */
 
 /*----------------------------------------------------------------------------
  * Function Declarations and Documentation
@@ -131,6 +128,16 @@ void sapSetOperatingChannel(ptSapContext psapContext, v_U8_t operChannel)
 {
     v_U8_t i = 0;
     v_U32_t event;
+    tHalHandle hHal = NULL;
+    uint32_t operating_band = 0;
+
+    hHal = VOS_GET_HAL_CB(psapContext->pvosGCtx);
+    if (NULL == hHal)
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                     "hHal is NULL in %s", __func__);
+        return;
+    }
 
     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
                 FL("SAP Channel : %d"), psapContext->channel);
@@ -146,7 +153,7 @@ void sapSetOperatingChannel(ptSapContext psapContext, v_U8_t operChannel)
         {
             if(psapContext->channelList != NULL)
             {
-                 psapContext->channel = SAP_DEFAULT_CHANNEL;
+                 psapContext->channel = SAP_CHANNEL_NOT_SELECTED;
                  for ( i = 0 ; i < psapContext->numofChannel ; i++)
                  {
                     if (NV_CHANNEL_ENABLE ==
@@ -157,26 +164,41 @@ void sapSetOperatingChannel(ptSapContext psapContext, v_U8_t operChannel)
                     }
                  }
             }
-            else
-            {
-                /* if the channel list is empty then there is no valid channel
-                   in the selected sub-band so select default channel in the
-                   BAND(2.4GHz) as 2.4 channels are available in all the
-                   countries*/
-                   psapContext->channel = SAP_DEFAULT_CHANNEL;
 
-#ifdef FEATURE_WLAN_CH_AVOID
-                for( i = 0; i < NUM_20MHZ_RF_CHANNELS; i++ )
+            /*
+             * In case if channel is not selected then channel
+             * to be selected based on band configured in .ini
+             */
+            if (!psapContext->channel)
+            {
+                ccmCfgGetInt(hHal, WNI_CFG_SAP_CHANNEL_SELECT_OPERATING_BAND,
+                             &operating_band);
+                if (operating_band == eSAP_RF_SUBBAND_5_LOW_GHZ ||
+                    operating_band == eSAP_RF_SUBBAND_5_MID_GHZ ||
+                    operating_band == eSAP_RF_SUBBAND_5_HIGH_GHZ)
                 {
-                    if((NV_CHANNEL_ENABLE ==
-                        vos_nv_getChannelEnabledState(safeChannels[i].channelNumber))
-                            && (VOS_TRUE == safeChannels[i].isSafe))
-                    {
-                        psapContext->channel = safeChannels[i].channelNumber;
-                        break;
-                    }
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+                              FL("Default channel selection from band %d"),
+                              operating_band);
+
+                    (operating_band == eSAP_RF_SUBBAND_5_LOW_GHZ) ?
+                            (psapContext->channel =
+                                     SAP_DEFAULT_LOW_5GHZ_CHANNEL) :
+                    (operating_band == eSAP_RF_SUBBAND_5_MID_GHZ) ?
+                            (psapContext->channel =
+                                     SAP_DEFAULT_MID_5GHZ_CHANNEL) :
+                    (operating_band == eSAP_RF_SUBBAND_5_HIGH_GHZ) ?
+                            (psapContext->channel =
+                                     SAP_DEFAULT_HIGH_5GHZ_CHANNEL) : 0;
+
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+                              FL("channel selected to start bss %d"),
+                              psapContext->channel);
                 }
-#endif
+                else
+                {
+                    psapContext->channel = SAP_DEFAULT_24GHZ_CHANNEL;
+                }
             }
         }
         else
@@ -195,7 +217,7 @@ void sapSetOperatingChannel(ptSapContext psapContext, v_U8_t operChannel)
         }
     }
 #else
-       psapContext->channel = SAP_DEFAULT_CHANNEL;
+       psapContext->channel = SAP_DEFAULT_24GHZ_CHANNEL;
 #endif
     else
     {
@@ -843,8 +865,7 @@ eHalStatus sapCheck40Mhz24G(tHalHandle halHandle, ptSapContext psapCtx,
 
         if ((pScanResult->BssDescriptor.ieFields != NULL))
         {
-            ieLen = (pScanResult->BssDescriptor.length + sizeof(tANI_U16));
-            ieLen += (sizeof(tANI_U32) - sizeof(tSirBssDescription));
+            ieLen = GET_IE_LEN_IN_BSS(pScanResult->BssDescriptor.length);
             vos_mem_set((tANI_U8 *) pBeaconStruct,
                                sizeof(tSirProbeRespBeacon), 0);
 
@@ -1405,6 +1426,7 @@ WLANSAP_RoamCallback
 #endif
             break;
 
+        case eCSR_ROAM_RESULT_DEAUTH_IND:
         case eCSR_ROAM_RESULT_DISASSOC_IND:
             VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
                           FL("CSR roamResult = %s (%d)"),
@@ -1414,23 +1436,6 @@ WLANSAP_RoamCallback
             sapRemoveHT40IntolerantSta(sapContext, pCsrRoamInfo);
 #endif
             /* Fill in the event structure */
-            vosStatus = sapSignalHDDevent( sapContext, pCsrRoamInfo, eSAP_STA_DISASSOC_EVENT, (v_PVOID_t)eSAP_STATUS_SUCCESS);
-            if(!VOS_IS_STATUS_SUCCESS(vosStatus))
-            {
-                halStatus = eHAL_STATUS_FAILURE;
-            }
-            break;
-
-        case eCSR_ROAM_RESULT_DEAUTH_IND:
-            VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
-                          FL("CSR roamResult = %s (%d)"),
-                             "eCSR_ROAM_RESULT_DEAUTH_IND",
-                              roamResult);
-#ifdef WLAN_FEATURE_AP_HT40_24G
-            sapRemoveHT40IntolerantSta(sapContext, pCsrRoamInfo);
-#endif
-            /* Fill in the event structure */
-            //TODO: we will use the same event inorder to inform HDD to disassociate the station
             vosStatus = sapSignalHDDevent( sapContext, pCsrRoamInfo, eSAP_STA_DISASSOC_EVENT, (v_PVOID_t)eSAP_STATUS_SUCCESS);
             if(!VOS_IS_STATUS_SUCCESS(vosStatus))
             {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -297,9 +297,6 @@ int limProcessFTPreAuthReq(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
          */
         return bufConsumed;
     }
-#ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM //FEATURE_WLAN_DIAG_SUPPORT
-        limDiagEventReport(pMac, WLAN_PE_DIAG_PRE_AUTH_REQ_EVENT, psessionEntry, 0, 0);
-#endif
 
     // Dont need to suspend if APs are in same channel
     if (psessionEntry->currentOperChannel != pMac->ft.ftPEContext.pFTPreAuthReq->preAuthchannelNum) 
@@ -389,6 +386,10 @@ MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, psessionEntry->peSessionId, eLI
 #if defined WLAN_FEATURE_VOWIFI_11R_DEBUG
     PELOGE(limLog( pMac, LOG1, "%s: FT Auth Rsp Timer Started", __func__);)
 #endif
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+      limDiagEventReport(pMac, WLAN_PE_DIAG_ROAM_AUTH_START_EVENT,
+             pMac->lim.pSessionEntry, eSIR_SUCCESS, eSIR_SUCCESS);
+#endif
 
     limSendAuthMgmtFrame(pMac, &authFrame,
         pMac->ft.ftPEContext.pFTPreAuthReq->preAuthbssId,
@@ -439,7 +440,7 @@ tSirRetStatus limFTPrepareAddBssReq( tpAniSirGlobal pMac,
 
     limExtractApCapabilities( pMac,
         (tANI_U8 *) bssDescription->ieFields,
-        limGetIElenFromBssDescription( bssDescription ), pBeaconStruct );
+        GET_IE_LEN_IN_BSS(bssDescription->length), pBeaconStruct);
 
     if (pMac->lim.gLimProtectionControl != WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
         limDecideStaProtectionOnAssoc(pMac, pBeaconStruct, pftSessionEntry);
@@ -733,7 +734,7 @@ tpPESession limFillFTSession(tpAniSirGlobal pMac,
 
     limExtractApCapabilities( pMac,
                             (tANI_U8 *) pbssDescription->ieFields,
-                            limGetIElenFromBssDescription( pbssDescription ),
+                            GET_IE_LEN_IN_BSS(pbssDescription->length),
                             pBeaconStruct );
 
     pftSessionEntry->rateSet.numRates = pBeaconStruct->supportedRates.numRates;
@@ -855,8 +856,8 @@ tpPESession limFillFTSession(tpAniSirGlobal pMac,
 
     regMax = cfgGetRegulatoryMaxTransmitPower( pMac, pftSessionEntry->currentOperChannel ); 
     localPowerConstraint = regMax;
-    limExtractApCapability( pMac, (tANI_U8 *) pbssDescription->ieFields, 
-        limGetIElenFromBssDescription(pbssDescription),
+    limExtractApCapability(pMac, (tANI_U8 *) pbssDescription->ieFields,
+        GET_IE_LEN_IN_BSS(pbssDescription->length),
         &pftSessionEntry->limCurrentBssQosCaps,
         &pftSessionEntry->limCurrentBssPropCap,
         &currentBssUapsd , &localPowerConstraint, psessionEntry);
@@ -1151,11 +1152,6 @@ void limPostFTPreAuthRsp(tpAniSirGlobal pMac, tSirRetStatus status,
 #if defined WLAN_FEATURE_VOWIFI_11R_DEBUG
     PELOGE(limLog( pMac, LOG1, "Posted Auth Rsp to SME with status of 0x%x", status);)
 #endif
-#ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM //FEATURE_WLAN_DIAG_SUPPORT
-    if (status == eSIR_SUCCESS)
-        limDiagEventReport(pMac, WLAN_PE_DIAG_PREAUTH_DONE, psessionEntry,
-                           status, 0);
-#endif
     limSysProcessMmhMsgApi(pMac, &mmhMsg,  ePROT);
 }
 
@@ -1177,7 +1173,8 @@ void limHandleFTPreAuthRsp(tpAniSirGlobal pMac, tSirRetStatus status,
     tANI_U8 sessionId;
     tpSirBssDescription  pbssDescription;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM //FEATURE_WLAN_DIAG_SUPPORT
-    limDiagEventReport(pMac, WLAN_PE_DIAG_PRE_AUTH_RSP_EVENT, psessionEntry, (tANI_U16)status, 0);
+    limDiagEventReport(pMac, WLAN_PE_DIAG_PRE_AUTH_RSP_EVENT,
+                       psessionEntry, status, eSIR_SUCCESS);
 #endif
 
     // Save the status of pre-auth
@@ -1317,6 +1314,12 @@ void limProcessMlmFTReassocReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf,
         vos_mem_free(pMlmReassocReq);
         return;
     }
+
+    lim_update_caps_info_for_bss(pMac, &caps,
+                  psessionEntry->pLimReAssocReq->bssDescription.capabilityInfo);
+
+    limLog(pMac, LOG1, FL("Capabilities info FT Reassoc: 0x%X"), caps);
+
     pMlmReassocReq->capabilityInfo = caps;
 
     /* Update PE sessionId*/
@@ -1503,29 +1506,6 @@ tANI_BOOLEAN limProcessFTUpdateKey(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf )
 
     limLog(pMac, LOG1,
            FL("BSSID = "MAC_ADDRESS_STR), MAC_ADDR_ARRAY(pKeyInfo->bssId));
-
-    if(pAddBssParams->extSetStaKeyParam.key[0].keyLength == 16)
-    {
-        limLog(pMac, LOG1,
-        FL("BSS key = %02X-%02X-%02X-%02X-%02X-%02X-%02X- "
-        "%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X"),
-        pAddBssParams->extSetStaKeyParam.key[0].key[0],
-        pAddBssParams->extSetStaKeyParam.key[0].key[1],
-        pAddBssParams->extSetStaKeyParam.key[0].key[2],
-        pAddBssParams->extSetStaKeyParam.key[0].key[3],
-        pAddBssParams->extSetStaKeyParam.key[0].key[4],
-        pAddBssParams->extSetStaKeyParam.key[0].key[5],
-        pAddBssParams->extSetStaKeyParam.key[0].key[6],
-        pAddBssParams->extSetStaKeyParam.key[0].key[7],
-        pAddBssParams->extSetStaKeyParam.key[0].key[8],
-        pAddBssParams->extSetStaKeyParam.key[0].key[9],
-        pAddBssParams->extSetStaKeyParam.key[0].key[10],
-        pAddBssParams->extSetStaKeyParam.key[0].key[11],
-        pAddBssParams->extSetStaKeyParam.key[0].key[12],
-        pAddBssParams->extSetStaKeyParam.key[0].key[13],
-        pAddBssParams->extSetStaKeyParam.key[0].key[14],
-        pAddBssParams->extSetStaKeyParam.key[0].key[15]);
-    }
 
     return TRUE;
 }

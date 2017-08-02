@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -266,7 +266,8 @@ typedef struct sLimMlmAssocInd
     tANI_U32             beaconLength;
     tANI_U8*             beaconPtr;
     tANI_U32             assocReqLength;
-    tANI_U8*             assocReqPtr;    
+    tANI_U8*             assocReqPtr;
+    uint32_t             rate_flags;
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
 typedef struct sLimMlmReassocReq
@@ -827,6 +828,7 @@ void limProcessSwitchChannelRsp(tpAniSirGlobal pMac,  void * );
 void limSendHalInitScanReq( tpAniSirGlobal, tLimLimHalScanState, tSirLinkTrafficCheck);
 void limSendHalStartScanReq( tpAniSirGlobal, tANI_U8, tLimLimHalScanState);
 void limSendHalEndScanReq( tpAniSirGlobal, tANI_U8, tLimLimHalScanState);
+void limSendTLPauseInd(tpAniSirGlobal pMac, uint16_t staId);
 void limSendHalFinishScanReq( tpAniSirGlobal, tLimLimHalScanState);
 
 void limContinuePostChannelScan(tpAniSirGlobal pMac);
@@ -871,6 +873,15 @@ tSirRetStatus limSendSaQueryRequestFrame( tpAniSirGlobal pMac, tANI_U8 *transId,
 tSirRetStatus limSendSaQueryResponseFrame( tpAniSirGlobal pMac, 
                    tANI_U8 *transId, tSirMacAddr peer,tpPESession psessionEntry);
 #endif
+
+#ifdef WLAN_FEATURE_RMC
+void limProcessRMCMessages(tpAniSirGlobal pMac, eRmcMessageType msgType,
+                             tANI_U32 *pMsgBuf);
+tSirRetStatus limSendRMCActionFrame(tpAniSirGlobal  pMac,
+                 tSirMacAddr peerMacAddr, tSirRMCInfo  *pRMC,
+                 tpPESession psessionEntry);
+#endif /* WLAN_FEATURE_RMC */
+
 // Inline functions
 
 /**
@@ -990,40 +1001,6 @@ limGetCurrentScanChannel(tpAniSirGlobal pMac)
 
     return (*(pChanNum + pMac->lim.gLimCurrentScanChannelId));
 } /*** end limGetCurrentScanChannel() ***/
-
-
-
-/**
- * limGetIElenFromBssDescription()
- *
- *FUNCTION:
- * This function is called in various places to get IE length
- * from tSirBssDescription structure
- * number being scanned.
- *
- *PARAMS:
- *
- *LOGIC:
- *
- *ASSUMPTIONS:
- * NA
- *
- *NOTE:
- * NA
- *
- * @param     pBssDescr
- * @return    Total IE length
- */
-
-static inline tANI_U16
-limGetIElenFromBssDescription(tpSirBssDescription pBssDescr)
-{
-    if (!pBssDescr)
-        return 0;
-
-    return ((tANI_U16) (pBssDescr->length + sizeof(tANI_U16) +
-                   sizeof(tANI_U32) - sizeof(tSirBssDescription)));
-} /*** end limGetIElenFromBssDescription() ***/
 
 /**
  * limSendBeaconInd()

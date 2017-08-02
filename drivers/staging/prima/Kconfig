@@ -49,6 +49,10 @@ config ENABLE_LINUX_REG
 	bool "Enable linux regulatory feature"
 	default n
 
+config WLAN_OFFLOAD_PACKETS
+	bool "Enable offload packets feature"
+	default n
+
 config QCOM_TDLS
 	bool "Enable TDLS"
 	default n

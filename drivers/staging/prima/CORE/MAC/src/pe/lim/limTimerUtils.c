@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -677,17 +677,31 @@ limCreateTimers(tpAniSirGlobal pMac)
         goto err_timer;
     }
 
-    cfgValue = ACTIVE_TO_PASSIVE_CONVERISON_TIMEOUT;
-    cfgValue = SYS_MS_TO_TICKS(cfgValue);
-    if (tx_timer_create(&pMac->lim.limTimers.gLimActiveToPassiveChannelTimer,
+    cfgValue = WNI_CFG_ACTIVE_PASSIVE_CON_MAX;
+    if (eSIR_SUCCESS != wlan_cfgGetInt(pMac, WNI_CFG_ACTIVE_PASSIVE_CON,
+                                      &cfgValue))
+    {
+        limLog(pMac, LOGP,
+               FL("could not retrieve WNI_CFG_ACTIVE_PASSIVE_CON"));
+    }
+    if (cfgValue)
+    {
+        cfgValue = ACTIVE_TO_PASSIVE_CONVERISON_TIMEOUT;
+        cfgValue = SYS_MS_TO_TICKS(cfgValue);
+        if (tx_timer_create(&pMac->lim.limTimers.gLimActiveToPassiveChannelTimer,
                                   "ACTIVE TO PASSIVE CHANNEL", limTimerHandler,
                  SIR_LIM_CONVERT_ACTIVE_CHANNEL_TO_PASSIVE, cfgValue, 0,
                  TX_NO_ACTIVATE) != TX_SUCCESS)
-    {
-        limLog(pMac, LOGW,FL("could not create timer for passive channel to active channel"));
-        goto err_timer;
+        {
+            limLog(pMac, LOGW,FL("could not create timer for passive channel to active channel"));
+            goto err_timer;
+        }
     }
-
+    else
+    {
+        limLog(pMac, LOG1,
+               FL("gLimActiveToPassiveChannelTimer not created %d"), cfgValue);
+    }
 
     return TX_SUCCESS;
 
@@ -1032,17 +1046,24 @@ limDeactivateAndChangeTimer(tpAniSirGlobal pMac, tANI_U32 timerId)
                 if(pMac->lim.gpLimMlmScanReq)
                 {
                     val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->minChannelTime);
-                    if (pMac->btc.btcScanCompromise)
+                    if (pMac->btc.btc_scan_compromise_esco)
                     {
-                        if (pMac->lim.gpLimMlmScanReq->minChannelTimeBtc)
+                        if (pMac->lim.gpLimMlmScanReq->min_chntime_btc_esco)
                         {
-                            val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->minChannelTimeBtc);
+                            val = SYS_MS_TO_TICKS(
+                                pMac->lim.gpLimMlmScanReq->min_chntime_btc_esco);
                             limLog(pMac, LOG1, FL("Using BTC Min Active Scan time"));
                         }
                         else
                         {
                             limLog(pMac, LOGE, FL("BTC Active Scan Min Time is Not Set"));
                         }
+                    } else if (pMac->btc.btc_scan_compromise_sco &&
+                       pMac->roam.configParam.min_chntime_btc_sco) {
+                        val = SYS_MS_TO_TICKS(
+                          pMac->roam.configParam.min_chntime_btc_sco);
+                        limLog(pMac, LOG1,
+                           FL("Using BTC SCO Min Active Scan time %d"), val);
                     }
                 }
                 else
@@ -1077,17 +1098,24 @@ limDeactivateAndChangeTimer(tpAniSirGlobal pMac, tANI_U32 timerId)
             if(pMac->lim.gpLimMlmScanReq)
             {
                 val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->minChannelTime)/2;
-                if (pMac->btc.btcScanCompromise)
+                if (pMac->btc.btc_scan_compromise_esco)
                 {
-                    if (pMac->lim.gpLimMlmScanReq->minChannelTimeBtc)
+                    if (pMac->lim.gpLimMlmScanReq->min_chntime_btc_esco)
                     {
-                        val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->minChannelTimeBtc)/2;
+                        val = SYS_MS_TO_TICKS(
+                            pMac->lim.gpLimMlmScanReq->min_chntime_btc_esco)/2;
                         limLog(pMac, LOG1, FL("Using BTC Min Active Scan time"));
                     }
                     else
                     {
                         limLog(pMac, LOGE, FL("BTC Active Scan Min Time is Not Set"));
                     }
+                } else if (pMac->btc.btc_scan_compromise_sco &&
+                   pMac->roam.configParam.min_chntime_btc_sco) {
+                    val = SYS_MS_TO_TICKS(
+                       pMac->roam.configParam.min_chntime_btc_sco / 2);
+                    limLog(pMac, LOG1,
+                       FL("Using BTC SCO Min Active Scan time %d"), val);
                 }
             }
             /*If val is 0 it means min Channel timer is 0 so take the value from maxChannelTimer*/
@@ -1097,17 +1125,24 @@ limDeactivateAndChangeTimer(tpAniSirGlobal pMac, tANI_U32 timerId)
                 if(pMac->lim.gpLimMlmScanReq)
                 {
                     val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->maxChannelTime)/2;
-                    if (pMac->btc.btcScanCompromise)
+                    if (pMac->btc.btc_scan_compromise_esco)
                     {
-                        if (pMac->lim.gpLimMlmScanReq->maxChannelTimeBtc)
+                        if (pMac->lim.gpLimMlmScanReq->max_chntime_btc_esco)
                         {
-                            val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->maxChannelTimeBtc)/2;
+                            val = SYS_MS_TO_TICKS(
+                              pMac->lim.gpLimMlmScanReq->max_chntime_btc_esco)/2;
                             limLog(pMac, LOG1, FL("Using BTC Max Active Scan time"));
                         }
                         else
                         {
                             limLog(pMac, LOGE, FL("BTC Active Scan Max Time is Not Set"));
                         }
+                    } else if (pMac->btc.btc_scan_compromise_sco &&
+                        pMac->roam.configParam.max_chntime_btc_sco) {
+                         val = SYS_MS_TO_TICKS(
+                           pMac->roam.configParam.max_chntime_btc_sco / 2);
+                         limLog(pMac, LOG1,
+                           FL("Using BTC SCO Max Active Scan time %d"), val);
                     }
                 }
                 else
@@ -1169,17 +1204,24 @@ limDeactivateAndChangeTimer(tpAniSirGlobal pMac, tANI_U32 timerId)
                     if(pMac->lim.gpLimMlmScanReq)
                     {
                         val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->maxChannelTime);
-                        if (pMac->btc.btcScanCompromise)
+                        if (pMac->btc.btc_scan_compromise_esco)
                         {
-                            if (pMac->lim.gpLimMlmScanReq->maxChannelTimeBtc)
+                            if (pMac->lim.gpLimMlmScanReq->max_chntime_btc_esco)
                             {
-                                val = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->maxChannelTimeBtc);
+                                val = SYS_MS_TO_TICKS(
+                                    pMac->lim.gpLimMlmScanReq->max_chntime_btc_esco);
                                 limLog(pMac, LOG1, FL("Using BTC Max Active Scan time"));
                             }
                             else
                             {
                                 limLog(pMac, LOGE, FL("BTC Active Scan Max Time is Not Set"));
                             }
+                        } else if (pMac->btc.btc_scan_compromise_sco &&
+                           pMac->roam.configParam.max_chntime_btc_sco) {
+                            val = SYS_MS_TO_TICKS(
+                                  pMac->roam.configParam.max_chntime_btc_sco);
+                            limLog(pMac, LOG1,
+                                  FL("Using BTC SCO Max Active Scan time %d"), val);
                         }
                     }
                     else

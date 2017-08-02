@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015. The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -164,53 +164,52 @@ limSearchAndDeleteDialogueToken(tpAniSirGlobal pMac, tANI_U8 token, tANI_U16 ass
     tpDialogueToken pCurrNode = pMac->lim.pDialogueTokenHead;
     tpDialogueToken pPrevNode = pMac->lim.pDialogueTokenHead;
 
-    //if the list is empty
+    /* if the list is empty */
     if(NULL == pCurrNode)
       return eSIR_FAILURE;
 
-    // if the matching node is the first node.
-    if(pCurrNode &&
+    /* If the matching node is the first node.*/
+    if ((token == pCurrNode->token) &&
         (assocId == pCurrNode->assocId) &&
-        (tid == pCurrNode->tid))
-    {
-        pMac->lim.pDialogueTokenHead = pCurrNode->next;        
-        //there was only one node in the list. So tail pointer also needs to be adjusted.
-        if(NULL == pMac->lim.pDialogueTokenHead)
+        (tid == pCurrNode->tid)) {
+        pMac->lim.pDialogueTokenHead = pCurrNode->next;
+        /* There was only one node in the list.
+         * So tail pointer also needs to be adjusted.
+         */
+        if (NULL == pMac->lim.pDialogueTokenHead)
             pMac->lim.pDialogueTokenTail = NULL;
         vos_mem_free(pCurrNode);
-        pMac->lim.pDialogueTokenHead = NULL;
         return eSIR_SUCCESS;
     }
 
-    //first node did not match. so move to the next one.
+    /* first node did not match. so move to the next one. */
     pCurrNode = pCurrNode->next;
-    while(NULL != pCurrNode )
-    {
-        if(token == pCurrNode->token)
-        {
-            break;
-        }
 
+    while (NULL != pCurrNode) {
+         if ((token == pCurrNode->token) &&
+           (assocId == pCurrNode->assocId) &&
+           (tid == pCurrNode->tid)) {
+           break;
+        }
         pPrevNode = pCurrNode;
         pCurrNode = pCurrNode->next;
     }
 
-    if(pCurrNode &&
-        (assocId == pCurrNode->assocId) &&
-        (tid == pCurrNode->tid))
-    {
+    if (pCurrNode) {
         pPrevNode->next = pCurrNode->next;
-        //if the node being deleted is the last one then we also need to move the tail pointer to the prevNode.
+        /* if the node being deleted is the last one
+         * then we also need to move the tail pointer
+         * to the prevNode.
+         */
         if(NULL == pCurrNode->next)
               pMac->lim.pDialogueTokenTail = pPrevNode;
         vos_mem_free(pCurrNode);
-        pMac->lim.pDialogueTokenHead = NULL;
         return eSIR_SUCCESS;
     }
 
-    PELOGW(limLog(pMac, LOGW, FL("LIM does not have matching dialogue token node"));)
+    limLog(pMac, LOGW,
+       FL("LIM does not have matching dialogue token node"));
     return eSIR_FAILURE;
-
 }
 
 
@@ -1399,9 +1398,15 @@ tANI_U8 limWriteDeferredMsgQ(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
          **/
     if (pMac->lim.gLimDeferredMsgQ.size >= MAX_DEFERRED_QUEUE_LEN)
     {
-        if(!(pMac->lim.deferredMsgCnt & 0xF))
+        if (!(pMac->lim.deferredMsgCnt & 0xF))
         {
-            PELOGE(limLog(pMac, LOGE, FL("Deferred Message Queue is full. Msg:%d Messages Failed:%d"), limMsg->type, ++pMac->lim.deferredMsgCnt);)
+            limLog(pMac, LOGE,
+             FL("Deferred Message Queue is full. Msg:%d Messages Failed:%d"),
+                                    limMsg->type, ++pMac->lim.deferredMsgCnt);
+            vos_fatal_event_logs_req(WLAN_LOG_TYPE_NON_FATAL,
+                     WLAN_LOG_INDICATOR_HOST_DRIVER,
+                     WLAN_LOG_REASON_QUEUE_FULL,
+                     FALSE, TRUE);
         }
         else
         {
@@ -2586,15 +2591,22 @@ void limProcessChannelSwitchTimeout(tpAniSirGlobal pMac)
     tpPESession psessionEntry = NULL;
     tANI_U8    channel; // This is received and stored from channelSwitch Action frame
    
-    if((psessionEntry = peFindSessionBySessionId(pMac, pMac->lim.limTimers.gLimChannelSwitchTimer.sessionId))== NULL) 
-    {
-        limLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+    if ((psessionEntry = peFindSessionBySessionId(pMac,
+       pMac->lim.limTimers.gLimChannelSwitchTimer.sessionId))== NULL) {
+        limLog(pMac, LOGW,FL("Session Does not exist for given sessionID"));
         return;
     }
 
     if (psessionEntry->limSystemRole != eLIM_STA_ROLE)
     {
         PELOGW(limLog(pMac, LOGW, "Channel switch can be done only in STA role, Current Role = %d", psessionEntry->limSystemRole);)
+        return;
+    }
+    if (psessionEntry->gLimSpecMgmt.dot11hChanSwState !=
+                                  eLIM_11H_CHANSW_RUNNING) {
+        limLog(pMac, LOGW,
+            FL("Channel switch timer should not have been running in state %d"),
+            psessionEntry->gLimSpecMgmt.dot11hChanSwState);
         return;
     }
     channel = psessionEntry->gLimChannelSwitch.primaryChannel;
@@ -2660,9 +2672,14 @@ void limProcessChannelSwitchTimeout(tpAniSirGlobal pMac)
          * then we cannot switch the channel. Just disassociate from AP. 
          * We will find a better AP !!!
          */
-        limTearDownLinkWithAp(pMac, 
+        if ((psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE) &&
+           (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE)&&
+           (psessionEntry->limSmeState != eLIM_SME_WT_DEAUTH_STATE)) {
+              limLog(pMac, LOGE, FL("Invalid channel!! Disconnect.."));
+              limTearDownLinkWithAp(pMac,
                         pMac->lim.limTimers.gLimChannelSwitchTimer.sessionId,
                         eSIR_MAC_UNSPEC_FAILURE_REASON);
+        }
         return;
     }
     limCovertChannelScanType(pMac, psessionEntry->currentOperChannel, false);
@@ -3420,6 +3437,11 @@ void limSwitchPrimarySecondaryChannel(tpAniSirGlobal pMac, tpPESession psessionE
                 limSendSwitchChnlParams(pMac, newChannel, subband, psessionEntry->maxTxPower, psessionEntry->peSessionId);
 #else
                 limSendSwitchChnlParams(pMac, newChannel, subband, (tPowerdBm)localPwrConstraint, psessionEntry->peSessionId);
+#endif
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+       limDiagEventReport(pMac, WLAN_PE_DIAG_CHANNEL_SWITCH_ANOUNCEMENT,
+                 psessionEntry, eSIR_SUCCESS, LIM_SWITCH_CHANNEL_OPERATION);
 #endif
 
     // Store the new primary and secondary channel in session entries if different
@@ -5716,9 +5738,12 @@ limProcessAddBaInd(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
             if((eBA_DISABLE == pSta->tcCfg[tid].fUseBATx) &&
                  (pBaCandidate->baInfo[tid].fBaEnable))
             {
-                limLog(pMac, LOGE, FL("BA setup for staId = %d, TID: %d, SSN: %d"),
-                        pSta->staIndex, tid, pBaCandidate->baInfo[tid].startingSeqNum);
-                limPostMlmAddBAReq(pMac, pSta, tid, pBaCandidate->baInfo[tid].startingSeqNum,psessionEntry);  
+                limLog(pMac, LOG1,
+                        FL("BA setup for staId = %d, TID: %d, SSN: %d"),
+                        pSta->staIndex, tid,
+                        pBaCandidate->baInfo[tid].startingSeqNum);
+                limPostMlmAddBAReq(pMac, pSta, tid,
+                        pBaCandidate->baInfo[tid].startingSeqNum,psessionEntry);
             }
         }
     }
@@ -8497,4 +8522,98 @@ eHalStatus limTxBdComplete(tpAniSirGlobal pMac, void *pData)
     limLog(pMac, LOG1, FL("txBdToken %u, txBdStatus %u"),
             pTxBdStatus->txBdToken, pTxBdStatus->txCompleteStatus);
     return eHAL_STATUS_SUCCESS;
+}
+
+/**
+ * lim_is_robust_mgmt_action_frame() - Check if action catagory is
+ * robust action frame
+ * @action_catagory: Action frame catagory.
+ *
+ * This function is used to check if given action catagory is robust
+ * action frame.
+ *
+ * Return: bool
+ */
+bool lim_is_robust_mgmt_action_frame(uint8 action_catagory)
+{
+   switch (action_catagory) {
+       /*
+        * NOTE: This function doesn't take care of the DMG
+        * (Directional Multi-Gigatbit) BSS case as 8011ad
+        * support is not yet added. In future, if the support
+        * is required then this function need few more arguments
+        * and little change in logic.
+        */
+       case SIR_MAC_ACTION_SPECTRUM_MGMT:
+       case SIR_MAC_ACTION_QOS_MGMT:
+       case SIR_MAC_ACTION_DLP:
+       case SIR_MAC_ACTION_BLKACK:
+       case SIR_MAC_ACTION_RRM:
+       case SIR_MAC_ACTION_FAST_BSS_TRNST:
+       case SIR_MAC_ACTION_SA_QUERY:
+       case SIR_MAC_ACTION_PROT_DUAL_PUB:
+       case SIR_MAC_ACTION_WNM:
+       case SIR_MAC_ACITON_MESH:
+       case SIR_MAC_ACTION_MHF:
+       case SIR_MAC_ACTION_FST:
+            return true;
+       default:
+            VOS_TRACE (VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
+                   FL("non-PMF action category[%d] "),
+                   action_catagory);
+            break;
+   }
+   return false;
+}
+
+/**
+ * lim_compute_ext_cap_ie_length - compute the length of ext cap ie
+ * based on the bits set
+ * @ext_cap: extended IEs structure
+ *
+ * Return: length of the ext cap ie, 0 means should not present
+ */
+tANI_U8 lim_compute_ext_cap_ie_length (tDot11fIEExtCap *ext_cap) {
+    tANI_U8 i = DOT11F_IE_EXTCAP_MAX_LEN;
+
+    while (i) {
+        if (ext_cap->bytes[i-1]) {
+            break;
+        }
+        i --;
+    }
+
+    return i;
+}
+
+/**
+ * lim_update_caps_info_for_bss - Update capability info for this BSS
+ *
+ * @mac_ctx: mac context
+ * @caps: Pointer to capability info to be updated
+ * @bss_caps: Capability info of the BSS
+ *
+ * Update the capability info in Assoc/Reassoc request frames and reset
+ * the spectrum management, short preamble, immediate block ack bits
+ * if the BSS doesnot support it
+ *
+ * Return: None
+ */
+void lim_update_caps_info_for_bss(tpAniSirGlobal mac_ctx,
+                                  uint16_t *caps, uint16_t bss_caps)
+{
+    if (!(bss_caps & LIM_SPECTRUM_MANAGEMENT_BIT_MASK)) {
+          *caps &= (~LIM_SPECTRUM_MANAGEMENT_BIT_MASK);
+          limLog(mac_ctx, LOG1, FL("Clearing spectrum management:no AP support"));
+    }
+
+    if (!(bss_caps & LIM_SHORT_PREAMBLE_BIT_MASK)) {
+          *caps &= (~LIM_SHORT_PREAMBLE_BIT_MASK);
+          limLog(mac_ctx, LOG1, FL("Clearing short preamble:no AP support"));
+    }
+
+    if (!(bss_caps & LIM_IMMEDIATE_BLOCK_ACK_MASK)) {
+          *caps &= (~LIM_IMMEDIATE_BLOCK_ACK_MASK);
+          limLog(mac_ctx, LOG1, FL("Clearing Immed Blk Ack:no AP support"));
+    }
 }
