@@ -969,6 +969,7 @@ err_subsys:
 	destroy_ramdump_device(d->ramdump_dev);
 err_ramdump:
 	pil_desc_release(&d->desc);
+	platform_set_drvdata(pdev, NULL);
 
 	return rc;
 }
