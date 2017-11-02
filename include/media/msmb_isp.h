@@ -130,7 +130,9 @@ struct msm_vfe_camif_cfg {
 	uint32_t epoch_line0;
 	uint32_t epoch_line1;
 	enum msm_vfe_camif_input camif_input;
+#ifndef CONFIG_MSM_USES_M_STACK
 	struct msm_vfe_camif_subsample_cfg subsample_cfg;
+#endif
 };
 
 enum msm_vfe_inputmux {

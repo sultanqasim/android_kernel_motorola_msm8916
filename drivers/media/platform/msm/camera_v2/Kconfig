@@ -283,3 +283,11 @@ config MSM_CHECK_CAMERA_ACTUATOR
 	   Older binaries didn't have struct msm_sensor_actuator_info_t in the
 	   camera API structs and will break with this enabled. New Motorola
 	   camera binaries from Marshmallow require this.
+
+config MSM_USES_M_STACK
+	 bool "Enable the support for devices that use a Marshmallow stack"
+	 default n
+	 depends on MSMB_CAMERA
+	 ---help---
+	    Older stacks do not support camif subsample, expect an 8K extrasize
+	    and somehow "msm: camera: sensor: Validate step_boundary" breaks camera.
