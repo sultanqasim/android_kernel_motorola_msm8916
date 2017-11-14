@@ -333,6 +333,8 @@ int mdss_mdp_get_plane_sizes(u32 format, u32 w, u32 h,
 	if (ps == NULL)
 		return -EINVAL;
 
+	memset(ps, 0, sizeof(struct mdss_mdp_plane_sizes));
+
 	if ((w > MAX_IMG_WIDTH) || (h > MAX_IMG_HEIGHT))
 		return -ERANGE;
 
@@ -341,7 +343,6 @@ int mdss_mdp_get_plane_sizes(u32 format, u32 w, u32 h,
 		return -EINVAL;
 
 	bpp = fmt->bpp;
-	memset(ps, 0, sizeof(struct mdss_mdp_plane_sizes));
 
 	if (bwc_mode) {
 		u32 height, meta_size;
