@@ -36,18 +36,21 @@
  */
 #define readl_poll_timeout(addr, val, cond, sleep_us, timeout_us) \
 ({ \
-	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-	might_sleep_if(timeout_us); \
+	u64 __timeout_us = (timeout_us); \
+	unsigned long __sleep_us = (sleep_us); \
+	ktime_t __timeout = ktime_add_us(ktime_get(), __timeout_us); \
+	might_sleep_if((__sleep_us) != 0); \
 	for (;;) { \
 		(val) = readl(addr); \
 		if (cond) \
 			break; \
-		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
+		if (__timeout_us && \
+				ktime_compare(ktime_get(), __timeout) > 0) { \
 			(val) = readl(addr); \
 			break; \
 		} \
-		if (sleep_us) \
-			usleep_range(DIV_ROUND_UP(sleep_us, 4), sleep_us); \
+		if (__sleep_us) \
+			usleep_range(DIV_ROUND_UP(__sleep_us, 4), __sleep_us); \
 	} \
 	(cond) ? 0 : -ETIMEDOUT; \
 })
