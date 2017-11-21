@@ -253,7 +253,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
             return;
         }
 
-        if (frameLen < LIM_ENCR_AUTH_BODY_LEN)
+        if ((frameLen < LIM_ENCR_AUTH_BODY_LEN) ||
+            (frameLen > sizeof(plainBody) + SIR_MAC_WEP_IV_LENGTH))
         {
             // Log error
             limLog(pMac, LOGE,
