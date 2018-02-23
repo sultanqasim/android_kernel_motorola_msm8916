@@ -225,7 +225,7 @@ qcom,bcl {
 			uv-to-ua-numerator = <2>;
 			uv-to-ua-denominator = <1>;
 			vph-channel = <0x06>;
-			vph-high-threshold-uv = <3630000>;
+			vph-high-threshold-uv = <3700000>;
 			vph-low-threshold-uv = <3500000>;
 			thermal-handle = <&msm_thermal_freq>;
 			charge-ic-handle = <&smb1357_otg_vreg>;
