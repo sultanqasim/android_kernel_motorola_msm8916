@@ -15,6 +15,7 @@
 #include <sound/q6asm-v2.h>
 #include <sound/compress_params.h>
 #include <sound/msm-audio-effects-q6-v2.h>
+#include <sound/devdep_params.h>
 
 #define GET_NEXT(ptr, upper_limit, rc)                                  \
 ({                                                                      \

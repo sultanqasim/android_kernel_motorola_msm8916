@@ -29,6 +29,7 @@
 #include <sound/q6asm-v2.h>
 #include <sound/pcm_params.h>
 #include <sound/audio_effects.h>
+#include <sound/devdep_params.h>
 #include <asm/dma.h>
 #include <linux/dma-mapping.h>
 #include <linux/msm_audio_ion.h>
