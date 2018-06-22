@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -623,7 +623,8 @@ static int diag_cmd_set_all_msg_mask(unsigned char *src_buf, int src_len,
 	msg_mask.status = (req->rt_mask) ? DIAG_CTRL_MASK_ALL_ENABLED :
 					   DIAG_CTRL_MASK_ALL_DISABLED;
 	for (i = 0; i < driver->msg_mask_tbl_count; i++, mask++) {
-		memset(mask->ptr, req->rt_mask,
+		if (mask && mask->ptr)
+			memset(mask->ptr, req->rt_mask,
 		       mask->range * sizeof(uint32_t));
 	}
 	mutex_unlock(&msg_mask.lock);
@@ -912,6 +913,8 @@ static int diag_cmd_set_log_mask(unsigned char *src_buf, int src_len,
 	}
 	mutex_lock(&log_mask.lock);
 	for (i = 0; i < MAX_EQUIP_ID && !status; i++, mask++) {
+		if (!mask || !mask->ptr)
+			continue;
 		if (mask->equip_id != req->equip_id)
 			continue;
 		if (req->num_items < mask->num_items)
@@ -980,10 +983,10 @@ static int diag_cmd_disable_log_mask(unsigned char *src_buf, int src_len,
 		       __func__, src_buf, src_len, dest_buf, dest_len);
 		return -EINVAL;
 	}
-
 	mutex_lock(&log_mask.lock);
 	for (i = 0; i < MAX_EQUIP_ID; i++, mask++)
-		memset(mask->ptr, 0, mask->range);
+		if (mask && mask->ptr)
+			memset(mask->ptr, 0, mask->range);
 	log_mask.status = DIAG_CTRL_MASK_ALL_DISABLED;
 	mutex_unlock(&log_mask.lock);
 	diag_update_userspace_clients(LOG_MASKS_TYPE);
