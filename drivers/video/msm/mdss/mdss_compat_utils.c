@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 1994 Martin Schaller
  *
  * 2001 - Documented with DocBook
@@ -1923,6 +1923,7 @@ static int __pp_compat_alloc(struct msmfb_mdp_pp32 __user *pp32,
 {
 	uint32_t alloc_size = 0, lut_type, r_size, g_size, b_size;
 	struct mdp_pgc_lut_data32 __user *pgc_data32;
+	struct mdp_lut_cfg_data *lut_data;
 	uint8_t num_r_stages, num_g_stages, num_b_stages;
 
 	alloc_size = sizeof(struct msmfb_mdp_pp);
@@ -1967,32 +1968,37 @@ static int __pp_compat_alloc(struct msmfb_mdp_pp32 __user *pp32,
 			*pp = compat_alloc_user_space(alloc_size);
 			if (NULL == *pp)
 				return -ENOMEM;
-			memset(*pp, 0, alloc_size);
+			if (clear_user(*pp, alloc_size))
+				return -EFAULT;
+			lut_data = &(*pp)->data.lut_cfg_data;
+			if (put_user((struct mdp_ar_gc_lut_data *)
+					((unsigned long) *pp +
+					sizeof(struct msmfb_mdp_pp)),
+				&(lut_data->data.pgc_lut_data.r_data)) ||
+				put_user((struct mdp_ar_gc_lut_data *)
+					((unsigned long) *pp +
+					sizeof(struct msmfb_mdp_pp) + r_size),
+				&(lut_data->data.pgc_lut_data.g_data)) ||
+				put_user((struct mdp_ar_gc_lut_data *)
+						((unsigned long) *pp +
+						sizeof(struct msmfb_mdp_pp) +
+						r_size + g_size),
+				&(lut_data->data.pgc_lut_data.b_data)))
+				return -EFAULT;
 
-			(*pp)->data.lut_cfg_data.data.pgc_lut_data.r_data =
-					(struct mdp_ar_gc_lut_data *)
-					((unsigned long) *pp +
-					sizeof(struct msmfb_mdp_pp));
-			(*pp)->data.lut_cfg_data.data.pgc_lut_data.g_data =
-					(struct mdp_ar_gc_lut_data *)
-					((unsigned long) *pp +
-					sizeof(struct msmfb_mdp_pp) + r_size);
-			(*pp)->data.lut_cfg_data.data.pgc_lut_data.b_data =
-					(struct mdp_ar_gc_lut_data *)
-					((unsigned long) *pp +
-					sizeof(struct msmfb_mdp_pp) +
-					r_size + g_size);
 		} else {
 			*pp = compat_alloc_user_space(alloc_size);
 			if (NULL == *pp)
 				return -ENOMEM;
-			memset(*pp, 0, alloc_size);
+			if (clear_user(*pp, alloc_size))
+				return -EFAULT;
 		}
 	} else {
 		*pp = compat_alloc_user_space(alloc_size);
 		if (NULL == *pp)
 			return -ENOMEM;
-		memset(*pp, 0, alloc_size);
+		if (clear_user(*pp, alloc_size))
+			return -EFAULT;
 	}
 
 	return 0;
@@ -2418,7 +2424,8 @@ static int mdss_histo_compat_ioctl(struct fb_info *info, unsigned int cmd,
 				 sizeof(struct mdp_histogram_start_req));
 			return -EINVAL;
 		}
-		memset(hist_req, 0, sizeof(struct mdp_histogram_start_req));
+		if (clear_user(hist_req, sizeof(struct mdp_histogram_start_req)))
+			return -EFAULT;
 		ret = __from_user_hist_start_req(hist_req32, hist_req);
 		if (ret)
 			goto histo_compat_err;
@@ -2437,7 +2444,8 @@ static int mdss_histo_compat_ioctl(struct fb_info *info, unsigned int cmd,
 				 sizeof(struct mdp_histogram_data));
 			return -EINVAL;
 		}
-		memset(hist, 0, sizeof(struct mdp_histogram_data));
+		if (clear_user(hist, sizeof(struct mdp_histogram_data)))
+			return -EFAULT;
 		ret = __from_user_hist_data(hist32, hist);
 		if (ret)
 			goto histo_compat_err;
@@ -2507,7 +2515,7 @@ static int __to_user_mdp_overlay(struct mdp_overlay32 __user *ov32,
 }
 
 
-static int __from_user_mdp_overlay(struct mdp_overlay *ov,
+static int __from_user_mdp_overlay(struct mdp_overlay __user *ov,
 				   struct mdp_overlay32 __user *ov32)
 {
 	__u32 data;
@@ -2566,12 +2574,12 @@ static int __from_user_mdp_overlay(struct mdp_overlay *ov,
 	return 0;
 }
 
-static int __from_user_mdp_overlaylist(struct mdp_overlay_list *ovlist,
-				   struct mdp_overlay_list32 *ovlist32,
+static int __from_user_mdp_overlaylist(struct mdp_overlay_list __user *ovlist,
+				   struct mdp_overlay_list32 __user *ovlist32,
 				   struct mdp_overlay **to_list_head)
 {
 	__u32 i, ret;
-	unsigned long data, from_list_head;
+	unsigned long data, from_list_head, num_overlays;
 	struct mdp_overlay32 *iter;
 
 	if (!to_list_head || !ovlist32 || !ovlist) {
@@ -2592,11 +2600,13 @@ static int __from_user_mdp_overlaylist(struct mdp_overlay_list *ovlist,
 			 sizeof(ovlist32->processed_overlays)))
 		return -EFAULT;
 
-	if (get_user(data, &ovlist32->overlay_list)) {
+	if (get_user(data, &ovlist32->overlay_list) ||
+		get_user(num_overlays, &ovlist32->num_overlays))
+	{
 		ret = -EFAULT;
 		goto validate_exit;
 	}
-	for (i = 0; i < ovlist32->num_overlays; i++) {
+	for (i = 0; i < num_overlays; i++) {
 		if (get_user(from_list_head, (__u32 *)data + i)) {
 			ret = -EFAULT;
 			goto validate_exit;
@@ -2609,8 +2619,8 @@ static int __from_user_mdp_overlaylist(struct mdp_overlay_list *ovlist,
 			goto validate_exit;
 		}
 	}
-	ovlist->overlay_list = to_list_head;
-
+	if (put_user(to_list_head, &ovlist->overlay_list))
+		return -EFAULT;
 	return 0;
 
 validate_exit:
@@ -2618,8 +2628,8 @@ validate_exit:
 	return -EFAULT;
 }
 
-static int __to_user_mdp_overlaylist(struct mdp_overlay_list32 *ovlist32,
-				   struct mdp_overlay_list *ovlist,
+static int __to_user_mdp_overlaylist(struct mdp_overlay_list32 __user *ovlist32,
+				   struct mdp_overlay_list __user *ovlist,
 				   struct mdp_overlay **l_ptr)
 {
 	__u32 i, ret;
@@ -2684,8 +2694,9 @@ void mdss_compat_align_list(void __user *total_mem_chunk,
 int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 			 unsigned long arg)
 {
-	struct mdp_overlay *ov, **layers_head;
-	struct mdp_overlay32 *ov32;
+	struct mdp_overlay **layers_head;
+	struct mdp_overlay __user *ov;
+	struct mdp_overlay32 __user *ov32;
 	struct mdp_overlay_list __user *ovlist;
 	struct mdp_overlay_list32 __user *ovlist32;
 	size_t layers_refs_sz, layers_sz, prepare_sz;
