@@ -851,7 +851,7 @@ static struct binder_buffer *binder_alloc_buf(struct binder_proc *proc,
 	if (buffer_size != size) {
 		struct binder_buffer *new_buffer;
 
-		new_buffer = kzalloc(sizeof(*buffer), GFP_KERNEL);
+		new_buffer = kzalloc_preempt_disabled(sizeof(*buffer));
 		if (!new_buffer) {
 			pr_err("%s: %d failed to alloc new buffer struct\n",
 			       __func__, proc->pid);
