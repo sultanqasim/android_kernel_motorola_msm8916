@@ -107,7 +107,7 @@ static void level_stats_print(struct seq_file *m, struct level_stats *stats)
 	int64_t s = stats->total_time;
 	uint32_t ns = do_div(s, NSEC_PER_SEC);
 
-	snprintf(seqs, MAX_STR_LEN,
+	i = snprintf(seqs, MAX_STR_LEN,
 		"[%s] %s:\n"
 		"  success count: %7d\n"
 		"  total success time: %lld.%09u\n",
@@ -115,7 +115,8 @@ static void level_stats_print(struct seq_file *m, struct level_stats *stats)
 		stats->name,
 		stats->success_count,
 		s, ns);
-	seq_puts(m, seqs);
+	if (i < MAX_STR_LEN)
+		seq_puts(m, seqs);
 
 	if (stats->failed_count) {
 		snprintf(seqs, MAX_STR_LEN, "  failed count: %7d\n",
@@ -301,14 +302,15 @@ int lifo_stats_file_show(struct seq_file *m, void *v)
 
 	centry = &stats->child;
 	list_for_each_entry(pos, centry, sibling) {
-		snprintf(seqs, MAX_STR_LEN,
+		int i = snprintf(seqs, MAX_STR_LEN,
 			"%s:\n"
 			"\tLast-In:%u\n"
 			"\tFirst-Out:%u\n",
 			pos->name,
 			pos->lifo.last_in,
 			pos->lifo.first_out);
-		seq_puts(m, seqs);
+		if (i < MAX_STR_LEN)
+			seq_puts(m, seqs);
 	}
 	return 0;
 }

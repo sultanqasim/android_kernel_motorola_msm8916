@@ -417,10 +417,10 @@ static struct dentry *relay_create_buf_file(struct rchan *chan,
 	struct dentry *dentry;
 	char *tmpname;
 
-	tmpname = kzalloc(NAME_MAX + 1, GFP_KERNEL);
+	tmpname = kzalloc(NAME_MAX + 9, GFP_KERNEL);
 	if (!tmpname)
 		return NULL;
-	snprintf(tmpname, NAME_MAX, "%s%d", chan->base_filename, cpu);
+	snprintf(tmpname, NAME_MAX + 8, "%s%d", chan->base_filename, cpu);
 
 	/* Create file in fs */
 	dentry = chan->cb->create_buf_file(tmpname, chan->parent,

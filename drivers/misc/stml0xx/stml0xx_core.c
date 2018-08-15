@@ -265,11 +265,11 @@ static ssize_t dock_print_name(struct switch_dev *switch_dev, char *buf)
 {
 	switch (switch_get_state(switch_dev)) {
 	case NO_DOCK:
-		return snprintf(buf, 5, "None\n");
+		return snprintf(buf, 6, "None\n");
 	case DESK_DOCK:
-		return snprintf(buf, 5, "DESK\n");
+		return snprintf(buf, 6, "DESK\n");
 	case CAR_DOCK:
-		return snprintf(buf, 4, "CAR\n");
+		return snprintf(buf, 5, "CAR\n");
 	}
 
 	return -EINVAL;

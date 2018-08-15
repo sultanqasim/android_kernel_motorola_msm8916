@@ -875,6 +875,8 @@ int ext4_es_zeroout(struct inode *inode, struct ext4_extent *ex)
 	ext4_fsblk_t ee_pblock;
 	unsigned int ee_len;
 
+	memset(&ee_block, 0, sizeof(ee_block));
+
 	ee_block  = le32_to_cpu(ex->ee_block);
 	ee_len    = ext4_ext_get_actual_len(ex);
 	ee_pblock = ext4_ext_pblock(ex);

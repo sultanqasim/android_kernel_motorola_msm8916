@@ -130,7 +130,7 @@ struct alps_fields {
  */
 struct alps_data {
 	struct input_dev *dev2;
-	char phys[32];
+	char phys[40];
 
 	/* these are autodetected when the device is identified */
 	const struct alps_nibble_commands *nibble_commands;

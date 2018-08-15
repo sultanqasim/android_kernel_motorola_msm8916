@@ -3498,7 +3498,7 @@ static int __handle_overlay_prepare(struct msm_fb_data_type *mfd,
 	struct mdp_overlay *sorted_ovs = NULL;
 	struct mdp_overlay *req, *prev_req;
 
-	struct mdss_mdp_pipe *pipe, *left_blend_pipe;
+	struct mdss_mdp_pipe *pipe = NULL, *left_blend_pipe = NULL;
 	struct mdss_mdp_pipe *right_plist[MAX_PIPES_PER_LM] = { 0 };
 	struct mdss_mdp_pipe *left_plist[MAX_PIPES_PER_LM] = { 0 };
 

@@ -429,7 +429,7 @@ static ssize_t store_reset(struct kobject *kobj,
 static ssize_t show_enabled(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return snprintf(buf, 2, "%u\n", !!stats_collection_enabled);
+	return snprintf(buf, 3, "%u\n", !!stats_collection_enabled);
 }
 
 static ssize_t store_enable(struct kobject *kobj,

@@ -1284,7 +1284,7 @@ static ssize_t read_single_reg(struct device *dev, char *buf, u8 reg)
 	err = lis3dh_acc_i2c_read(acc, &data, 1);
 	if (err < 0)
 		return err;
-	ret = snprintf(buf, 4, "0x%02x\n", data);
+	ret = snprintf(buf, 6, "0x%02x\n", data);
 	return ret;
 
 }

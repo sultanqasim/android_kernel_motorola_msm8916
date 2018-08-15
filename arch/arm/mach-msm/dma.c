@@ -806,7 +806,7 @@ static int msm_dmov_probe(struct platform_device *pdev)
 		platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	struct resource *mres =
 		platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	char wq_name[12];
+	char wq_name[20];
 
 	if (pdata) {
 		dmov_conf[adm].sd = pdata->sd;

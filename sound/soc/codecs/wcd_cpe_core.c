@@ -208,7 +208,7 @@ static int wcd_cpe_load_each_segment(struct wcd_cpe_core *core,
 			  int file_idx, const struct elf32_phdr *phdr)
 {
 	const struct firmware *split_fw;
-	char split_fname[32];
+	char split_fname[70];
 	int ret = 0;
 	struct cpe_svc_mem_segment *segment;
 
@@ -338,7 +338,7 @@ static int wcd_cpe_load_fw(struct wcd_cpe_core *core,
 	const struct elf32_phdr *phdr;
 	const struct firmware *fw;
 	const u8 *elf_ptr;
-	char mdt_name[64];
+	char mdt_name[68];
 	bool img_dload_fail = false;
 	bool load_segment;
 

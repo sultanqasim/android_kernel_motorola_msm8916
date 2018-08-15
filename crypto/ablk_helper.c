@@ -139,7 +139,7 @@ EXPORT_SYMBOL_GPL(ablk_init_common);
 
 int ablk_init(struct crypto_tfm *tfm)
 {
-	char drv_name[CRYPTO_MAX_ALG_NAME];
+	char drv_name[CRYPTO_MAX_ALG_NAME + 9];
 
 	snprintf(drv_name, sizeof(drv_name), "__driver-%s",
 					crypto_tfm_alg_driver_name(tfm));

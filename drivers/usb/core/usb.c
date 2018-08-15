@@ -421,8 +421,9 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
 			/* Root ports are not counted in route string */
 			dev->route = 0;
 		} else {
-			snprintf(dev->devpath, sizeof dev->devpath,
+			int i = snprintf(dev->devpath, sizeof dev->devpath,
 				"%s.%d", parent->devpath, port1);
+			WARN_ON(i >= sizeof(dev->devpath));
 			/* Route string assumes hubs have less than 16 ports */
 			if (port1 < 15)
 				dev->route = parent->route +

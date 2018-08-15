@@ -205,7 +205,7 @@ struct atkbd {
 
 	/* Written only during init */
 	char name[64];
-	char phys[32];
+	char phys[40];
 
 	unsigned short id;
 	unsigned short keycode[ATKBD_KEYMAP_SIZE];

@@ -2137,7 +2137,7 @@ EXPORT_SYMBOL(qpnp_adc_tm_usbid_configure);
 
 int32_t qpnp_adc_tm_usbid_end(struct qpnp_adc_tm_chip *chip)
 {
-	struct qpnp_adc_tm_btm_param param;
+	struct qpnp_adc_tm_btm_param param = {0};
 
 	return qpnp_adc_tm_disable_chan_meas(chip, &param);
 }

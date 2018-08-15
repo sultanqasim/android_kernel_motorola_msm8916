@@ -2525,7 +2525,7 @@ EXPORT_SYMBOL(v4l2_subdev_g_ctrl);
 
 s32 v4l2_ctrl_g_ctrl(struct v4l2_ctrl *ctrl)
 {
-	struct v4l2_ext_control c;
+	struct v4l2_ext_control c = {0};
 
 	/* It's a driver bug if this happens. */
 	WARN_ON(!type_is_int(ctrl));
@@ -2537,7 +2537,7 @@ EXPORT_SYMBOL(v4l2_ctrl_g_ctrl);
 
 s64 v4l2_ctrl_g_ctrl_int64(struct v4l2_ctrl *ctrl)
 {
-	struct v4l2_ext_control c;
+	struct v4l2_ext_control c = {0};
 
 	/* It's a driver bug if this happens. */
 	WARN_ON(ctrl->type != V4L2_CTRL_TYPE_INTEGER64);

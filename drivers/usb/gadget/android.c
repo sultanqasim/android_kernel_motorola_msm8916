@@ -2449,7 +2449,7 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		pr_debug("limiting uicc luns to %d\n", uicc_nluns);
 	}
 
-	for (i = 0; i < uicc_nluns; i++) {
+	for (i = 0; i < uicc_nluns && i < 999; i++) {
 		n = config->fsg.nluns;
 		snprintf(name[n], MAX_LUN_NAME, "uicc%d", i);
 		config->fsg.luns[n].removable = 1;

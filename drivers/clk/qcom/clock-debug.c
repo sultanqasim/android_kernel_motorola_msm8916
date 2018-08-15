@@ -201,7 +201,7 @@ static int fmax_rates_show(struct seq_file *m, void *unused)
 	struct clk *clock = m->private;
 	struct clk_vdd_class *vdd_class = clock->vdd_class;
 	int level = 0, i, nregs = vdd_class->num_regulators;
-	char reg_name[10];
+	char reg_name[16];
 
 	int vdd_level = find_vdd_level(clock, clock->rate);
 	if (vdd_level < 0) {
