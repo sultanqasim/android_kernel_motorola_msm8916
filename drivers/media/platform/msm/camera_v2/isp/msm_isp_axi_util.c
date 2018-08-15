@@ -1550,7 +1550,9 @@ static int msm_isp_start_axi_stream(struct vfe_device *vfe_dev,
 
 		msm_isp_calculate_bandwidth(axi_data, stream_info);
 		msm_isp_reset_framedrop(vfe_dev, stream_info);
+#ifndef CONFIG_MSM_USES_M_STACK
 		init_frm_drop = stream_info->init_frame_drop;
+#endif
 		msm_isp_get_stream_wm_mask(stream_info, &wm_reload_mask);
 		rc = msm_isp_init_stream_ping_pong_reg(vfe_dev, stream_info);
 		if (rc < 0) {
