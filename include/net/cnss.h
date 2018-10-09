@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, 2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -150,7 +150,7 @@ extern int cnss_get_platform_cap(struct cnss_platform_cap *cap);
 extern void cnss_set_driver_status(enum cnss_driver_status driver_status);
 
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
-extern void *wcnss_prealloc_get(unsigned int size);
+extern void *wcnss_prealloc_get(size_t size);
 extern int wcnss_prealloc_put(void *ptr);
 #endif
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012,2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012,2014,2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,7 +19,7 @@ static DEFINE_SPINLOCK(alloc_lock);
 
 struct wcnss_prealloc {
 	int occupied;
-	unsigned int size;
+	size_t size;
 	void *ptr;
 };
 
@@ -114,7 +114,7 @@ void wcnss_prealloc_deinit(void)
 	}
 }
 
-void *wcnss_prealloc_get(unsigned int size)
+void *wcnss_prealloc_get(size_t size)
 {
 	int i = 0;
 	unsigned long flags;
@@ -132,8 +132,8 @@ void *wcnss_prealloc_get(unsigned int size)
 		}
 	}
 	spin_unlock_irqrestore(&alloc_lock, flags);
-	pr_err("wcnss: %s: prealloc not available for size: %d\n",
-			__func__, size);
+	pr_err("wcnss: %s: prealloc not available for size: %zu\n",
+	       __func__, size);
 
 	return NULL;
 }
