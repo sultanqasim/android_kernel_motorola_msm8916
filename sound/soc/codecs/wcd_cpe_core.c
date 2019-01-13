@@ -2730,7 +2730,7 @@ static int wcd_cpe_lsm_lab_enable_disable(
 				bool enable)
 {
 	int ret = 0, pld_size = CPE_PARAM_SIZE_LSM_LAB_CONTROL;
-	struct cpe_lsm_control_lab cpe_lab_enable;
+	struct cpe_lsm_control_lab cpe_lab_enable = {};
 	struct cpe_lsm_lab_enable *lab_enable = &cpe_lab_enable.lab_enable;
 
 	// avoid warnings about uninitialized stuff
