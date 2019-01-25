@@ -1016,6 +1016,8 @@ static int stml0xx_probe(struct spi_device *spi)
 			ps_stml0xx->led_cdev.name);
 		goto err10;
 	}
+
+#ifdef CONFIG_STML0XX_LED
 	err = sysfs_create_group(&ps_stml0xx->led_cdev.dev->kobj,
 			&stml0xx_notification_attribute_group);
 	if (err < 0) {
@@ -1023,6 +1025,7 @@ static int stml0xx_probe(struct spi_device *spi)
 			"couldn't register LED attribute sysfs group\n");
 		goto err11;
 	}
+#endif
 
 	ps_stml0xx->is_suspended = false;
 
@@ -1044,7 +1047,9 @@ static int stml0xx_probe(struct spi_device *spi)
 	dev_dbg(&spi->dev, "probed finished");
 
 	return 0;
+#ifdef CONFIG_STML0XX_LED
 err11:
+#endif
 	led_classdev_unregister(&ps_stml0xx->led_cdev);
 err10:
 	input_free_device(ps_stml0xx->input_dev);

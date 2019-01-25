@@ -64,6 +64,7 @@ int stml0xx_led_set_reset(struct led_classdev *led_cdev, uint8_t allow_reset)
 	return err;
 }
 
+#ifdef CONFIG_STML0XX_LED
 static ssize_t notification_show_control(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -112,6 +113,7 @@ static ssize_t notification_store_control(struct device *dev,
 
 	return len;
 }
+#endif
 
 void stml0xx_brightness_set(struct led_classdev *led_cdev,
 	enum led_brightness value)
@@ -158,6 +160,7 @@ int stml0xx_blink_set(struct led_classdev *led_cdev,
 	return 0;
 }
 
+#ifdef CONFIG_STML0XX_LED
 static DEVICE_ATTR(control, S_IRUGO | S_IWUSR,
 	notification_show_control, notification_store_control);
 
@@ -169,3 +172,4 @@ static struct attribute *notification_led_attributes[] = {
 struct attribute_group stml0xx_notification_attribute_group = {
 	.attrs = notification_led_attributes
 };
+#endif

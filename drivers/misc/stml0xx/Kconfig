@@ -19,3 +19,12 @@ config MMI_HALL_NOTIFICATIONS
 	depends on SENSORS_STML0XX
 	help
 	  Support for hall effect sensor notifications.
+
+config STML0XX_LED
+	bool "STML0XX blinking LED notifications"
+	default n
+	depends on SENSORS_STML0XX
+	help
+	  Say yes here if you wish to have blinking notification
+	  LED support for STML0XX controlled LEDs. This only
+	  works on surnia and lux for the msm8916 family.
