@@ -1064,6 +1064,7 @@ typedef struct tagCsrRoamStruct
 #endif
     tANI_U32 deauthRspStatus;
     tANI_BOOLEAN pending_roam_disable;
+    vos_spin_lock_t roam_state_lock;
 }tCsrRoamStruct;
 
 
@@ -1490,6 +1491,9 @@ tANI_BOOLEAN csrRoamIsStaMode(tpAniSirGlobal pMac, tANI_U32 sessionId);
 #endif
 
 void csrDisableDfsChannel(tpAniSirGlobal pMac);
+
+void csrRoamSubstateChange(tpAniSirGlobal pMac,
+    eCsrRoamSubState NewSubstate, tANI_U32 sessionId);
 
 #ifdef WLAN_FEATURE_RMC
 eHalStatus csrEnableRMC(tpAniSirGlobal pMac, tANI_U32 sessionId);

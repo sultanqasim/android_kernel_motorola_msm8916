@@ -714,6 +714,9 @@ WLANTL_Open
   pTLCb->tlConfigInfo.uDelayedTriggerFrmInt =
                 pTLConfig->uDelayedTriggerFrmInt;
 
+  pTLCb->tlConfigInfo.ucIsReplayCheck =
+                pTLConfig->ucIsReplayCheck;
+
   /*------------------------------------------------------------------------
     Allocate internal resources
    ------------------------------------------------------------------------*/
@@ -1499,7 +1502,9 @@ WLANTL_RegisterSTAClient
   vos_copy_macaddr( &pClientSTA->wSTADesc.vSelfMACAddress, &pwSTADescType->vSelfMACAddress);
 
   /* In volans release L replay check is done at TL */
-  pClientSTA->ucIsReplayCheckValid = pwSTADescType->ucIsReplayCheckValid;
+  if (pTLCb->tlConfigInfo.ucIsReplayCheck)
+     pClientSTA->ucIsReplayCheckValid = pwSTADescType->ucIsReplayCheckValid;
+
   pClientSTA->ulTotalReplayPacketsDetected =  0;
 /*Clear replay counters of the STA on all TIDs*/
   for(ucTid = 0; ucTid < WLANTL_MAX_TID ; ucTid++)
@@ -6016,6 +6021,7 @@ WLANTL_RxFrames
   v_U8_t              ac;
 
 #endif
+  u64                pn_num;
 
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -6194,6 +6200,10 @@ WLANTL_RxFrames
     {
       ucSTAId = (v_U8_t)WDA_GET_RX_STAID( pvBDHeader );
       ucTid   = (v_U8_t)WDA_GET_RX_TID( pvBDHeader );
+      pn_num = WDA_GET_RX_REPLAY_COUNT(pvBDHeader);
+
+      vosTempBuff->pn_replay_skip = 0;
+      vosTempBuff->pn_num = pn_num;
 
       TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
                  "WLAN TL:Data packet received for STA %d", ucSTAId));
@@ -6302,11 +6312,13 @@ WLANTL_RxFrames
               }
               else
               {
-                  TLLOGW(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
-                           "%s: staId %d doesn't exist, but mapped to AP staId %d", __func__,
-                           ucSTAId, ucAddr3STAId));
+                  VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+                            "staId %d doesn't exist"
+                            " but mapped to AP staId %d PN:[0x%llX]",
+                            ucSTAId, ucAddr3STAId, pn_num);
                   ucSTAId = ucAddr3STAId;
                   pClientSTA = pTLCb->atlSTAClients[ucAddr3STAId];
+                  vosTempBuff->pn_replay_skip = 1;
               }
           }
       }
@@ -9404,21 +9416,23 @@ WLANTL_STARxAuth
                                  (v_PVOID_t)STAMetaInfoPtr);
     }
 
-  /*------------------------------------------------------------------------
-    Check to see if re-ordering session is in place
-   ------------------------------------------------------------------------*/
-  if ( 0 != pClientSTA->atlBAReorderInfo[ucTid].ucExists )
+  /* Check to see if re-ordering session is in place.
+     Skip add to reorder list for TDLS packet on AP staid*/
+  if (0 != pClientSTA->atlBAReorderInfo[ucTid].ucExists  &&
+      !vosDataBuff->pn_replay_skip)
   {
     WLANTL_MSDUReorder( pTLCb, &vosDataBuff, aucBDHeader, ucSTAId, ucTid );
   }
 
-if(0 == ucUnicastBroadcastType
+if(WLANTL_IS_DATA_FRAME(WDA_GET_RX_TYPE_SUBTYPE(aucBDHeader)) &&
+   (0 == ucUnicastBroadcastType)
 #ifdef FEATURE_ON_CHIP_REORDERING
    && (WLANHAL_IsOnChipReorderingEnabledForTID(pvosGCtx, ucSTAId, ucTid) != TRUE)
 #endif
 )
 {
-  /* replay check code : check whether replay check is needed or not */
+  /* replay check code : check whether replay check is needed or not
+     Skip replay check for TDLS traffic with AP sta id */
   if(VOS_TRUE == pClientSTA->ucIsReplayCheckValid)
   {
       /* replay check is needed for the station */
@@ -9474,6 +9488,7 @@ if(0 == ucUnicastBroadcastType
       else
       {
            v_BOOL_t status;
+           uint16_t seq_no = (uint16_t)WDA_GET_RX_REORDER_CUR_PKT_SEQ_NO(aucBDHeader);
 
            /* Getting 48-bit replay counter from the RX BD */
            ullcurrentReplayCounter = WDA_DS_GetReplayCounter(aucBDHeader);
@@ -9489,30 +9504,39 @@ if(0 == ucUnicastBroadcastType
 
            /* It is not AMSDU frame so perform 
               reaply check for each packet, as
-              each packet contains valid replay counter*/ 
-           status =  WLANTL_IsReplayPacket( ullcurrentReplayCounter, ullpreviousReplayCounter);
-           if(VOS_FALSE == status)
-           {
-                /* Not a replay paket, update previous replay counter in TL CB */    
-                pClientSTA->ullReplayCounter[ucTid] = ullcurrentReplayCounter;
-           }
-           else
-           {
-              VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-               "WLAN TL: Non-AMSDU Drop the replay packet with PN : [0x%llX]",ullcurrentReplayCounter);
+              each packet contains valid replay counter*/
+           if (vosDataBuff != NULL && !vosDataBuff->pn_replay_skip) {
+              if (vos_is_pkt_chain(vosDataBuff)) {
+                 WLANTL_ReorderReplayCheck(pClientSTA, &vosDataBuff, ucTid);
+              } else {
+                 status =  WLANTL_IsReplayPacket(ullcurrentReplayCounter,
+                                                 ullpreviousReplayCounter);
+                 if(VOS_FALSE == status) {
+                    /* Not a replay paket, update previous replay counter in TL CB */
+                    pClientSTA->ullReplayCounter[ucTid] = ullcurrentReplayCounter;
+                    pClientSTA->last_seq_no[ucTid] = seq_no;
+                 } else {
+                    VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+                    "Non AMSDU Drop replay with PN: [0x%llX], prevPN: [0x%llx]"
+                    " seq_no:%d last_seq_no:%d",
+                    ullcurrentReplayCounter, ullpreviousReplayCounter, seq_no,
+                    pClientSTA->last_seq_no[ucTid]);
 
-               pClientSTA->ulTotalReplayPacketsDetected++;
-               VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-                "WLAN TL: Non-AMSDU total dropped replay packets on STA ID %X is [0x%X]",
-                ucSTAId, pClientSTA->ulTotalReplayPacketsDetected);
+                    pClientSTA->ulTotalReplayPacketsDetected++;
+                    VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+                    "WLAN TL: Non AMSDU total dropped replay packets on STA ID %X is [0x%X]",
+                    ucSTAId,  pClientSTA->ulTotalReplayPacketsDetected);
 
-               /* Repaly packet, drop the packet */
-               vos_pkt_return_packet(vosDataBuff);
-               return VOS_STATUS_SUCCESS;
-           }
+                    /* Repaly packet, drop the packet */
+                    vos_pkt_return_packet(vosDataBuff);
+                    return VOS_STATUS_SUCCESS;
+                 }
+              }
+          }
       }
-  }
+   }
 }
+
 /*It is a broadast packet DPU has already done replay check for 
   broadcast packets no need to do replay check of these packets*/
 
@@ -13849,6 +13873,35 @@ void WLANTL_SetARPFWDatapath(void * pvosGCtx, bool flag)
 
    pTLCb->track_arp = flag;
 
+}
+
+
+void WLANTL_SetKeySeqCounter(void *pvosGCtx, u64 counter, uint8_t staid)
+{
+   WLANTL_CbType*  pTLCb = NULL;
+   uint8_t i;
+
+   pTLCb = VOS_GET_TL_CB(pvosGCtx);
+   if (NULL == pTLCb) {
+      TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+             "%s: Invalid TL pointer from pvosGCtx", __func__));
+      return;
+   }
+
+   if (WLANTL_STA_ID_INVALID(staid)) {
+      TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+             "%s: Invalid Sta id passed", __func__));
+      return;
+   }
+
+   if (NULL == pTLCb->atlSTAClients[staid]) {
+      TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+             "%s: Station context is NULL", __func__));
+      return;
+   }
+
+   for(i = 0; i < WLANTL_MAX_TID; i++)
+      pTLCb->atlSTAClients[staid]->ullReplayCounter[i] = counter;
 }
 
 #ifdef WLAN_FEATURE_RMC
