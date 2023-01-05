@@ -17,8 +17,8 @@
 			compatible = "qcom,spm-regulator";
 			regulator-name = "8916_s2";
 			reg = <0x1700 0x100>;
-			regulator-min-microvolt = <1000000>;
-			regulator-max-microvolt = <1350000>;
+			regulator-min-microvolt = <850000>;
+			regulator-max-microvolt = <1200000>;
 		};
 	};
 };
@@ -52,8 +52,8 @@
 		regulator-min-microvolt = <1>;
 		regulator-max-microvolt = <9>;
 
-		qcom,cpr-voltage-ceiling = <1050000 1150000 1300000>;
-		qcom,cpr-voltage-floor = <1000000 1000000 1100000>;
+		qcom,cpr-voltage-ceiling = <850000 1000000 1200000>;
+		qcom,cpr-voltage-floor = <850000 1000000 1012500>;
 		vdd-apc-supply = <&pm8916_s2>;
 
 		qcom,vdd-mx-corner-map = <4 5 7>;
@@ -85,7 +85,7 @@
 					<27 36 6 0>,
 					<27 18 6 0>,
 					<27 0 6 0>;
-		qcom,cpr-init-voltage-ref = <1050000 1120000 1300000>;
+		qcom,cpr-init-voltage-ref = <850000 1000000 1200000>;
 		qcom,cpr-init-voltage-step = <10000>;
 		qcom,cpr-corner-map = <1 1 2 2 3 3 3 3 3>;
 		qcom,cpr-corner-frequency-map =
